@@ -89,7 +89,7 @@ def init_db():
 
 init_db()
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static', static_url_path='/static')
 
 @app.route('/')
 def index():
@@ -98,6 +98,10 @@ def index():
 @app.route('/thanks')
 def thanks():
     return render_template('thanks.html')
+
+@app.route('/static/<path:filename>')
+def static_files(filename):
+    return app.send_static_file(filename)
 
 @app.route('/subscribe', methods=['POST'])
 def subscribe():
