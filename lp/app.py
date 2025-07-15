@@ -144,6 +144,32 @@ def debug_users():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/debug/subscription/<subscription_id>')
+def debug_subscription(subscription_id):
+    """サブスクリプションの詳細を確認"""
+    try:
+        subscription = stripe.Subscription.retrieve(subscription_id)
+        usage_items = []
+        
+        for item in subscription['items']['data']:
+            usage_items.append({
+                'id': item['id'],
+                'price_id': item['price']['id'],
+                'price_nickname': item['price'].get('nickname', 'No nickname'),
+                'usage_type': item['price'].get('usage_type', 'Unknown'),
+                'billing_scheme': item['price'].get('billing_scheme', 'Unknown')
+            })
+        
+        return jsonify({
+            'subscription_id': subscription_id,
+            'status': subscription['status'],
+            'usage_price_id': USAGE_PRICE_ID,
+            'items': usage_items,
+            'total_items': len(usage_items)
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/subscribe', methods=['POST'])
 def subscribe():
     email = request.form.get('email')
@@ -437,16 +463,24 @@ def get_default_message():
 def handle_add_content(reply_token, user_id_db, stripe_subscription_id):
     """コンテンツ追加処理"""
     try:
+        print(f"コンテンツ追加処理開始: subscription_id={stripe_subscription_id}, usage_price_id={USAGE_PRICE_ID}")
+        
         # Stripeからsubscription_item_id取得
         subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+        print(f"サブスクリプション詳細: {subscription}")
+        
         usage_item = None
         for item in subscription['items']['data']:
+            print(f"アイテム確認: price_id={item['price']['id']}, usage_price_id={USAGE_PRICE_ID}")
             if item['price']['id'] == USAGE_PRICE_ID:
                 usage_item = item
+                print(f"従量課金アイテム発見: {item}")
                 break
         
         if not usage_item:
-            send_line_message(reply_token, "❌ 従量課金アイテムが見つかりません。サポートにお問い合わせください。")
+            print(f"従量課金アイテムが見つかりません: usage_price_id={USAGE_PRICE_ID}")
+            print(f"利用可能なアイテム: {[item['price']['id'] for item in subscription['items']['data']]}")
+            send_line_message(reply_token, f"❌ 従量課金アイテムが見つかりません。\n\n設定されている価格ID: {USAGE_PRICE_ID}\n\nサポートにお問い合わせください。")
             return
         
         subscription_item_id = usage_item['id']
