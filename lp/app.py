@@ -180,85 +180,213 @@ def line_webhook():
         expected_signature = base64.b64encode(hash).decode('utf-8')
         if not hmac.compare_digest(signature, expected_signature):
             abort(400, 'Invalid signature')
+    
     # イベント処理
     events = json.loads(body).get('events', [])
     for event in events:
         if event.get('type') == 'message' and event['message'].get('type') == 'text':
             user_id = event['source']['userId']
             text = event['message']['text']
-            if text == '追加':
-                print(f'ユーザー {user_id} から「追加」メッセージ受信')
-                # DBからユーザー情報取得
-                conn = get_db_connection()
-                c = conn.cursor()
-                c.execute('SELECT id, stripe_subscription_id, line_user_id FROM users WHERE line_user_id = %s', (user_id,))
+            
+            # ユーザー情報を取得
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute('SELECT id, stripe_subscription_id, line_user_id FROM users WHERE line_user_id = %s', (user_id,))
+            user = c.fetchone()
+            
+            if not user:
+                # line_user_id未登録なら最新ユーザーを取得し、紐付け
+                c.execute('SELECT id, stripe_subscription_id FROM users WHERE line_user_id IS NULL ORDER BY created_at DESC LIMIT 1')
                 user = c.fetchone()
-                if not user:
-                    # line_user_id未登録ならstripe_customer_idで最新ユーザーを取得し、紐付け
-                    c.execute('SELECT id, stripe_subscription_id FROM users WHERE line_user_id IS NULL ORDER BY created_at DESC LIMIT 1')
-                    user = c.fetchone()
-                    if user:
-                        c.execute('UPDATE users SET line_user_id = %s WHERE id = %s', (user_id, user[0]))
-                        conn.commit()
-                    else:
-                        conn.close()
-                        # ユーザー未登録
-                        reply_token = event['replyToken']
-                        headers = {
-                            'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}',
-                            'Content-Type': 'application/json'
-                        }
-                        data = {
-                            'replyToken': reply_token,
-                            'messages': [
-                                {'type': 'text', 'text': 'ご登録情報が見つかりません。先にLPからご登録ください。'}
-                            ]
-                        }
-                        requests.post('https://api.line.me/v2/bot/message/reply', headers=headers, json=data)
-                        return jsonify({'status': 'ok'})
-                user_id_db = user[0]
-                stripe_subscription_id = user[1]
-                # Stripeからsubscription_item_id取得
-                subscription = stripe.Subscription.retrieve(stripe_subscription_id)
-                # 最初のitemを従量課金と仮定
-                usage_item = None
-                for item in subscription['items']['data']:
-                    if item['price']['id'] == USAGE_PRICE_ID:
-                        usage_item = item
-                        break
-                if not usage_item:
-                    conn.close()
-                    print('従量課金アイテムが見つかりません')
-                    return jsonify({'status': 'ok'})
-                subscription_item_id = usage_item['id']
-                try:
-                    usage_record = stripe.SubscriptionItem.create_usage_record(
-                        subscription_item_id,
-                        quantity=1,
-                        timestamp=int(__import__('time').time()),
-                        action='increment',
-                    )
-                    # usage_logsに記録
-                    c.execute('INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id) VALUES (%s, %s, %s)',
-                              (user_id_db, 1, usage_record.id))
+                if user:
+                    c.execute('UPDATE users SET line_user_id = %s WHERE id = %s', (user_id, user[0]))
                     conn.commit()
-                    # LINEに返信
-                    reply_token = event['replyToken']
-                    headers = {
-                        'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}',
-                        'Content-Type': 'application/json'
-                    }
-                    data = {
-                        'replyToken': reply_token,
-                        'messages': [
-                            {'type': 'text', 'text': 'コンテンツ追加を受け付けました！'}
-                        ]
-                    }
-                    requests.post('https://api.line.me/v2/bot/message/reply', headers=headers, json=data)
-                except Exception as e:
-                    print('Usage Record作成エラー:', e)
+                    # 歓迎メッセージを送信
+                    send_line_message(event['replyToken'], get_welcome_message())
+                else:
+                    # ユーザー未登録
+                    send_line_message(event['replyToken'], get_not_registered_message())
                 conn.close()
+                continue
+            
+            # 登録済みユーザーの処理
+            user_id_db = user[0]
+            stripe_subscription_id = user[1]
+            
+            # コマンド処理
+            if text == '追加':
+                handle_add_content(event['replyToken'], user_id_db, stripe_subscription_id)
+            elif text == 'メニュー':
+                send_line_message(event['replyToken'], get_menu_message())
+            elif text == 'ヘルプ':
+                send_line_message(event['replyToken'], get_help_message())
+            elif text == '状態':
+                handle_status_check(event['replyToken'], user_id_db)
+            else:
+                send_line_message(event['replyToken'], get_default_message())
+            
+            conn.close()
+    
     return jsonify({'status': 'ok'})
+
+def send_line_message(reply_token, message):
+    """LINEメッセージを送信"""
+    headers = {
+        'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}',
+        'Content-Type': 'application/json'
+    }
+    data = {
+        'replyToken': reply_token,
+        'messages': [{'type': 'text', 'text': message}]
+    }
+    try:
+        response = requests.post('https://api.line.me/v2/bot/message/reply', headers=headers, json=data)
+        response.raise_for_status()
+    except Exception as e:
+        print(f'LINEメッセージ送信エラー: {e}')
+
+def get_welcome_message():
+    """歓迎メッセージ"""
+    return """🎉 AIコレクションズへようこそ！
+
+あなたのAI秘書が準備できました。
+
+📋 利用可能なコマンド：
+• 「追加」- コンテンツを追加
+• 「メニュー」- メニューを表示
+• 「状態」- 利用状況を確認
+• 「ヘルプ」- ヘルプを表示
+
+何かご質問がございましたら、お気軽にお声かけください！"""
+
+def get_menu_message():
+    """メニューメッセージ"""
+    return """📋 AIコレクションズ メニュー
+
+🤖 利用可能なAI秘書：
+1. AI予定秘書 - スケジュール管理
+2. AI経理秘書 - 見積書・請求書作成
+3. AIタスクコンシェルジュ - タスク最適配置
+
+💡 コマンド：
+• 「追加」- コンテンツを追加
+• 「状態」- 利用状況を確認
+• 「ヘルプ」- ヘルプを表示
+
+何かご質問がございましたら、お気軽にお声かけください！"""
+
+def get_help_message():
+    """ヘルプメッセージ"""
+    return """❓ AIコレクションズ ヘルプ
+
+📝 基本的な使い方：
+1. 「追加」と送信してコンテンツを追加
+2. 「状態」で利用状況を確認
+3. 「メニュー」で利用可能な機能を確認
+
+🔧 サポート：
+ご不明な点がございましたら、以下のコマンドをお試しください：
+• 「メニュー」- 機能一覧
+• 「状態」- 現在の利用状況
+
+お困りの際は、いつでもお声かけください！"""
+
+def get_not_registered_message():
+    """未登録ユーザーメッセージ"""
+    return """⚠️ ご登録情報が見つかりません
+
+AIコレクションズをご利用いただくには、先にLPからご登録が必要です。
+
+🌐 登録はこちらから：
+https://lp-production-xxxx.up.railway.app
+
+ご登録後、再度お声かけください！"""
+
+def get_default_message():
+    """デフォルトメッセージ"""
+    return """💬 何かお手伝いできることはありますか？
+
+📋 利用可能なコマンド：
+• 「追加」- コンテンツを追加
+• 「メニュー」- メニューを表示
+• 「状態」- 利用状況を確認
+• 「ヘルプ」- ヘルプを表示
+
+お気軽にお声かけください！"""
+
+def handle_add_content(reply_token, user_id_db, stripe_subscription_id):
+    """コンテンツ追加処理"""
+    try:
+        # Stripeからsubscription_item_id取得
+        subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+        usage_item = None
+        for item in subscription['items']['data']:
+            if item['price']['id'] == USAGE_PRICE_ID:
+                usage_item = item
+                break
+        
+        if not usage_item:
+            send_line_message(reply_token, "❌ 従量課金アイテムが見つかりません。サポートにお問い合わせください。")
+            return
+        
+        subscription_item_id = usage_item['id']
+        
+        # Usage Record作成
+        usage_record = stripe.SubscriptionItem.create_usage_record(
+            subscription_item_id,
+            quantity=1,
+            timestamp=int(__import__('time').time()),
+            action='increment',
+        )
+        
+        # DBに記録
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute('INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id) VALUES (%s, %s, %s)',
+                  (user_id_db, 1, usage_record.id))
+        conn.commit()
+        conn.close()
+        
+        # 成功メッセージ
+        success_message = """✅ コンテンツ追加を受け付けました！
+
+📊 追加内容：
+• AI秘書機能 1件追加
+
+💰 料金：
+• 追加料金：1,500円（次回請求時に反映）
+
+何か他にお手伝いできることはありますか？"""
+        
+        send_line_message(reply_token, success_message)
+        
+    except Exception as e:
+        print(f'コンテンツ追加エラー: {e}')
+        send_line_message(reply_token, "❌ エラーが発生しました。しばらく時間をおいて再度お試しください。")
+
+def handle_status_check(reply_token, user_id_db):
+    """利用状況確認"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute('SELECT COUNT(*) FROM usage_logs WHERE user_id = %s', (user_id_db,))
+        usage_count = c.fetchone()[0]
+        conn.close()
+        
+        status_message = f"""📊 利用状況
+
+📈 今月の追加回数：{usage_count}回
+💰 追加料金：{usage_count * 1500}円
+
+💡 ヒント：
+• 「追加」でコンテンツを追加
+• 「メニュー」で機能一覧を確認"""
+        
+        send_line_message(reply_token, status_message)
+        
+    except Exception as e:
+        print(f'利用状況確認エラー: {e}')
+        send_line_message(reply_token, "❌ 利用状況の取得に失敗しました。しばらく時間をおいて再度お試しください。")
 
 if __name__ == '__main__':
     app.run(debug=True)

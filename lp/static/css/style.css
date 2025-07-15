@@ -567,4 +567,93 @@ footer {
   margin: 2rem auto 0 auto;
   display: block;
   object-fit: contain;
+}
+
+/* LINE Instructions Styles */
+.line-instructions {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.instruction-step {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  background: var(--background-white);
+  border-radius: var(--radius-medium);
+  box-shadow: var(--shadow-soft);
+  border: 1px solid var(--border-light);
+}
+
+.step-number {
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+  color: var(--background-white);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.2rem;
+  margin-right: 1.5rem;
+  flex-shrink: 0;
+}
+
+.step-content h3 {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  margin-bottom: 0.5rem;
+}
+
+.step-content p {
+  color: var(--text-gray);
+  line-height: 1.6;
+  margin-bottom: 1rem;
+}
+
+.command-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.command-list li {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border-light);
+  color: var(--text-gray);
+}
+
+.command-list li:last-child {
+  border-bottom: none;
+}
+
+.command-list strong {
+  color: var(--primary-color);
+  font-weight: 600;
+}
+
+.tips-content {
+  text-align: center;
+  color: var(--text-gray);
+  line-height: 1.8;
+}
+
+.tips-content p {
+  margin-bottom: 1rem;
+}
+
+/* Responsive adjustments for instructions */
+@media (max-width: 768px) {
+  .instruction-step {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .step-number {
+    margin-right: 0;
+    margin-bottom: 1rem;
+  }
 } 
