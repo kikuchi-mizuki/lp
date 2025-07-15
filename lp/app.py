@@ -186,27 +186,68 @@ def stripe_webhook():
     if event['type'] == 'invoice.payment_succeeded':
         invoice = event['data']['object']
         customer_id = invoice['customer']
+        print(f'Stripe Webhook受信: invoice.payment_succeeded - {invoice["id"]}')
+        print(f'Invoice詳細: {invoice}')
         
         # subscriptionキーが存在する場合のみ処理
         if 'subscription' in invoice:
             subscription_id = invoice['subscription']
             email = invoice['customer_email'] if 'customer_email' in invoice else None
+            print(f'サブスクリプション情報: subscription_id={subscription_id}, email={email}')
+            
             # DBに保存（既存ならスキップ）
             conn = get_db_connection()
             c = conn.cursor()
             c.execute('SELECT id FROM users WHERE stripe_customer_id = ?', (customer_id,))
-            if not c.fetchone():
+            existing_user = c.fetchone()
+            print(f'既存ユーザー確認: {existing_user}')
+            
+            if not existing_user:
                 c.execute('INSERT INTO users (email, stripe_customer_id, stripe_subscription_id) VALUES (?, ?, ?)',
                           (email, customer_id, subscription_id))
                 conn.commit()
+                print(f'ユーザー登録完了: customer_id={customer_id}, subscription_id={subscription_id}')
+            else:
+                print(f'既存ユーザーが存在: {existing_user[0]}')
             conn.close()
             print('支払い成功（サブスクリプション）:', invoice['id'])
         else:
             print('支払い成功（サブスクリプション以外）:', invoice['id'])
+            print('subscriptionキーが存在しないため、ユーザー登録をスキップ')
         # ここでLINE通知やDB更新などを今後追加
     elif event['type'] == 'invoice.payment_failed':
         invoice = event['data']['object']
         print('支払い失敗:', invoice['id'])
+    elif event['type'] == 'customer.subscription.created':
+        subscription = event['data']['object']
+        customer_id = subscription['customer']
+        subscription_id = subscription['id']
+        print(f'サブスクリプション作成: {subscription_id}')
+        print(f'Subscription詳細: {subscription}')
+        
+        # 顧客情報を取得
+        try:
+            customer = stripe.Customer.retrieve(customer_id)
+            email = customer.get('email')
+            print(f'顧客情報: customer_id={customer_id}, email={email}')
+            
+            # DBに保存（既存ならスキップ）
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute('SELECT id FROM users WHERE stripe_customer_id = ?', (customer_id,))
+            existing_user = c.fetchone()
+            print(f'既存ユーザー確認: {existing_user}')
+            
+            if not existing_user:
+                c.execute('INSERT INTO users (email, stripe_customer_id, stripe_subscription_id) VALUES (?, ?, ?)',
+                          (email, customer_id, subscription_id))
+                conn.commit()
+                print(f'ユーザー登録完了: customer_id={customer_id}, subscription_id={subscription_id}')
+            else:
+                print(f'既存ユーザーが存在: {existing_user[0]}')
+            conn.close()
+        except Exception as e:
+            print(f'サブスクリプション作成処理エラー: {e}')
     # 他のイベントも必要に応じて追加
 
     return jsonify({'status': 'success'})
