@@ -206,6 +206,36 @@ def update_subscription_id(new_subscription_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/debug/add_user')
+def add_user():
+    """手動でユーザーを追加"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # ユーザーを追加
+        c.execute('''
+            INSERT INTO users (email, stripe_customer_id, stripe_subscription_id, line_user_id) 
+            VALUES (?, ?, ?, ?)
+        ''', ('mmms.dy.23@gmail.com', 'cus_SgegVyzBF7uIwK', 'sub_1RlGjqIxg6C5hAVdffLdWfUL', 'U1b9d0d75b0c770dc1107dde349d572f7'))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': 'ユーザーを追加しました',
+            'user': {
+                'email': 'mmms.dy.23@gmail.com',
+                'stripe_customer_id': 'cus_SgegVyzBF7uIwK',
+                'stripe_subscription_id': 'sub_1RlGjqIxg6C5hAVdffLdWfUL',
+                'line_user_id': 'U1b9d0d75b0c770dc1107dde349d572f7'
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/subscribe', methods=['POST'])
 def subscribe():
     email = request.form.get('email')
