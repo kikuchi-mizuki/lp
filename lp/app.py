@@ -170,6 +170,42 @@ def debug_subscription(subscription_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/debug/update_subscription/<new_subscription_id>')
+def update_subscription_id(new_subscription_id):
+    """サブスクリプションIDを更新"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 現在のサブスクリプションIDを確認
+        c.execute('SELECT stripe_subscription_id FROM users WHERE line_user_id = ?', ('U1b9d0d75b0c770dc1107dde349d572f7',))
+        current_subscription = c.fetchone()
+        
+        if current_subscription:
+            old_subscription_id = current_subscription[0]
+            print(f"現在のサブスクリプションID: {old_subscription_id}")
+            
+            # サブスクリプションIDを更新
+            c.execute('UPDATE users SET stripe_subscription_id = ? WHERE line_user_id = ?', (new_subscription_id, 'U1b9d0d75b0c770dc1107dde349d572f7'))
+            conn.commit()
+            
+            print(f"サブスクリプションIDを更新: {old_subscription_id} -> {new_subscription_id}")
+            
+            conn.close()
+            
+            return jsonify({
+                'success': True,
+                'old_subscription_id': old_subscription_id,
+                'new_subscription_id': new_subscription_id,
+                'message': f'サブスクリプションIDを更新しました: {old_subscription_id} -> {new_subscription_id}'
+            })
+        else:
+            conn.close()
+            return jsonify({'error': 'ユーザーが見つかりません'}), 404
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/subscribe', methods=['POST'])
 def subscribe():
     email = request.form.get('email')
