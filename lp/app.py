@@ -103,6 +103,19 @@ def thanks():
 def static_files(filename):
     return app.send_static_file(filename)
 
+@app.route('/line/status')
+def line_status():
+    """LINE Bot設定状況を確認"""
+    status = {
+        'line_channel_secret_set': bool(LINE_CHANNEL_SECRET),
+        'line_channel_access_token_set': bool(LINE_CHANNEL_ACCESS_TOKEN),
+        'stripe_monthly_price_id_set': bool(MONTHLY_PRICE_ID),
+        'stripe_usage_price_id_set': bool(USAGE_PRICE_ID),
+        'stripe_webhook_secret_set': bool(STRIPE_WEBHOOK_SECRET),
+        'database_url_set': bool(DATABASE_URL),
+    }
+    return jsonify(status)
+
 @app.route('/subscribe', methods=['POST'])
 def subscribe():
     email = request.form.get('email')
@@ -172,60 +185,93 @@ def stripe_webhook():
 
 @app.route('/line/webhook', methods=['POST'])
 def line_webhook():
+    print("=== LINE Webhook受信 ===")
+    print(f"Headers: {dict(request.headers)}")
+    
     signature = request.headers.get('X-Line-Signature', '')
     body = request.data.decode('utf-8')
+    print(f"Body: {body}")
+    
     # 署名検証
     if LINE_CHANNEL_SECRET:
-        hash = hmac.new(LINE_CHANNEL_SECRET.encode('utf-8'), body.encode('utf-8'), hashlib.sha256).digest()
-        expected_signature = base64.b64encode(hash).decode('utf-8')
-        if not hmac.compare_digest(signature, expected_signature):
-            abort(400, 'Invalid signature')
+        try:
+            hash = hmac.new(LINE_CHANNEL_SECRET.encode('utf-8'), body.encode('utf-8'), hashlib.sha256).digest()
+            expected_signature = base64.b64encode(hash).decode('utf-8')
+            if not hmac.compare_digest(signature, expected_signature):
+                print(f"署名検証失敗: {signature} != {expected_signature}")
+                abort(400, 'Invalid signature')
+        except Exception as e:
+            print(f"署名検証エラー: {e}")
+            abort(400, 'Signature verification error')
+    else:
+        print("LINE_CHANNEL_SECRETが設定されていません")
     
     # イベント処理
-    events = json.loads(body).get('events', [])
-    for event in events:
-        if event.get('type') == 'message' and event['message'].get('type') == 'text':
-            user_id = event['source']['userId']
-            text = event['message']['text']
+    try:
+        events = json.loads(body).get('events', [])
+        print(f"イベント数: {len(events)}")
+        
+        for event in events:
+            print(f"イベント: {event}")
             
-            # ユーザー情報を取得
-            conn = get_db_connection()
-            c = conn.cursor()
-            c.execute('SELECT id, stripe_subscription_id, line_user_id FROM users WHERE line_user_id = %s', (user_id,))
-            user = c.fetchone()
-            
-            if not user:
-                # line_user_id未登録なら最新ユーザーを取得し、紐付け
-                c.execute('SELECT id, stripe_subscription_id FROM users WHERE line_user_id IS NULL ORDER BY created_at DESC LIMIT 1')
+            if event.get('type') == 'message' and event['message'].get('type') == 'text':
+                user_id = event['source']['userId']
+                text = event['message']['text']
+                print(f"ユーザーID: {user_id}, テキスト: {text}")
+                
+                # ユーザー情報を取得
+                conn = get_db_connection()
+                c = conn.cursor()
+                c.execute('SELECT id, stripe_subscription_id, line_user_id FROM users WHERE line_user_id = %s', (user_id,))
                 user = c.fetchone()
-                if user:
-                    c.execute('UPDATE users SET line_user_id = %s WHERE id = %s', (user_id, user[0]))
-                    conn.commit()
-                    # 歓迎メッセージを送信
-                    send_line_message(event['replyToken'], get_welcome_message())
+                print(f"DB検索結果: {user}")
+                
+                if not user:
+                    # line_user_id未登録なら最新ユーザーを取得し、紐付け
+                    c.execute('SELECT id, stripe_subscription_id FROM users WHERE line_user_id IS NULL ORDER BY created_at DESC LIMIT 1')
+                    user = c.fetchone()
+                    print(f"未紐付けユーザー検索結果: {user}")
+                    
+                    if user:
+                        c.execute('UPDATE users SET line_user_id = %s WHERE id = %s', (user_id, user[0]))
+                        conn.commit()
+                        print(f"ユーザー紐付け完了: {user_id} -> {user[0]}")
+                        # 歓迎メッセージを送信
+                        send_line_message(event['replyToken'], get_welcome_message())
+                    else:
+                        # ユーザー未登録
+                        print("ユーザー未登録")
+                        send_line_message(event['replyToken'], get_not_registered_message())
+                    conn.close()
+                    continue
+                
+                # 登録済みユーザーの処理
+                user_id_db = user[0]
+                stripe_subscription_id = user[1]
+                print(f"登録済みユーザー処理: user_id={user_id_db}, subscription_id={stripe_subscription_id}")
+                
+                # コマンド処理
+                if text == '追加':
+                    print("「追加」コマンド処理開始")
+                    handle_add_content(event['replyToken'], user_id_db, stripe_subscription_id)
+                elif text == 'メニュー':
+                    print("「メニュー」コマンド処理")
+                    send_line_message(event['replyToken'], get_menu_message())
+                elif text == 'ヘルプ':
+                    print("「ヘルプ」コマンド処理")
+                    send_line_message(event['replyToken'], get_help_message())
+                elif text == '状態':
+                    print("「状態」コマンド処理")
+                    handle_status_check(event['replyToken'], user_id_db)
                 else:
-                    # ユーザー未登録
-                    send_line_message(event['replyToken'], get_not_registered_message())
+                    print(f"デフォルトメッセージ送信: {text}")
+                    send_line_message(event['replyToken'], get_default_message())
+                
                 conn.close()
-                continue
-            
-            # 登録済みユーザーの処理
-            user_id_db = user[0]
-            stripe_subscription_id = user[1]
-            
-            # コマンド処理
-            if text == '追加':
-                handle_add_content(event['replyToken'], user_id_db, stripe_subscription_id)
-            elif text == 'メニュー':
-                send_line_message(event['replyToken'], get_menu_message())
-            elif text == 'ヘルプ':
-                send_line_message(event['replyToken'], get_help_message())
-            elif text == '状態':
-                handle_status_check(event['replyToken'], user_id_db)
-            else:
-                send_line_message(event['replyToken'], get_default_message())
-            
-            conn.close()
+    except Exception as e:
+        print(f"LINE Webhook処理エラー: {e}")
+        import traceback
+        traceback.print_exc()
     
     return jsonify({'status': 'ok'})
 
