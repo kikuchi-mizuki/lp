@@ -116,6 +116,34 @@ def line_status():
     }
     return jsonify(status)
 
+@app.route('/debug/users')
+def debug_users():
+    """データベース内のユーザー情報を確認"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute('SELECT id, email, stripe_customer_id, stripe_subscription_id, line_user_id, created_at FROM users ORDER BY created_at DESC')
+        users = c.fetchall()
+        conn.close()
+        
+        user_list = []
+        for user in users:
+            user_list.append({
+                'id': user[0],
+                'email': user[1],
+                'stripe_customer_id': user[2],
+                'stripe_subscription_id': user[3],
+                'line_user_id': user[4],
+                'created_at': user[5]
+            })
+        
+        return jsonify({
+            'total_users': len(user_list),
+            'users': user_list
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/subscribe', methods=['POST'])
 def subscribe():
     email = request.form.get('email')
@@ -231,6 +259,11 @@ def line_webhook():
                     c.execute('SELECT id, stripe_subscription_id FROM users WHERE line_user_id IS NULL ORDER BY created_at DESC LIMIT 1')
                     user = c.fetchone()
                     print(f"未紐付けユーザー検索結果: {user}")
+                    
+                    # 全ユーザー数を確認
+                    c.execute('SELECT COUNT(*) FROM users')
+                    total_users = c.fetchone()[0]
+                    print(f"データベース内の総ユーザー数: {total_users}")
                     
                     if user:
                         c.execute('UPDATE users SET line_user_id = ? WHERE id = ?', (user_id, user[0]))
