@@ -166,9 +166,9 @@ def stripe_webhook():
             # DBに保存（既存ならスキップ）
             conn = get_db_connection()
             c = conn.cursor()
-            c.execute('SELECT id FROM users WHERE stripe_customer_id = %s', (customer_id,))
+            c.execute('SELECT id FROM users WHERE stripe_customer_id = ?', (customer_id,))
             if not c.fetchone():
-                c.execute('INSERT INTO users (email, stripe_customer_id, stripe_subscription_id) VALUES (%s, %s, %s)',
+                c.execute('INSERT INTO users (email, stripe_customer_id, stripe_subscription_id) VALUES (?, ?, ?)',
                           (email, customer_id, subscription_id))
                 conn.commit()
             conn.close()
@@ -222,7 +222,7 @@ def line_webhook():
                 # ユーザー情報を取得
                 conn = get_db_connection()
                 c = conn.cursor()
-                c.execute('SELECT id, stripe_subscription_id, line_user_id FROM users WHERE line_user_id = %s', (user_id,))
+                c.execute('SELECT id, stripe_subscription_id, line_user_id FROM users WHERE line_user_id = ?', (user_id,))
                 user = c.fetchone()
                 print(f"DB検索結果: {user}")
                 
@@ -233,7 +233,7 @@ def line_webhook():
                     print(f"未紐付けユーザー検索結果: {user}")
                     
                     if user:
-                        c.execute('UPDATE users SET line_user_id = %s WHERE id = %s', (user_id, user[0]))
+                        c.execute('UPDATE users SET line_user_id = ? WHERE id = ?', (user_id, user[0]))
                         conn.commit()
                         print(f"ユーザー紐付け完了: {user_id} -> {user[0]}")
                         # 歓迎メッセージを送信
@@ -388,7 +388,7 @@ def handle_add_content(reply_token, user_id_db, stripe_subscription_id):
         # DBに記録
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute('INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id) VALUES (%s, %s, %s)',
+        c.execute('INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id) VALUES (?, ?, ?)',
                   (user_id_db, 1, usage_record.id))
         conn.commit()
         conn.close()
@@ -415,7 +415,7 @@ def handle_status_check(reply_token, user_id_db):
     try:
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute('SELECT COUNT(*) FROM usage_logs WHERE user_id = %s', (user_id_db,))
+        c.execute('SELECT COUNT(*) FROM usage_logs WHERE user_id = ?', (user_id_db,))
         usage_count = c.fetchone()[0]
         conn.close()
         
