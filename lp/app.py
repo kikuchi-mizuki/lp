@@ -543,6 +543,37 @@ def add_usage_item_to_subscription(subscription_id):
             'message': f'エラー: {str(e)}'
         })
 
+@app.route('/set-default-rich-menu/<rich_menu_id>')
+def set_existing_rich_menu_as_default(rich_menu_id):
+    """既存のリッチメニューをデフォルトに設定"""
+    try:
+        headers = {
+            'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}',
+            'Content-Type': 'application/json'
+        }
+        
+        response = requests.post(
+            f'https://api.line.me/v2/bot/user/all/richmenu/{rich_menu_id}',
+            headers=headers
+        )
+        
+        if response.status_code == 200:
+            return jsonify({
+                'success': True,
+                'message': f'リッチメニューをデフォルトに設定しました: {rich_menu_id}'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': f'設定失敗: {response.status_code} - {response.text}'
+            })
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'エラー: {str(e)}'
+        })
+
 def send_line_message(reply_token, message):
     """LINEメッセージを送信"""
     headers = {
