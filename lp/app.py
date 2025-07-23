@@ -254,10 +254,6 @@ def subscribe():
                 'price': MONTHLY_PRICE_ID,
                 'quantity': 1,
             },
-            {
-                'price': USAGE_PRICE_ID,
-                'quantity': 0,  # 従量課金は初期数量0で追加
-            },
         ],
         success_url=url_for('thanks', _external=True),
         cancel_url=url_for('index', _external=True),
@@ -305,6 +301,17 @@ def stripe_webhook():
                           (email, customer_id, subscription_id))
                 conn.commit()
                 print(f'ユーザー登録完了: customer_id={customer_id}, subscription_id={subscription_id}')
+                
+                # 従量課金アイテムを追加
+                try:
+                    stripe.SubscriptionItem.create(
+                        subscription=subscription_id,
+                        price=USAGE_PRICE_ID,
+                        quantity=0
+                    )
+                    print(f'従量課金アイテム追加完了: subscription_id={subscription_id}')
+                except Exception as e:
+                    print(f'従量課金アイテム追加エラー: {e}')
             else:
                 print(f'既存ユーザーが存在: {existing_user[0]}')
             conn.close()
@@ -341,6 +348,17 @@ def stripe_webhook():
                           (email, customer_id, subscription_id))
                 conn.commit()
                 print(f'ユーザー登録完了: customer_id={customer_id}, subscription_id={subscription_id}')
+                
+                # 従量課金アイテムを追加
+                try:
+                    stripe.SubscriptionItem.create(
+                        subscription=subscription_id,
+                        price=USAGE_PRICE_ID,
+                        quantity=0
+                    )
+                    print(f'従量課金アイテム追加完了: subscription_id={subscription_id}')
+                except Exception as e:
+                    print(f'従量課金アイテム追加エラー: {e}')
             else:
                 print(f'既存ユーザーが存在: {existing_user[0]}')
             conn.close()
@@ -488,6 +506,45 @@ def line_webhook():
 def admin_rich_menu():
     """リッチメニュー管理画面"""
     return render_template('admin_rich_menu.html')
+
+@app.route('/add-usage-item/<subscription_id>')
+def add_usage_item_to_subscription(subscription_id):
+    """既存のサブスクリプションに従量課金アイテムを追加"""
+    try:
+        # サブスクリプションを取得
+        subscription = stripe.Subscription.retrieve(subscription_id)
+        
+        # 既に従量課金アイテムがあるかチェック
+        existing_usage_item = None
+        for item in subscription['items']['data']:
+            if item['price']['id'] == USAGE_PRICE_ID:
+                existing_usage_item = item
+                break
+        
+        if existing_usage_item:
+            return jsonify({
+                'success': False,
+                'message': f'従量課金アイテムは既に存在します: {existing_usage_item["id"]}'
+            })
+        
+        # 従量課金アイテムを追加
+        usage_item = stripe.SubscriptionItem.create(
+            subscription=subscription_id,
+            price=USAGE_PRICE_ID,
+            quantity=0
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': f'従量課金アイテムを追加しました: {usage_item["id"]}',
+            'usage_item_id': usage_item['id']
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'エラー: {str(e)}'
+        })
 
 def send_line_message(reply_token, message):
     """LINEメッセージを送信"""
