@@ -306,8 +306,7 @@ def stripe_webhook():
                 try:
                     stripe.SubscriptionItem.create(
                         subscription=subscription_id,
-                        price=USAGE_PRICE_ID,
-                        quantity=0
+                        price=USAGE_PRICE_ID
                     )
                     print(f'従量課金アイテム追加完了: subscription_id={subscription_id}')
                 except Exception as e:
@@ -353,8 +352,7 @@ def stripe_webhook():
                 try:
                     stripe.SubscriptionItem.create(
                         subscription=subscription_id,
-                        price=USAGE_PRICE_ID,
-                        quantity=0
+                        price=USAGE_PRICE_ID
                     )
                     print(f'従量課金アイテム追加完了: subscription_id={subscription_id}')
                 except Exception as e:
@@ -530,8 +528,7 @@ def add_usage_item_to_subscription(subscription_id):
         # 従量課金アイテムを追加
         usage_item = stripe.SubscriptionItem.create(
             subscription=subscription_id,
-            price=USAGE_PRICE_ID,
-            quantity=0
+            price=USAGE_PRICE_ID
         )
         
         return jsonify({
