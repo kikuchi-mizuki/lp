@@ -10,6 +10,8 @@ import requests
 import sqlite3
 import psycopg2
 from urllib.parse import urlparse
+from PIL import Image, ImageDraw, ImageFont
+import io
 
 load_dotenv()
 
@@ -379,6 +381,7 @@ def line_webhook():
         for event in events:
             print(f"イベント: {event}")
             
+            # テキストメッセージの処理
             if event.get('type') == 'message' and event['message'].get('type') == 'text':
                 user_id = event['source']['userId']
                 text = event['message']['text']
@@ -438,12 +441,53 @@ def line_webhook():
                     send_line_message(event['replyToken'], get_default_message())
                 
                 conn.close()
+            
+            # リッチメニューのpostbackイベント処理
+            elif event.get('type') == 'postback':
+                user_id = event['source']['userId']
+                postback_data = event['postback']['data']
+                print(f"Postback受信: user_id={user_id}, data={postback_data}")
+                
+                # ユーザー情報を取得
+                conn = get_db_connection()
+                c = conn.cursor()
+                c.execute('SELECT id, stripe_subscription_id, line_user_id FROM users WHERE line_user_id = ?', (user_id,))
+                user = c.fetchone()
+                
+                if not user:
+                    send_line_message(event['replyToken'], get_not_registered_message())
+                    conn.close()
+                    continue
+                
+                user_id_db = user[0]
+                stripe_subscription_id = user[1]
+                
+                # postbackデータに基づいて処理
+                if postback_data == 'action=add_content':
+                    print("リッチメニュー「追加」ボタン処理")
+                    handle_add_content(event['replyToken'], user_id_db, stripe_subscription_id)
+                elif postback_data == 'action=show_menu':
+                    print("リッチメニュー「メニュー」ボタン処理")
+                    send_line_message(event['replyToken'], get_menu_message())
+                elif postback_data == 'action=check_status':
+                    print("リッチメニュー「状態」ボタン処理")
+                    handle_status_check(event['replyToken'], user_id_db)
+                else:
+                    print(f"不明なpostbackデータ: {postback_data}")
+                    send_line_message(event['replyToken'], get_default_message())
+                
+                conn.close()
     except Exception as e:
         print(f"LINE Webhook処理エラー: {e}")
         import traceback
         traceback.print_exc()
     
     return jsonify({'status': 'ok'})
+
+@app.route('/admin/rich-menu')
+def admin_rich_menu():
+    """リッチメニュー管理画面"""
+    return render_template('admin_rich_menu.html')
 
 def send_line_message(reply_token, message):
     """LINEメッセージを送信"""
@@ -611,6 +655,249 @@ def handle_status_check(reply_token, user_id_db):
     except Exception as e:
         print(f'利用状況確認エラー: {e}')
         send_line_message(reply_token, "❌ 利用状況の取得に失敗しました。しばらく時間をおいて再度お試しください。")
+
+def create_rich_menu():
+    """リッチメニューを作成"""
+    try:
+        rich_menu_to_create = {
+            "size": {
+                "width": 2500,
+                "height": 843
+            },
+            "selected": False,
+            "name": "AIコレクションズ メニュー",
+            "chatBarText": "メニュー",
+            "areas": [
+                {
+                    "bounds": {
+                        "x": 0,
+                        "y": 0,
+                        "width": 833,
+                        "height": 843
+                    },
+                    "action": {
+                        "type": "postback",
+                        "label": "追加",
+                        "data": "action=add_content"
+                    }
+                },
+                {
+                    "bounds": {
+                        "x": 833,
+                        "y": 0,
+                        "width": 833,
+                        "height": 843
+                    },
+                    "action": {
+                        "type": "postback",
+                        "label": "メニュー",
+                        "data": "action=show_menu"
+                    }
+                },
+                {
+                    "bounds": {
+                        "x": 1666,
+                        "y": 0,
+                        "width": 833,
+                        "height": 843
+                    },
+                    "action": {
+                        "type": "postback",
+                        "label": "状態",
+                        "data": "action=check_status"
+                    }
+                }
+            ]
+        }
+        
+        headers = {
+            'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}',
+            'Content-Type': 'application/json'
+        }
+        
+        response = requests.post(
+            'https://api.line.me/v2/bot/richmenu',
+            headers=headers,
+            json=rich_menu_to_create
+        )
+        
+        if response.status_code == 200:
+            rich_menu_id = response.json()['richMenuId']
+            print(f"リッチメニュー作成成功: {rich_menu_id}")
+            return rich_menu_id
+        else:
+            print(f"リッチメニュー作成失敗: {response.status_code} - {response.text}")
+            return None
+            
+    except Exception as e:
+        print(f"リッチメニュー作成エラー: {e}")
+        return None
+
+def create_rich_menu_image():
+    """リッチメニュー用の画像を生成"""
+    try:
+        # 2500x843の画像を作成
+        width, height = 2500, 843
+        image = Image.new('RGB', (width, height), '#FFFFFF')
+        draw = ImageDraw.Draw(image)
+        
+        # フォント設定（デフォルトフォントを使用）
+        try:
+            font_large = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 60)
+            font_medium = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 40)
+        except:
+            # フォントが見つからない場合はデフォルト
+            font_large = ImageFont.load_default()
+            font_medium = ImageFont.load_default()
+        
+        # 3つのエリアを描画
+        areas = [
+            {"x": 0, "width": 833, "text": "追加", "color": "#4F46E5"},
+            {"x": 833, "width": 833, "text": "メニュー", "color": "#7C3AED"},
+            {"x": 1666, "width": 833, "text": "状態", "color": "#10B981"}
+        ]
+        
+        for area in areas:
+            # 背景色
+            draw.rectangle([area["x"], 0, area["x"] + area["width"], height], fill=area["color"])
+            
+            # テキスト
+            text = area["text"]
+            bbox = draw.textbbox((0, 0), text, font=font_large)
+            text_width = bbox[2] - bbox[0]
+            text_height = bbox[3] - bbox[1]
+            
+            x = area["x"] + (area["width"] - text_width) // 2
+            y = (height - text_height) // 2
+            
+            draw.text((x, y), text, fill='white', font=font_large)
+        
+        # 画像をバイトデータに変換
+        img_byte_arr = io.BytesIO()
+        image.save(img_byte_arr, format='PNG')
+        img_byte_arr = img_byte_arr.getvalue()
+        
+        return img_byte_arr
+        
+    except Exception as e:
+        print(f"リッチメニュー画像生成エラー: {e}")
+        return None
+
+def set_rich_menu_image(rich_menu_id):
+    """リッチメニューに画像を設定"""
+    try:
+        # リッチメニュー画像を生成
+        image_data = create_rich_menu_image()
+        if not image_data:
+            print("リッチメニュー画像生成に失敗しました")
+            return False
+        
+        headers = {
+            'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}',
+            'Content-Type': 'image/png'
+        }
+        
+        response = requests.post(
+            f'https://api.line.me/v2/bot/richmenu/{rich_menu_id}/content',
+            headers=headers,
+            data=image_data
+        )
+        
+        if response.status_code == 200:
+            print(f"リッチメニュー画像設定成功: {rich_menu_id}")
+            return True
+        else:
+            print(f"リッチメニュー画像設定失敗: {response.status_code} - {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"リッチメニュー画像設定エラー: {e}")
+        return False
+
+def set_default_rich_menu(rich_menu_id):
+    """デフォルトリッチメニューを設定"""
+    try:
+        headers = {
+            'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}',
+            'Content-Type': 'application/json'
+        }
+        
+        response = requests.post(
+            f'https://api.line.me/v2/bot/user/all/richmenu/{rich_menu_id}',
+            headers=headers
+        )
+        
+        if response.status_code == 200:
+            print(f"デフォルトリッチメニュー設定成功: {rich_menu_id}")
+            return True
+        else:
+            print(f"デフォルトリッチメニュー設定失敗: {response.status_code}")
+            return False
+            
+    except Exception as e:
+        print(f"デフォルトリッチメニュー設定エラー: {e}")
+        return False
+
+def delete_rich_menu(rich_menu_id):
+    """リッチメニューを削除"""
+    try:
+        headers = {
+            'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}'
+        }
+        
+        response = requests.delete(
+            f'https://api.line.me/v2/bot/richmenu/{rich_menu_id}',
+            headers=headers
+        )
+        
+        if response.status_code == 200:
+            print(f"リッチメニュー削除成功: {rich_menu_id}")
+            return True
+        else:
+            print(f"リッチメニュー削除失敗: {response.status_code}")
+            return False
+            
+    except Exception as e:
+        print(f"リッチメニュー削除エラー: {e}")
+        return False
+
+@app.route('/setup-rich-menu')
+def setup_rich_menu():
+    """リッチメニュー設定エンドポイント"""
+    try:
+        # 既存のリッチメニューを削除
+        headers = {
+            'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}'
+        }
+        response = requests.get('https://api.line.me/v2/bot/richmenu/list', headers=headers)
+        if response.status_code == 200:
+            rich_menus = response.json()['richmenus']
+            for menu in rich_menus:
+                delete_rich_menu(menu['richMenuId'])
+        
+        # 新しいリッチメニューを作成
+        rich_menu_id = create_rich_menu()
+        if rich_menu_id:
+            # リッチメニューに画像を設定
+            if set_rich_menu_image(rich_menu_id):
+                # デフォルトリッチメニューに設定
+                if set_default_rich_menu(rich_menu_id):
+                    return jsonify({
+                        'success': True,
+                        'message': f'リッチメニュー設定完了: {rich_menu_id}',
+                        'rich_menu_id': rich_menu_id
+                    })
+        
+        return jsonify({
+            'success': False,
+            'message': 'リッチメニュー設定に失敗しました'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'エラー: {str(e)}'
+        })
 
 if __name__ == '__main__':
     app.run(debug=True)
