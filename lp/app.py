@@ -252,6 +252,10 @@ def subscribe():
                 'price': MONTHLY_PRICE_ID,
                 'quantity': 1,
             },
+            {
+                'price': USAGE_PRICE_ID,
+                'quantity': 0,  # 従量課金は初期数量0で追加
+            },
         ],
         success_url=url_for('thanks', _external=True),
         cancel_url=url_for('index', _external=True),
