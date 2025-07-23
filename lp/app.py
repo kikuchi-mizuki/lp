@@ -953,5 +953,43 @@ def setup_rich_menu():
             'message': f'エラー: {str(e)}'
         })
 
+@app.route('/debug-rich-menu')
+def debug_rich_menu():
+    """リッチメニュー設定のデバッグ情報を表示"""
+    try:
+        # LINE Bot設定状況を確認
+        line_status = {
+            'line_channel_access_token_set': bool(LINE_CHANNEL_ACCESS_TOKEN),
+            'line_channel_secret_set': bool(LINE_CHANNEL_SECRET),
+        }
+        
+        # 既存のリッチメニューを取得
+        headers = {
+            'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}'
+        }
+        
+        response = requests.get('https://api.line.me/v2/bot/richmenu/list', headers=headers)
+        existing_menus = []
+        if response.status_code == 200:
+            existing_menus = response.json()['richmenus']
+        else:
+            existing_menus = [f"Error: {response.status_code} - {response.text}"]
+        
+        return jsonify({
+            'line_status': line_status,
+            'existing_rich_menus': existing_menus,
+            'response_status': response.status_code,
+            'response_text': response.text if response.status_code != 200 else "Success"
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'line_status': {
+                'line_channel_access_token_set': bool(LINE_CHANNEL_ACCESS_TOKEN),
+                'line_channel_secret_set': bool(LINE_CHANNEL_SECRET),
+            }
+        })
+
 if __name__ == '__main__':
     app.run(debug=True)
