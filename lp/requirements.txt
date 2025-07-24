@@ -1,5 +1,5 @@
 Flask
-stripe
+stripe==7.11.0
 python-dotenv
 requests
 gunicorn

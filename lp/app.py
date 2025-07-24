@@ -866,8 +866,8 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
             
                     # Usage Record作成
         try:
-            usage_record = stripe.UsageRecord.create(
-                subscription_item=subscription_item_id,
+            usage_record = stripe.SubscriptionItem.create_usage_record(
+                subscription_item_id,
                 quantity=1,
                 timestamp=int(__import__('time').time()),
                 action='increment',
