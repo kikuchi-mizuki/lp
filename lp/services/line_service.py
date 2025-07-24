@@ -366,12 +366,15 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
         try:
             conn = get_db_connection()
             c = conn.cursor()
+            
+            # usage_record_idを初期化
+            usage_record_id = None
+            
             if is_free:
                 c.execute('INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type) VALUES (?, ?, ?, ?, ?)',
                           (user_id_db, 1, None, True, content['name']))
             else:
                 # usage_recordのidフィールドを安全に取得
-                usage_record_id = None
                 if usage_record and 'id' in usage_record:
                     usage_record_id = usage_record['id']
                 elif usage_record and 'meter_event' in usage_record:
