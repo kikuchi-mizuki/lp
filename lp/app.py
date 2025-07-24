@@ -459,6 +459,12 @@ def line_webhook():
                 elif text == '状態':
                     print("「状態」コマンド処理")
                     handle_status_check(event['replyToken'], user_id_db)
+                elif text == '解約':
+                    print("「解約」コマンド処理開始")
+                    handle_cancel_request(event['replyToken'], user_id_db, stripe_subscription_id)
+                elif text and all(x.strip().isdigit() for x in text.split(',')):
+                    print(f"解約選択処理: {text}")
+                    handle_cancel_selection(event['replyToken'], user_id_db, stripe_subscription_id, text)
                 elif text in ['1', '2', '3', '4']:
                     print(f"コンテンツ選択処理: {text}")
                     handle_content_selection(event['replyToken'], user_id_db, stripe_subscription_id, text)
@@ -986,6 +992,46 @@ def handle_status_check(reply_token, user_id_db):
     except Exception as e:
         print(f'利用状況確認エラー: {e}')
         send_line_message(reply_token, "❌ 利用状況の取得に失敗しました。しばらく時間をおいて再度お試しください。")
+
+def handle_cancel_request(reply_token, user_id_db, stripe_subscription_id):
+    """契約中コンテンツ一覧をLINEで送信"""
+    try:
+        subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+        items = subscription['items']['data']
+        content_choices = []
+        for idx, item in enumerate(items, 1):
+            name = item['price'].get('nickname') or item['price'].get('id')
+            price = item['price']['unit_amount'] // 100 if item['price']['unit_amount'] else 0
+            content_choices.append(f"{idx}. {name}（{price}円/月）")
+        if not content_choices:
+            send_line_message(reply_token, "現在契約中のコンテンツはありません。")
+            return
+        choice_message = "\n".join(content_choices)
+        send_line_message(reply_token, f"解約したいコンテンツの番号をカンマ区切りで入力してください:\n{choice_message}\n\n例: 1,2")
+    except Exception as e:
+        print(f'解約一覧取得エラー: {e}')
+        send_line_message(reply_token, "❌ 契約中コンテンツの取得に失敗しました。しばらく時間をおいて再度お試しください。")
+
+def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, selection_text):
+    """選択されたコンテンツをキャンセル"""
+    try:
+        subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+        items = subscription['items']['data']
+        indices = [int(x.strip())-1 for x in selection_text.split(',') if x.strip().isdigit()]
+        cancelled = []
+        for idx in indices:
+            if 0 <= idx < len(items):
+                item = items[idx]
+                stripe.SubscriptionItem.modify(item['id'], cancel_at_period_end=True)
+                name = item['price'].get('nickname') or item['price'].get('id')
+                cancelled.append(name)
+        if cancelled:
+            send_line_message(reply_token, f"以下のコンテンツの解約を受け付けました（請求期間終了まで利用可能です）：\n" + "\n".join(cancelled))
+        else:
+            send_line_message(reply_token, "有効な番号が選択されませんでした。もう一度お試しください。")
+    except Exception as e:
+        print(f'解約処理エラー: {e}')
+        send_line_message(reply_token, "❌ 解約処理に失敗しました。しばらく時間をおいて再度お試しください。")
 
 def create_rich_menu():
     """リッチメニューを作成"""
