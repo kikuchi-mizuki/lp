@@ -53,7 +53,19 @@ def stripe_webhook():
                           (email, customer_id, subscription_id))
                 conn.commit()
                 print(f'ユーザー登録完了: customer_id={customer_id}, subscription_id={subscription_id}')
-                # 従量課金アイテムを追加（省略）
+                # 従量課金アイテムを追加
+                try:
+                    import os
+                    USAGE_PRICE_ID = os.getenv('STRIPE_USAGE_PRICE_ID')
+                    result = stripe.SubscriptionItem.create(
+                        subscription=subscription_id,
+                        price=USAGE_PRICE_ID
+                    )
+                    print(f'従量課金アイテム追加完了: subscription_id={subscription_id}, usage_price_id={USAGE_PRICE_ID}, result={result}')
+                except Exception as e:
+                    import traceback
+                    print(f'従量課金アイテム追加エラー: {e}')
+                    print(traceback.format_exc())
             else:
                 print(f'既存ユーザーが存在: {existing_user[0]}')
             conn.close()
@@ -73,7 +85,19 @@ def stripe_webhook():
                           (email, customer_id, subscription_id))
                 conn.commit()
                 print(f'ユーザー登録完了: customer_id={customer_id}, subscription_id={subscription_id}')
-                # 従量課金アイテムを追加（省略）
+                # 従量課金アイテムを追加
+                try:
+                    import os
+                    USAGE_PRICE_ID = os.getenv('STRIPE_USAGE_PRICE_ID')
+                    result = stripe.SubscriptionItem.create(
+                        subscription=subscription_id,
+                        price=USAGE_PRICE_ID
+                    )
+                    print(f'従量課金アイテム追加完了: subscription_id={subscription_id}, usage_price_id={USAGE_PRICE_ID}, result={result}')
+                except Exception as e:
+                    import traceback
+                    print(f'従量課金アイテム追加エラー: {e}')
+                    print(traceback.format_exc())
             else:
                 print(f'既存ユーザーが存在: {existing_user[0]}')
             conn.close()
