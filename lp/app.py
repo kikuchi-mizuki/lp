@@ -259,6 +259,9 @@ def subscribe():
                 'quantity': 1,
             },
         ],
+        subscription_data={
+            'trial_period_days': 7
+        },
         success_url=url_for('thanks', _external=True),
         cancel_url=url_for('index', _external=True),
     )
