@@ -18,6 +18,8 @@ from services.stripe_service import create_subscription, cancel_subscription, ad
 from services.user_service import register_user, get_user_by_line_id, set_user_state, get_user_state
 from models.user import User
 from models.usage_log import UsageLog
+from routes.line import line_bp
+from routes.stripe import stripe_bp
 
 load_dotenv()
 
@@ -102,6 +104,8 @@ def init_db():
 init_db()
 
 app = Flask(__name__, static_folder='static', static_url_path='/static')
+app.register_blueprint(line_bp)
+app.register_blueprint(stripe_bp)
 
 @app.route('/')
 def index():
@@ -381,231 +385,6 @@ def stripe_webhook():
 
 # ユーザーごとの状態管理（本番はDBやRedis推奨）
 user_states = {}
-
-@app.route('/line/webhook', methods=['POST'])
-def line_webhook():
-    print("=== LINE Webhook受信 ===")
-    print(f"Headers: {dict(request.headers)}")
-    
-    signature = request.headers.get('X-Line-Signature', '')
-    body = request.data.decode('utf-8')
-    print(f"Body: {body}")
-    
-    # 署名検証
-    if LINE_CHANNEL_SECRET:
-        try:
-            hash = hmac.new(LINE_CHANNEL_SECRET.encode('utf-8'), body.encode('utf-8'), hashlib.sha256).digest()
-            expected_signature = base64.b64encode(hash).decode('utf-8')
-            if not hmac.compare_digest(signature, expected_signature):
-                print(f"署名検証失敗: {signature} != {expected_signature}")
-                abort(400, 'Invalid signature')
-        except Exception as e:
-            print(f"署名検証エラー: {e}")
-            abort(400, 'Signature verification error')
-    else:
-        print("LINE_CHANNEL_SECRETが設定されていません")
-    
-    # イベント処理
-    try:
-        events = json.loads(body).get('events', [])
-        print(f"イベント数: {len(events)}")
-        
-        for event in events:
-            print(f"イベント: {event}")
-            
-            # テキストメッセージの処理
-            if event.get('type') == 'message' and event['message'].get('type') == 'text':
-                user_id = event['source']['userId']
-                text = event['message']['text']
-                print(f"ユーザーID: {user_id}, テキスト: {text}")
-                
-                # ユーザー情報を取得
-                conn = get_db_connection()
-                c = conn.cursor()
-                c.execute('SELECT id, stripe_subscription_id, line_user_id FROM users WHERE line_user_id = ?', (user_id,))
-                user = c.fetchone()
-                print(f"DB検索結果: {user}")
-                
-                if not user:
-                    # line_user_id未登録なら最新ユーザーを取得し、紐付け
-                    c.execute('SELECT id, stripe_subscription_id FROM users WHERE line_user_id IS NULL ORDER BY created_at DESC LIMIT 1')
-                    user = c.fetchone()
-                    print(f"未紐付けユーザー検索結果: {user}")
-                    
-                    # 全ユーザー数を確認
-                    c.execute('SELECT COUNT(*) FROM users')
-                    total_users = c.fetchone()[0]
-                    print(f"データベース内の総ユーザー数: {total_users}")
-                    
-                    if user:
-                        c.execute('UPDATE users SET line_user_id = ? WHERE id = ?', (user_id, user[0]))
-                        conn.commit()
-                        print(f"ユーザー紐付け完了: {user_id} -> {user[0]}")
-                        # 歓迎メッセージを送信
-                        send_line_message(event['replyToken'], get_welcome_message())
-                    else:
-                        # ユーザー未登録
-                        print("ユーザー未登録")
-                        send_line_message(event['replyToken'], get_not_registered_message())
-                    conn.close()
-                    continue
-                
-                # 登録済みユーザーの処理
-                user_id_db = user[0]
-                stripe_subscription_id = user[1]
-                print(f"登録済みユーザー処理: user_id={user_id_db}, subscription_id={stripe_subscription_id}")
-                
-                # コマンド処理
-                state = user_states.get(user_id, None)
-
-                if text == '追加':
-                    user_states[user_id] = 'add_select'
-                    handle_add_content(event['replyToken'], user_id_db, stripe_subscription_id)
-                elif text == 'メニュー':
-                    send_line_message(event['replyToken'], get_menu_message())
-                elif text == 'ヘルプ':
-                    send_line_message(event['replyToken'], get_help_message())
-                elif text == '状態':
-                    handle_status_check(event['replyToken'], user_id_db)
-                elif text == '解約':
-                    user_states[user_id] = 'cancel_select'
-                    handle_cancel_request(event['replyToken'], user_id_db, stripe_subscription_id)
-                elif state == 'add_select' and text in ['1', '2', '3', '4']:
-                    handle_content_selection(event['replyToken'], user_id_db, stripe_subscription_id, text)
-                    user_states[user_id] = None
-                elif state == 'cancel_select' and all(x.strip().isdigit() for x in text.split(',')):
-                    handle_cancel_selection(event['replyToken'], user_id_db, stripe_subscription_id, text)
-                    user_states[user_id] = None
-                elif text.lower() in ['はい', 'yes', 'y']:
-                    print("コンテンツ追加確認処理（はい）")
-                    # 簡易的な実装：最新の選択を記憶するため、一時的に1を選択
-                    handle_content_confirmation(event['replyToken'], user_id_db, stripe_subscription_id, '1', True)
-                elif text.lower() in ['いいえ', 'no', 'n']:
-                    print("コンテンツ追加確認処理（いいえ）")
-                    # 簡易的な実装：最新の選択を記憶するため、一時的に1を選択
-                    handle_content_confirmation(event['replyToken'], user_id_db, stripe_subscription_id, '1', False)
-                else:
-                    print(f"デフォルトメッセージ送信: {text}")
-                    send_line_message(event['replyToken'], get_default_message())
-                
-                conn.close()
-            
-            # リッチメニューのpostbackイベント処理
-            elif event.get('type') == 'postback':
-                user_id = event['source']['userId']
-                postback_data = event['postback']['data']
-                print(f"Postback受信: user_id={user_id}, data={postback_data}")
-                
-                # ユーザー情報を取得
-                conn = get_db_connection()
-                c = conn.cursor()
-                c.execute('SELECT id, stripe_subscription_id, line_user_id FROM users WHERE line_user_id = ?', (user_id,))
-                user = c.fetchone()
-                
-                if not user:
-                    send_line_message(event['replyToken'], get_not_registered_message())
-                    conn.close()
-                    continue
-                
-                user_id_db = user[0]
-                stripe_subscription_id = user[1]
-                
-                try:
-                    # postbackデータに基づいて処理
-                    if postback_data == 'action=add_content':
-                        print("リッチメニュー「追加」ボタン処理")
-                        handle_add_content(event['replyToken'], user_id_db, stripe_subscription_id)
-                    elif postback_data == 'action=show_menu':
-                        print("リッチメニュー「メニュー」ボタン処理")
-                        send_line_message(event['replyToken'], get_menu_message())
-                    elif postback_data == 'action=check_status':
-                        print("リッチメニュー「状態」ボタン処理")
-                        handle_status_check(event['replyToken'], user_id_db)
-                    else:
-                        print(f"不明なpostbackデータ: {postback_data}")
-                        send_line_message(event['replyToken'], get_default_message())
-                finally:
-                    conn.close()
-    except Exception as e:
-        print(f"LINE Webhook処理エラー: {e}")
-        import traceback
-        traceback.print_exc()
-    
-    return jsonify({'status': 'ok'})
-
-@app.route('/admin/rich-menu')
-def admin_rich_menu():
-    """リッチメニュー管理画面"""
-    return render_template('admin_rich_menu.html')
-
-@app.route('/add-usage-item/<subscription_id>')
-def add_usage_item_to_subscription(subscription_id):
-    """既存のサブスクリプションに従量課金アイテムを追加"""
-    try:
-        # サブスクリプションを取得
-        subscription = stripe.Subscription.retrieve(subscription_id)
-        
-        # 既に従量課金アイテムがあるかチェック
-        existing_usage_item = None
-        for item in subscription['items']['data']:
-            if item['price']['id'] == USAGE_PRICE_ID:
-                existing_usage_item = item
-                break
-        
-        if existing_usage_item:
-            return jsonify({
-                'success': False,
-                'message': f'従量課金アイテムは既に存在します: {existing_usage_item["id"]}'
-            })
-        
-        # 従量課金アイテムを追加
-        usage_item = stripe.SubscriptionItem.create(
-            subscription=subscription_id,
-            price=USAGE_PRICE_ID
-        )
-        
-        return jsonify({
-            'success': True,
-            'message': f'従量課金アイテムを追加しました: {usage_item["id"]}',
-            'usage_item_id': usage_item['id']
-        })
-        
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'message': f'エラー: {str(e)}'
-        })
-
-@app.route('/set-default-rich-menu/<rich_menu_id>')
-def set_existing_rich_menu_as_default(rich_menu_id):
-    """既存のリッチメニューをデフォルトに設定"""
-    try:
-        headers = {
-            'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}',
-            'Content-Type': 'application/json'
-        }
-        
-        response = requests.post(
-            f'https://api.line.me/v2/bot/user/all/richmenu/{rich_menu_id}',
-            headers=headers
-        )
-        
-        if response.status_code == 200:
-            return jsonify({
-                'success': True,
-                'message': f'リッチメニューをデフォルトに設定しました: {rich_menu_id}'
-            })
-        else:
-            return jsonify({
-                'success': False,
-                'message': f'設定失敗: {response.status_code} - {response.text}'
-            })
-            
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'message': f'エラー: {str(e)}'
-        })
 
 def get_welcome_message():
     """歓迎メッセージ"""
