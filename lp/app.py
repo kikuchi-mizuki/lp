@@ -373,6 +373,9 @@ def stripe_webhook():
 
     return jsonify({'status': 'success'})
 
+# ユーザーごとの状態管理（本番はDBやRedis推奨）
+user_states = {}
+
 @app.route('/line/webhook', methods=['POST'])
 def line_webhook():
     print("=== LINE Webhook受信 ===")
@@ -447,27 +450,26 @@ def line_webhook():
                 print(f"登録済みユーザー処理: user_id={user_id_db}, subscription_id={stripe_subscription_id}")
                 
                 # コマンド処理
+                state = user_states.get(user_id, None)
+
                 if text == '追加':
-                    print("「追加」コマンド処理開始")
+                    user_states[user_id] = 'add_select'
                     handle_add_content(event['replyToken'], user_id_db, stripe_subscription_id)
                 elif text == 'メニュー':
-                    print("「メニュー」コマンド処理")
                     send_line_message(event['replyToken'], get_menu_message())
                 elif text == 'ヘルプ':
-                    print("「ヘルプ」コマンド処理")
                     send_line_message(event['replyToken'], get_help_message())
                 elif text == '状態':
-                    print("「状態」コマンド処理")
                     handle_status_check(event['replyToken'], user_id_db)
                 elif text == '解約':
-                    print("「解約」コマンド処理開始")
+                    user_states[user_id] = 'cancel_select'
                     handle_cancel_request(event['replyToken'], user_id_db, stripe_subscription_id)
-                elif text and all(x.strip().isdigit() for x in text.split(',')):
-                    print(f"解約選択処理: {text}")
-                    handle_cancel_selection(event['replyToken'], user_id_db, stripe_subscription_id, text)
-                elif text in ['1', '2', '3', '4']:
-                    print(f"コンテンツ選択処理: {text}")
+                elif state == 'add_select' and text in ['1', '2', '3', '4']:
                     handle_content_selection(event['replyToken'], user_id_db, stripe_subscription_id, text)
+                    user_states[user_id] = None
+                elif state == 'cancel_select' and all(x.strip().isdigit() for x in text.split(',')):
+                    handle_cancel_selection(event['replyToken'], user_id_db, stripe_subscription_id, text)
+                    user_states[user_id] = None
                 elif text.lower() in ['はい', 'yes', 'y']:
                     print("コンテンツ追加確認処理（はい）")
                     # 簡易的な実装：最新の選択を記憶するため、一時的に1を選択
