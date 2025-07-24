@@ -865,13 +865,12 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
             subscription_item_id = usage_item['id']
             print(f"従量課金アイテムID: {subscription_item_id}")
             
-            # Usage Record作成
+            # Usage Record作成（新しいメータリングシステム）
             try:
-                usage_record = stripe.SubscriptionItem.create_usage_record(
-                    subscription_item_id,
-                    quantity=1,
+                usage_record = stripe.billing.MeterEvent.create(
+                    subscription_item=subscription_item_id,
+                    value=1,
                     timestamp=int(__import__('time').time()),
-                    action='increment',
                 )
                 print(f"Usage Record作成成功: {usage_record.id}")
             except Exception as usage_error:
