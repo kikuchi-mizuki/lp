@@ -250,13 +250,38 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                 return
             subscription_item_id = usage_item['id']
             try:
-                usage_record = stripe.UsageRecord.create(
-                    subscription_item=subscription_item_id,
-                    quantity=1,
-                    timestamp=int(__import__('time').time()),
-                    action='increment',
+                # 新しいStripe APIを使用して使用量レコードを作成
+                import requests
+                import os
+                import time
+                
+                stripe_secret_key = os.getenv('STRIPE_SECRET_KEY')
+                headers = {
+                    'Authorization': f'Bearer {stripe_secret_key}',
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+                
+                data = {
+                    'subscription_item': subscription_item_id,
+                    'value': 1,
+                    'timestamp': int(time.time())
+                }
+                
+                response = requests.post(
+                    'https://api.stripe.com/v1/billing/meter_events',
+                    headers=headers,
+                    data=data
                 )
+                
+                if response.status_code == 200:
+                    usage_record = response.json()
+                    print(f'使用量レコード作成成功: {usage_record}')
+                else:
+                    print(f'使用量レコード作成エラー: {response.status_code} - {response.text}')
+                    send_line_message(reply_token, f"❌ 使用量記録の作成に失敗しました。\n\nエラー: {response.text}")
+                    return
             except Exception as usage_error:
+                print(f'使用量レコード作成エラー: {usage_error}')
                 send_line_message(reply_token, f"❌ 使用量記録の作成に失敗しました。\n\nエラー: {str(usage_error)}")
                 return
         try:
