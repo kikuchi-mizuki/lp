@@ -78,6 +78,10 @@ def line_webhook():
                         email = unicodedata.normalize('NFKC', email)
                         return email
                     normalized_email = normalize_email(text)
+                    # デバッグ: DB内の全メールアドレスを取得
+                    c.execute('SELECT email FROM users')
+                    all_emails = [row[0] for row in c.fetchall()]
+                    debug_msg = f"[DEBUG]\n検索: {normalized_email}\nDB: {all_emails}"
                     c.execute('SELECT id, line_user_id FROM users WHERE email = ?', (normalized_email,))
                     user = c.fetchone()
                     if user:
@@ -97,6 +101,8 @@ def line_webhook():
                             send_line_message(event['replyToken'], 'メールアドレスが見つかりませんでしたが、直近の登録ユーザーにLINE連携しました。メニューや追加コマンドが利用できます。')
                         else:
                             send_line_message(event['replyToken'], 'ご登録メールアドレスが見つかりません。LPでご登録済みかご確認ください。')
+                    # デバッグメッセージを送信
+                    send_line_message(event['replyToken'], debug_msg)
                     conn.close()
                     continue
                 else:
