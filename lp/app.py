@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 from PIL import Image, ImageDraw, ImageFont
 import io
 from utils.message_templates import get_default_message, get_menu_message, get_help_message
+from services.line_service import send_line_message, create_rich_menu, set_rich_menu_image, set_default_rich_menu, delete_rich_menu
 
 load_dotenv()
 
@@ -601,22 +602,6 @@ def set_existing_rich_menu_as_default(rich_menu_id):
             'success': False,
             'message': f'エラー: {str(e)}'
         })
-
-def send_line_message(reply_token, message):
-    """LINEメッセージを送信"""
-    headers = {
-        'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}',
-        'Content-Type': 'application/json'
-    }
-    data = {
-        'replyToken': reply_token,
-        'messages': [{'type': 'text', 'text': message}]
-    }
-    try:
-        response = requests.post('https://api.line.me/v2/bot/message/reply', headers=headers, json=data)
-        response.raise_for_status()
-    except Exception as e:
-        print(f'LINEメッセージ送信エラー: {e}')
 
 def get_welcome_message():
     """歓迎メッセージ"""
