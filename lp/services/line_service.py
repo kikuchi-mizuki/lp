@@ -169,8 +169,10 @@ def delete_all_rich_menus():
         print(f"リッチメニュー削除エラー: {e}")
 
 def setup_rich_menu():
+    import time
     delete_all_rich_menus()
     rich_menu_id = create_rich_menu()
+    time.sleep(1)  # 作成直後に1秒待機
     set_rich_menu_image(rich_menu_id)
     set_default_rich_menu(rich_menu_id)
     return rich_menu_id 
