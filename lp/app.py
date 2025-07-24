@@ -996,26 +996,53 @@ def handle_status_check(reply_token, user_id_db):
         send_line_message(reply_token, "❌ 利用状況の取得に失敗しました。しばらく時間をおいて再度お試しください。")
 
 def handle_cancel_request(reply_token, user_id_db, stripe_subscription_id):
-    """契約中コンテンツ一覧をLINEで送信"""
+    """契約中コンテンツ一覧をLINEで送信（日本語名＋金額、無料分は0円表示）"""
     try:
         subscription = stripe.Subscription.retrieve(stripe_subscription_id)
         items = subscription['items']['data']
+        # ユーザーのusage_logsから無料分を特定
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute('SELECT content_type, is_free FROM usage_logs WHERE user_id = ?', (user_id_db,))
+        usage_free_map = {}
+        for row in c.fetchall():
+            usage_free_map[row[0]] = usage_free_map.get(row[0], False) or row[1]
+        conn.close()
         content_choices = []
         for idx, item in enumerate(items, 1):
-            name = item['price'].get('nickname') or item['price'].get('id')
-            price = item['price']['unit_amount'] // 100 if item['price']['unit_amount'] else 0
-            content_choices.append(f"{idx}. {name}（{price}円/月）")
+            price = item['price']
+            # 日本語名推測
+            name = price.get('nickname') or price.get('id')
+            if 'AI秘書' in name or 'secretary' in name or 'prod_SgSj7btk61lSNI' in price.get('product',''):
+                jp_name = 'AI秘書機能'
+            elif '会計' in name or 'accounting' in name or 'prod_SgSnVeUB5DAihu' in price.get('product',''):
+                jp_name = '会計管理ツール'
+            elif 'スケジュール' in name or 'schedule' in name:
+                jp_name = 'スケジュール管理'
+            elif 'タスク' in name or 'task' in name:
+                jp_name = 'タスク管理'
+            elif price.get('unit_amount',0) >= 500000:
+                jp_name = '月額基本料金'
+            else:
+                jp_name = name
+            # 金額計算
+            amount = price.get('unit_amount', 0)
+            amount_jpy = int(amount) // 100 if amount else 0
+            # 無料分判定
+            is_free = usage_free_map.get(jp_name, False)
+            display_price = '0円' if is_free else f'{amount_jpy:,}円'
+            content_choices.append(f"{idx}. {jp_name}（{display_price}/月）")
         if not content_choices:
             send_line_message(reply_token, "現在契約中のコンテンツはありません。")
             return
         choice_message = "\n".join(content_choices)
-        send_line_message(reply_token, f"解約したいコンテンツの番号をカンマ区切りで入力してください:\n{choice_message}\n\n例: 1,2")
+        send_line_message(reply_token, f"解約したいコンテンツを選んでください（カンマ区切りで複数選択可）:\n{choice_message}\n\n例: 1,2")
     except Exception as e:
         print(f'解約一覧取得エラー: {e}')
         send_line_message(reply_token, "❌ 契約中コンテンツの取得に失敗しました。しばらく時間をおいて再度お試しください。")
 
 def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, selection_text):
-    """選択されたコンテンツをキャンセル"""
+    """選択されたコンテンツをキャンセル（日本語名で案内）"""
     try:
         subscription = stripe.Subscription.retrieve(stripe_subscription_id)
         items = subscription['items']['data']
@@ -1024,10 +1051,22 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
         for idx in indices:
             if 0 <= idx < len(items):
                 item = items[idx]
-                #stripe.SubscriptionItem.modify(item['id'], cancel_at_period_end=True)
                 stripe.SubscriptionItem.delete(item['id'], proration_behavior='none')
-                name = item['price'].get('nickname') or item['price'].get('id')
-                cancelled.append(name)
+                price = item['price']
+                name = price.get('nickname') or price.get('id')
+                if 'AI秘書' in name or 'secretary' in name or 'prod_SgSj7btk61lSNI' in price.get('product',''):
+                    jp_name = 'AI秘書機能'
+                elif '会計' in name or 'accounting' in name or 'prod_SgSnVeUB5DAihu' in price.get('product',''):
+                    jp_name = '会計管理ツール'
+                elif 'スケジュール' in name or 'schedule' in name:
+                    jp_name = 'スケジュール管理'
+                elif 'タスク' in name or 'task' in name:
+                    jp_name = 'タスク管理'
+                elif price.get('unit_amount',0) >= 500000:
+                    jp_name = '月額基本料金'
+                else:
+                    jp_name = name
+                cancelled.append(jp_name)
         if cancelled:
             send_line_message(reply_token, f"以下のコンテンツの解約を受け付けました（請求期間終了まで利用可能です）：\n" + "\n".join(cancelled))
         else:
