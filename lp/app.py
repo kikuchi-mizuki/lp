@@ -478,21 +478,22 @@ def line_webhook():
                 user_id_db = user[0]
                 stripe_subscription_id = user[1]
                 
-                # postbackデータに基づいて処理
-                if postback_data == 'action=add_content':
-                    print("リッチメニュー「追加」ボタン処理")
-                    handle_add_content(event['replyToken'], user_id_db, stripe_subscription_id)
-                elif postback_data == 'action=show_menu':
-                    print("リッチメニュー「メニュー」ボタン処理")
-                    send_line_message(event['replyToken'], get_menu_message())
-                elif postback_data == 'action=check_status':
-                    print("リッチメニュー「状態」ボタン処理")
-                    handle_status_check(event['replyToken'], user_id_db)
-                else:
-                    print(f"不明なpostbackデータ: {postback_data}")
-                    send_line_message(event['replyToken'], get_default_message())
-                
-                conn.close()
+                try:
+                    # postbackデータに基づいて処理
+                    if postback_data == 'action=add_content':
+                        print("リッチメニュー「追加」ボタン処理")
+                        handle_add_content(event['replyToken'], user_id_db, stripe_subscription_id)
+                    elif postback_data == 'action=show_menu':
+                        print("リッチメニュー「メニュー」ボタン処理")
+                        send_line_message(event['replyToken'], get_menu_message())
+                    elif postback_data == 'action=check_status':
+                        print("リッチメニュー「状態」ボタン処理")
+                        handle_status_check(event['replyToken'], user_id_db)
+                    else:
+                        print(f"不明なpostbackデータ: {postback_data}")
+                        send_line_message(event['replyToken'], get_default_message())
+                finally:
+                    conn.close()
     except Exception as e:
         print(f"LINE Webhook処理エラー: {e}")
         import traceback
