@@ -65,13 +65,60 @@ def create_rich_menu():
     return response.json()['richMenuId']
 
 def set_rich_menu_image(rich_menu_id, image_path='static/images/richmenu.png'):
-    headers = {
-        'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}',
-        'Content-Type': 'image/png'
-    }
-    with open(image_path, 'rb') as f:
-        response = requests.post(f'https://api.line.me/v2/bot/richmenu/{rich_menu_id}/content', headers=headers, data=f)
-    response.raise_for_status()
+    """リッチメニューに画像を設定"""
+    try:
+        # リッチメニュー画像を生成
+        from PIL import Image, ImageDraw, ImageFont
+        import io
+        
+        # 画像を生成
+        width, height = 2500, 843
+        image = Image.new('RGB', (width, height), color='white')
+        draw = ImageDraw.Draw(image)
+        
+        # フォント設定（デフォルトフォントを使用）
+        try:
+            font = ImageFont.truetype("arial.ttf", 60)
+        except:
+            font = ImageFont.load_default()
+        
+        # メニュー項目を描画
+        menu_items = [
+            ("追加", (200, 200)),
+            ("状態", (700, 200)),
+            ("解約", (1200, 200)),
+            ("メニュー", (1700, 200))
+        ]
+        
+        for text, pos in menu_items:
+            draw.text(pos, text, fill='black', font=font)
+        
+        # 画像をバイトデータに変換
+        img_byte_arr = io.BytesIO()
+        image.save(img_byte_arr, format='PNG')
+        img_byte_arr = img_byte_arr.getvalue()
+        
+        headers = {
+            'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}',
+            'Content-Type': 'image/png'
+        }
+        
+        response = requests.post(
+            f'https://api.line.me/v2/bot/richmenu/{rich_menu_id}/content',
+            headers=headers,
+            data=img_byte_arr
+        )
+        
+        if response.status_code == 200:
+            print(f"リッチメニュー画像設定成功: {rich_menu_id}")
+            return True
+        else:
+            print(f"リッチメニュー画像設定失敗: {response.status_code} - {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"リッチメニュー画像設定エラー: {e}")
+        return False
 
 def set_default_rich_menu(rich_menu_id):
     headers = {
