@@ -55,7 +55,6 @@ def stripe_webhook():
                 print(f'ユーザー登録完了: customer_id={customer_id}, subscription_id={subscription_id}')
                 # 従量課金アイテムを追加
                 try:
-                    import os
                     USAGE_PRICE_ID = os.getenv('STRIPE_USAGE_PRICE_ID')
                     result = stripe.SubscriptionItem.create(
                         subscription=subscription_id,
@@ -87,7 +86,6 @@ def stripe_webhook():
                 print(f'ユーザー登録完了: customer_id={customer_id}, subscription_id={subscription_id}')
                 # 従量課金アイテムを追加
                 try:
-                    import os
                     USAGE_PRICE_ID = os.getenv('STRIPE_USAGE_PRICE_ID')
                     result = stripe.SubscriptionItem.create(
                         subscription=subscription_id,
