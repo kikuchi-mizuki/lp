@@ -70,6 +70,21 @@ def line_webhook():
                     handle_content_confirmation(event['replyToken'], user_id_db, stripe_subscription_id, '1', True)
                 elif text.lower() in ['いいえ', 'no', 'n']:
                     handle_content_confirmation(event['replyToken'], user_id_db, stripe_subscription_id, '1', False)
+                elif '@' in text and '.' in text and len(text) < 100:
+                    # メールアドレスっぽい文字列が来た場合
+                    c.execute('SELECT id, line_user_id FROM users WHERE email = ?', (text.strip(),))
+                    user = c.fetchone()
+                    if user:
+                        if user[1] is None:
+                            c.execute('UPDATE users SET line_user_id = ? WHERE id = ?', (user_id, user[0]))
+                            conn.commit()
+                            send_line_message(event['replyToken'], 'LINE連携が完了しました。メニューや追加コマンドが利用できます。')
+                        else:
+                            send_line_message(event['replyToken'], 'このメールアドレスは既にLINE連携済みです。')
+                    else:
+                        send_line_message(event['replyToken'], 'ご登録メールアドレスが見つかりません。LPでご登録済みかご確認ください。')
+                    conn.close()
+                    continue
                 else:
                     send_line_message(event['replyToken'], get_default_message())
                 conn.close()
