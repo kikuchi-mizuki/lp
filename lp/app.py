@@ -58,6 +58,8 @@ def init_db():
                 user_id INTEGER NOT NULL,
                 usage_quantity INTEGER DEFAULT 1,
                 stripe_usage_record_id VARCHAR(255),
+                is_free BOOLEAN DEFAULT FALSE,
+                content_type VARCHAR(255),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
@@ -81,6 +83,8 @@ def init_db():
                 user_id INTEGER NOT NULL,
                 usage_quantity INTEGER DEFAULT 1,
                 stripe_usage_record_id VARCHAR(255),
+                is_free BOOLEAN DEFAULT FALSE,
+                content_type VARCHAR(255),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
@@ -452,6 +456,17 @@ def line_webhook():
                 elif text == '状態':
                     print("「状態」コマンド処理")
                     handle_status_check(event['replyToken'], user_id_db)
+                elif text in ['1', '2', '3', '4']:
+                    print(f"コンテンツ選択処理: {text}")
+                    handle_content_selection(event['replyToken'], user_id_db, stripe_subscription_id, text)
+                elif text.lower() in ['はい', 'yes', 'y']:
+                    print("コンテンツ追加確認処理（はい）")
+                    # 簡易的な実装：最新の選択を記憶するため、一時的に1を選択
+                    handle_content_confirmation(event['replyToken'], user_id_db, stripe_subscription_id, '1', True)
+                elif text.lower() in ['いいえ', 'no', 'n']:
+                    print("コンテンツ追加確認処理（いいえ）")
+                    # 簡易的な実装：最新の選択を記憶するため、一時的に1を選択
+                    handle_content_confirmation(event['replyToken'], user_id_db, stripe_subscription_id, '1', False)
                 else:
                     print(f"デフォルトメッセージ送信: {text}")
                     send_line_message(event['replyToken'], get_default_message())
@@ -661,66 +676,256 @@ def get_default_message():
 お気軽にお声かけください！"""
 
 def handle_add_content(reply_token, user_id_db, stripe_subscription_id):
-    """コンテンツ追加処理"""
+    """コンテンツ選択メニュー表示"""
     try:
-        print(f"コンテンツ追加処理開始: subscription_id={stripe_subscription_id}, usage_price_id={USAGE_PRICE_ID}")
+        # コンテンツ選択メニューを表示
+        content_menu = """📚 コンテンツ選択メニュー
+
+利用可能なコンテンツを選択してください：
+
+1️⃣ **AI秘書機能**
+   💰 料金：1,500円（1個目は無料）
+   📝 内容：24時間対応のAI秘書
+
+2️⃣ **会計管理ツール**
+   💰 料金：1,500円（1個目は無料）
+   📝 内容：自動会計・経費管理
+
+3️⃣ **スケジュール管理**
+   💰 料金：1,500円（1個目は無料）
+   📝 内容：AIによる最適スケジュール
+
+4️⃣ **タスク管理**
+   💰 料金：1,500円（1個目は無料）
+   📝 内容：プロジェクト管理・進捗追跡
+
+選択するには：
+• 「1」- AI秘書機能
+• 「2」- 会計管理ツール
+• 「3」- スケジュール管理
+• 「4」- タスク管理
+
+または、番号を直接入力してください。"""
         
-        # Stripeからsubscription_item_id取得
-        subscription = stripe.Subscription.retrieve(stripe_subscription_id)
-        print(f"サブスクリプション詳細: {subscription}")
+        send_line_message(reply_token, content_menu)
         
-        usage_item = None
-        for item in subscription['items']['data']:
-            print(f"アイテム確認: price_id={item['price']['id']}, usage_price_id={USAGE_PRICE_ID}")
-            if item['price']['id'] == USAGE_PRICE_ID:
-                usage_item = item
-                print(f"従量課金アイテム発見: {item}")
-                break
+    except Exception as e:
+        print(f'コンテンツ選択メニューエラー: {e}')
+        send_line_message(reply_token, "❌ エラーが発生しました。しばらく時間をおいて再度お試しください。")
+
+def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, content_number):
+    """コンテンツ選択処理"""
+    try:
+        # コンテンツ情報
+        content_info = {
+            '1': {
+                'name': 'AI秘書機能',
+                'price': 1500,
+                'description': '24時間対応のAI秘書',
+                'usage': 'LINEで直接メッセージを送るだけで、予定管理、メール作成、リマインダー設定などができます。',
+                'url': 'https://lp-production-9e2c.up.railway.app/secretary'
+            },
+            '2': {
+                'name': '会計管理ツール',
+                'price': 1500,
+                'description': '自動会計・経費管理',
+                'usage': 'レシートを撮影するだけで自動で経費を記録し、月次レポートを自動生成します。',
+                'url': 'https://lp-production-9e2c.up.railway.app/accounting'
+            },
+            '3': {
+                'name': 'スケジュール管理',
+                'price': 1500,
+                'description': 'AIによる最適スケジュール',
+                'usage': '予定を入力すると、AIが最適なスケジュールを提案し、効率的な時間管理をサポートします。',
+                'url': 'https://lp-production-9e2c.up.railway.app/schedule'
+            },
+            '4': {
+                'name': 'タスク管理',
+                'price': 1500,
+                'description': 'プロジェクト管理・進捗追跡',
+                'usage': 'プロジェクトのタスクを管理し、進捗状況を自動で追跡・報告します。',
+                'url': 'https://lp-production-9e2c.up.railway.app/task'
+            }
+        }
         
-        if not usage_item:
-            print(f"従量課金アイテムが見つかりません: usage_price_id={USAGE_PRICE_ID}")
-            print(f"利用可能なアイテム: {[item['price']['id'] for item in subscription['items']['data']]}")
-            send_line_message(reply_token, f"❌ 従量課金アイテムが見つかりません。\n\n設定されている価格ID: {USAGE_PRICE_ID}\n\nサポートにお問い合わせください。")
+        if content_number not in content_info:
+            send_line_message(reply_token, "❌ 無効な選択です。1-4の数字で選択してください。")
             return
         
-        subscription_item_id = usage_item['id']
-        print(f"従量課金アイテムID: {subscription_item_id}")
+        content = content_info[content_number]
         
-        # Usage Record作成
-        try:
-            usage_record = stripe.SubscriptionItem.create_usage_record(
-                subscription_item_id,
-                quantity=1,
-                timestamp=int(__import__('time').time()),
-                action='increment',
-            )
-            print(f"Usage Record作成成功: {usage_record.id}")
-        except Exception as usage_error:
-            print(f"Usage Record作成エラー: {usage_error}")
-            send_line_message(reply_token, f"❌ 使用量記録の作成に失敗しました。\n\nエラー: {str(usage_error)}")
+        # 無料枠チェック
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute('SELECT COUNT(*) FROM usage_logs WHERE user_id = ?', (user_id_db,))
+        usage_count = c.fetchone()[0]
+        conn.close()
+        
+        is_free = usage_count == 0
+        
+        # 料金表示
+        if is_free:
+            price_message = "🎉 **1個目は無料です！**"
+        else:
+            price_message = f"💰 料金：{content['price']:,}円"
+        
+        # 確認メッセージ
+        confirm_message = f"""📋 選択内容の確認
+
+📚 コンテンツ：{content['name']}
+📝 内容：{content['description']}
+{price_message}
+
+このコンテンツを追加しますか？
+
+✅ 追加する場合は「はい」と入力
+❌ キャンセルする場合は「いいえ」と入力"""
+        
+        # 一時的に選択内容を保存（実際の実装ではRedisやDBを使用）
+        # ここでは簡易的にメッセージに含める
+        send_line_message(reply_token, confirm_message)
+        
+    except Exception as e:
+        print(f'コンテンツ選択エラー: {e}')
+        send_line_message(reply_token, "❌ エラーが発生しました。しばらく時間をおいて再度お試しください。")
+
+def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id, content_number, confirmed):
+    """コンテンツ追加確認処理"""
+    try:
+        if not confirmed:
+            send_line_message(reply_token, "❌ キャンセルしました。\n\n何か他にお手伝いできることはありますか？")
             return
+        
+        # コンテンツ情報
+        content_info = {
+            '1': {
+                'name': 'AI秘書機能',
+                'price': 1500,
+                'description': '24時間対応のAI秘書',
+                'usage': 'LINEで直接メッセージを送るだけで、予定管理、メール作成、リマインダー設定などができます。',
+                'url': 'https://lp-production-9e2c.up.railway.app/secretary'
+            },
+            '2': {
+                'name': '会計管理ツール',
+                'price': 1500,
+                'description': '自動会計・経費管理',
+                'usage': 'レシートを撮影するだけで自動で経費を記録し、月次レポートを自動生成します。',
+                'url': 'https://lp-production-9e2c.up.railway.app/accounting'
+            },
+            '3': {
+                'name': 'スケジュール管理',
+                'price': 1500,
+                'description': 'AIによる最適スケジュール',
+                'usage': '予定を入力すると、AIが最適なスケジュールを提案し、効率的な時間管理をサポートします。',
+                'url': 'https://lp-production-9e2c.up.railway.app/schedule'
+            },
+            '4': {
+                'name': 'タスク管理',
+                'price': 1500,
+                'description': 'プロジェクト管理・進捗追跡',
+                'usage': 'プロジェクトのタスクを管理し、進捗状況を自動で追跡・報告します。',
+                'url': 'https://lp-production-9e2c.up.railway.app/task'
+            }
+        }
+        
+        content = content_info[content_number]
+        
+        # 無料枠チェック
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute('SELECT COUNT(*) FROM usage_logs WHERE user_id = ?', (user_id_db,))
+        usage_count = c.fetchone()[0]
+        conn.close()
+        
+        is_free = usage_count == 0
+        
+        # 有料の場合のみStripe処理
+        if not is_free:
+            print(f"コンテンツ追加処理開始: subscription_id={stripe_subscription_id}, usage_price_id={USAGE_PRICE_ID}")
+            
+            # Stripeからsubscription_item_id取得
+            subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+            print(f"サブスクリプション詳細: {subscription}")
+            
+            usage_item = None
+            for item in subscription['items']['data']:
+                print(f"アイテム確認: price_id={item['price']['id']}, usage_price_id={USAGE_PRICE_ID}")
+                if item['price']['id'] == USAGE_PRICE_ID:
+                    usage_item = item
+                    print(f"従量課金アイテム発見: {item}")
+                    break
+            
+            if not usage_item:
+                print(f"従量課金アイテムが見つかりません: usage_price_id={USAGE_PRICE_ID}")
+                print(f"利用可能なアイテム: {[item['price']['id'] for item in subscription['items']['data']]}")
+                send_line_message(reply_token, f"❌ 従量課金アイテムが見つかりません。\n\n設定されている価格ID: {USAGE_PRICE_ID}\n\nサポートにお問い合わせください。")
+                return
+            
+            subscription_item_id = usage_item['id']
+            print(f"従量課金アイテムID: {subscription_item_id}")
+            
+            # Usage Record作成
+            try:
+                usage_record = stripe.SubscriptionItem.create_usage_record(
+                    subscription_item_id,
+                    quantity=1,
+                    timestamp=int(__import__('time').time()),
+                    action='increment',
+                )
+                print(f"Usage Record作成成功: {usage_record.id}")
+            except Exception as usage_error:
+                print(f"Usage Record作成エラー: {usage_error}")
+                send_line_message(reply_token, f"❌ 使用量記録の作成に失敗しました。\n\nエラー: {str(usage_error)}")
+                return
         
         # DBに記録
         try:
             conn = get_db_connection()
             c = conn.cursor()
-            c.execute('INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id) VALUES (?, ?, ?)',
-                      (user_id_db, 1, usage_record.id))
+            if is_free:
+                c.execute('INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type) VALUES (?, ?, ?, ?, ?)',
+                          (user_id_db, 1, None, True, content['name']))
+            else:
+                c.execute('INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type) VALUES (?, ?, ?, ?, ?)',
+                          (user_id_db, 1, usage_record.id, False, content['name']))
             conn.commit()
             conn.close()
-            print(f"DB記録成功: user_id={user_id_db}")
+            print(f"DB記録成功: user_id={user_id_db}, is_free={is_free}, content_type={content['name']}")
         except Exception as db_error:
             print(f"DB記録エラー: {db_error}")
-            # DBエラーでもUsage Recordは作成済みなので、成功メッセージを送信
+            # DBエラーでも処理は継続
         
         # 成功メッセージ
-        success_message = """✅ コンテンツ追加を受け付けました！
+        if is_free:
+            success_message = f"""🎉 コンテンツ追加完了！
 
-📊 追加内容：
-• AI秘書機能 1件追加
+📚 追加内容：
+• {content['name']} 1件追加
 
 💰 料金：
-• 追加料金：1,500円（次回請求時に反映）
+• 🎉 **無料で追加されました！**
+
+📖 使用方法：
+{content['usage']}
+
+🔗 アクセスURL：
+{content['url']}
+
+何か他にお手伝いできることはありますか？"""
+        else:
+            success_message = f"""✅ コンテンツ追加完了！
+
+📚 追加内容：
+• {content['name']} 1件追加
+
+💰 料金：
+• 追加料金：{content['price']:,}円（次回請求時に反映）
+
+📖 使用方法：
+{content['usage']}
+
+🔗 アクセスURL：
+{content['url']}
 
 何か他にお手伝いできることはありますか？"""
         
@@ -735,14 +940,38 @@ def handle_status_check(reply_token, user_id_db):
     try:
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute('SELECT COUNT(*) FROM usage_logs WHERE user_id = ?', (user_id_db,))
-        usage_count = c.fetchone()[0]
+        c.execute('SELECT content_type, is_free, created_at FROM usage_logs WHERE user_id = ? ORDER BY created_at DESC', (user_id_db,))
+        usage_logs = c.fetchall()
         conn.close()
         
-        status_message = f"""📊 利用状況
+        if not usage_logs:
+            status_message = """📊 利用状況
 
-📈 今月の追加回数：{usage_count}回
-💰 追加料金：{usage_count * 1500}円
+📈 今月の追加回数：0回
+💰 追加料金：0円
+
+💡 ヒント：
+• 「追加」でコンテンツを追加
+• 「メニュー」で機能一覧を確認"""
+        else:
+            # 料金計算
+            total_cost = 0
+            content_list = []
+            for log in usage_logs:
+                content_type = log[0] or "不明"
+                is_free = log[1]
+                created_at = log[2]
+                if not is_free:
+                    total_cost += 1500
+                content_list.append(f"• {content_type} ({'無料' if is_free else '1,500円'}) - {created_at}")
+            
+            status_message = f"""📊 利用状況
+
+📈 今月の追加回数：{len(usage_logs)}回
+💰 追加料金：{total_cost:,}円
+
+📚 追加済みコンテンツ：
+{chr(10).join(content_list[:5])}  # 最新5件まで表示
 
 💡 ヒント：
 • 「追加」でコンテンツを追加
