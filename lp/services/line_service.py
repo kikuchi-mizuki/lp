@@ -121,20 +121,52 @@ def set_rich_menu_image(rich_menu_id, image_path='static/images/richmenu.png'):
         return False
 
 def set_default_rich_menu(rich_menu_id):
-    headers = {
-        'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}'
-    }
-    response = requests.post(f'https://api.line.me/v2/bot/user/all/richmenu/{rich_menu_id}', headers=headers)
-    response.raise_for_status()
+    """デフォルトリッチメニューを設定"""
+    try:
+        headers = {
+            'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}',
+            'Content-Type': 'application/json'
+        }
+        
+        response = requests.post(
+            f'https://api.line.me/v2/bot/user/all/richmenu/{rich_menu_id}',
+            headers=headers
+        )
+        
+        if response.status_code == 200:
+            print(f"デフォルトリッチメニュー設定成功: {rich_menu_id}")
+            return True
+        else:
+            print(f"デフォルトリッチメニュー設定失敗: {response.status_code} - {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"デフォルトリッチメニュー設定エラー: {e}")
+        return False
 
 def delete_all_rich_menus():
-    headers = {
-        'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}'
-    }
-    response = requests.get('https://api.line.me/v2/bot/richmenu/list', headers=headers)
-    response.raise_for_status()
-    for rm in response.json().get('richmenus', []):
-        requests.delete(f'https://api.line.me/v2/bot/richmenu/{rm["richMenuId"]}', headers=headers)
+    """既存のリッチメニューをすべて削除"""
+    try:
+        headers = {
+            'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}'
+        }
+        
+        response = requests.get('https://api.line.me/v2/bot/richmenu/list', headers=headers)
+        
+        if response.status_code == 200:
+            richmenus = response.json().get('richmenus', [])
+            for rm in richmenus:
+                delete_response = requests.delete(f'https://api.line.me/v2/bot/richmenu/{rm["richMenuId"]}', headers=headers)
+                if delete_response.status_code == 200:
+                    print(f"リッチメニュー削除成功: {rm['richMenuId']}")
+                else:
+                    print(f"リッチメニュー削除失敗: {rm['richMenuId']} - {delete_response.status_code}")
+            print(f"既存のリッチメニュー削除完了: {len(richmenus)}件")
+        else:
+            print(f"リッチメニュー一覧取得失敗: {response.status_code}")
+            
+    except Exception as e:
+        print(f"リッチメニュー削除エラー: {e}")
 
 def setup_rich_menu():
     delete_all_rich_menus()
