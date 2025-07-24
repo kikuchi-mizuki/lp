@@ -1,4 +1,6 @@
 import requests
+import sqlite3
+import psycopg2
 import os
 
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
@@ -77,3 +79,34 @@ def setup_rich_menu():
     set_rich_menu_image(rich_menu_id)
     set_default_rich_menu(rich_menu_id)
     return rich_menu_id 
+
+def get_db_connection():
+    DATABASE_URL = os.getenv('DATABASE_URL', 'database.db')
+    if DATABASE_URL.startswith('postgresql://'):
+        return psycopg2.connect(DATABASE_URL)
+    else:
+        return sqlite3.connect(DATABASE_URL)
+
+def handle_add_content(reply_token, user_id_db, stripe_subscription_id):
+    pass
+
+def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, content_number):
+    pass
+
+def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id, content_number, confirmed):
+    pass
+
+def handle_status_check(reply_token, user_id_db):
+    pass
+
+def handle_cancel_request(reply_token, user_id_db, stripe_subscription_id):
+    pass
+
+def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, selection_text):
+    pass
+
+def get_welcome_message():
+    return "ようこそ！LINE連携が完了しました。"
+
+def get_not_registered_message():
+    return "ご登録情報が見つかりません。LPからご登録ください。" 
