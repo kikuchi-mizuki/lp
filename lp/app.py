@@ -865,26 +865,15 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
             subscription_item_id = usage_item['id']
             print(f"従量課金アイテムID: {subscription_item_id}")
             
-            # Usage Record作成（新しいメータリングシステム: 直接APIリクエスト）
+            # Usage Record作成（従来API）
             try:
-                import requests
-                STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")
-                url = "https://api.stripe.com/v1/billing/meter_events"
-                headers = {
-                    "Authorization": f"Bearer {STRIPE_SECRET_KEY}"
-                }
-                data = {
-                    "subscription_item": subscription_item_id,
-                    "value": 1,
-                    "timestamp": int(__import__('time').time())
-                }
-                response = requests.post(url, headers=headers, data=data)
-                if response.status_code != 200:
-                    print(f"Usage Record作成APIエラー: {response.text}")
-                    send_line_message(reply_token, f"❌ 使用量記録の作成に失敗しました。\n\nエラー: {response.text}")
-                    return
-                usage_record = response.json()
-                print(f"Usage Record作成成功: {usage_record.get('id')}")
+                usage_record = stripe.UsageRecord.create(
+                    subscription_item=subscription_item_id,
+                    quantity=1,
+                    timestamp=int(__import__('time').time()),
+                    action='increment',
+                )
+                print(f"Usage Record作成成功: {usage_record.id}")
             except Exception as usage_error:
                 print(f"Usage Record作成エラー: {usage_error}")
                 send_line_message(reply_token, f"❌ 使用量記録の作成に失敗しました。\n\nエラー: {str(usage_error)}")
