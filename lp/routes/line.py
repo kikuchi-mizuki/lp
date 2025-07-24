@@ -71,11 +71,9 @@ def line_webhook():
                 elif text.lower() in ['いいえ', 'no', 'n']:
                     handle_content_confirmation(event['replyToken'], user_id_db, stripe_subscription_id, '1', False)
                 elif '@' in text and '.' in text and len(text) < 100:
-                    # メールアドレスっぽい文字列が来た場合
                     import unicodedata
                     def normalize_email(email):
                         email = email.strip().lower()
-                        # 全角英数→半角英数
                         email = unicodedata.normalize('NFKC', email)
                         return email
                     normalized_email = normalize_email(text)
@@ -89,7 +87,15 @@ def line_webhook():
                         else:
                             send_line_message(event['replyToken'], 'このメールアドレスは既にLINE連携済みです。')
                     else:
-                        send_line_message(event['replyToken'], 'ご登録メールアドレスが見つかりません。LPでご登録済みかご確認ください。')
+                        # 救済策: 直近のline_user_id未設定ユーザーを自動で紐付け
+                        c.execute('SELECT id FROM users WHERE line_user_id IS NULL ORDER BY created_at DESC LIMIT 1')
+                        fallback_user = c.fetchone()
+                        if fallback_user:
+                            c.execute('UPDATE users SET line_user_id = ? WHERE id = ?', (user_id, fallback_user[0]))
+                            conn.commit()
+                            send_line_message(event['replyToken'], 'メールアドレスが見つかりませんでしたが、直近の登録ユーザーにLINE連携しました。メニューや追加コマンドが利用できます。')
+                        else:
+                            send_line_message(event['replyToken'], 'ご登録メールアドレスが見つかりません。LPでご登録済みかご確認ください。')
                     conn.close()
                     continue
                 else:

@@ -121,16 +121,22 @@ def wait_for_registration():
 
 @app.route('/check_registration')
 def check_registration():
+    import unicodedata
     email = request.args.get('email')
+    def normalize_email(email):
+        if not email:
+            return email
+        email = email.strip().lower()
+        email = unicodedata.normalize('NFKC', email)
+        return email
+    email = normalize_email(email)
     if not email:
         return jsonify({'registered': False})
-    
     conn = get_db_connection()
     c = conn.cursor()
     c.execute('SELECT id FROM users WHERE email = ?', (email,))
     user = c.fetchone()
     conn.close()
-    
     if user:
         return jsonify({'registered': True, 'redirect_url': url_for('thanks', email=email, _external=True)})
     else:
@@ -138,7 +144,15 @@ def check_registration():
 
 @app.route('/thanks')
 def thanks():
+    import unicodedata
     email = request.args.get('email')
+    def normalize_email(email):
+        if not email:
+            return email
+        email = email.strip().lower()
+        email = unicodedata.normalize('NFKC', email)
+        return email
+    email = normalize_email(email)
     return render_template('thanks.html', email=email)
 
 @app.route('/static/<path:filename>')
