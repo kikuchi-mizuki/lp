@@ -20,6 +20,7 @@ from models.user import User
 from models.usage_log import UsageLog
 from routes.line import line_bp
 from routes.stripe import stripe_bp
+from utils.db import get_db_connection
 
 load_dotenv()
 
@@ -32,15 +33,6 @@ LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
 LINE_CHANNEL_SECRET = os.getenv('LINE_CHANNEL_SECRET')
 
 DATABASE_URL = os.getenv('DATABASE_URL', 'database.db')
-
-def get_db_connection():
-    """データベース接続を取得（SQLiteまたはPostgreSQL）"""
-    if DATABASE_URL.startswith('postgresql://'):
-        # PostgreSQL接続
-        return psycopg2.connect(DATABASE_URL)
-    else:
-        # SQLite接続（開発環境）
-        return sqlite3.connect(DATABASE_URL)
 
 def init_db():
     conn = get_db_connection()

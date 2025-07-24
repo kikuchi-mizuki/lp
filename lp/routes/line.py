@@ -6,6 +6,7 @@ from services.line_service import (
     handle_cancel_selection, get_welcome_message, get_not_registered_message
 )
 from utils.message_templates import get_menu_message, get_help_message, get_default_message
+from utils.db import get_db_connection
 
 line_bp = Blueprint('line', __name__)
 
