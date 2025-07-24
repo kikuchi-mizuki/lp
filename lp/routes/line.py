@@ -72,7 +72,14 @@ def line_webhook():
                     handle_content_confirmation(event['replyToken'], user_id_db, stripe_subscription_id, '1', False)
                 elif '@' in text and '.' in text and len(text) < 100:
                     # メールアドレスっぽい文字列が来た場合
-                    c.execute('SELECT id, line_user_id FROM users WHERE email = ?', (text.strip(),))
+                    import unicodedata
+                    def normalize_email(email):
+                        email = email.strip().lower()
+                        # 全角英数→半角英数
+                        email = unicodedata.normalize('NFKC', email)
+                        return email
+                    normalized_email = normalize_email(text)
+                    c.execute('SELECT id, line_user_id FROM users WHERE email = ?', (normalized_email,))
                     user = c.fetchone()
                     if user:
                         if user[1] is None:
