@@ -58,15 +58,14 @@ def index():
 
 @app.route('/thanks')
 def thanks():
-    return render_template('thanks.html')
+    email = request.args.get('email')
+    return render_template('thanks.html', email=email)
 
 @app.route('/subscribe', methods=['POST'])
 def subscribe():
     email = request.form.get('email')
     if not email:
         return redirect(url_for('index'))
-
-    # Stripe Checkoutセッション作成
     session = stripe.checkout.Session.create(
         payment_method_types=['card'],
         mode='subscription',
@@ -78,10 +77,10 @@ def subscribe():
             },
             {
                 'price': USAGE_PRICE_ID,
-                'quantity': 0,  # 従量課金は初期数量0で追加
+                'quantity': 0,
             },
         ],
-        success_url=url_for('thanks', _external=True),
+        success_url=url_for('thanks', _external=True) + f"?email={email}",
         cancel_url=url_for('index', _external=True),
     )
     return redirect(session.url, code=303)
