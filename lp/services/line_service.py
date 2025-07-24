@@ -9,8 +9,23 @@ LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
 # LINE関連のサービス層
 
 def send_line_message(reply_token, message):
-    """LINEメッセージ送信（実装はapp.pyから移動予定）"""
-    pass
+    """LINEメッセージ送信"""
+    import requests
+    import os
+    LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
+    headers = {
+        'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}',
+        'Content-Type': 'application/json'
+    }
+    data = {
+        'replyToken': reply_token,
+        'messages': [{'type': 'text', 'text': message}]
+    }
+    try:
+        response = requests.post('https://api.line.me/v2/bot/message/reply', headers=headers, json=data)
+        response.raise_for_status()
+    except Exception as e:
+        print(f'LINEメッセージ送信エラー: {e}')
 
 def create_rich_menu():
     rich_menu = {
