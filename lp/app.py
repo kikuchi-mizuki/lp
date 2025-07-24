@@ -1006,42 +1006,13 @@ def delete_rich_menu(rich_menu_id):
         return False
 
 @app.route('/setup-rich-menu')
-def setup_rich_menu():
-    """リッチメニュー設定エンドポイント"""
+def setup_rich_menu_endpoint():
     try:
-        # 既存のリッチメニューを削除
-        headers = {
-            'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}'
-        }
-        response = requests.get('https://api.line.me/v2/bot/richmenu/list', headers=headers)
-        if response.status_code == 200:
-            rich_menus = response.json()['richmenus']
-            for menu in rich_menus:
-                delete_rich_menu(menu['richMenuId'])
-        
-        # 新しいリッチメニューを作成
-        rich_menu_id = create_rich_menu()
-        if rich_menu_id:
-            # リッチメニューに画像を設定
-            if set_rich_menu_image(rich_menu_id):
-                # デフォルトリッチメニューに設定
-                if set_default_rich_menu(rich_menu_id):
-                    return jsonify({
-                        'success': True,
-                        'message': f'リッチメニュー設定完了: {rich_menu_id}',
-                        'rich_menu_id': rich_menu_id
-                    })
-        
-        return jsonify({
-            'success': False,
-            'message': 'リッチメニュー設定に失敗しました'
-        })
-        
+        from services.line_service import setup_rich_menu
+        rich_menu_id = setup_rich_menu()
+        return f'リッチメニューをセットアップしました: {rich_menu_id}'
     except Exception as e:
-        return jsonify({
-            'success': False,
-            'message': f'エラー: {str(e)}'
-        })
+        return f'リッチメニュー設定エラー: {e}'
 
 @app.route('/debug-rich-menu')
 def debug_rich_menu():
