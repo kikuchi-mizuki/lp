@@ -1022,7 +1022,8 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
         for idx in indices:
             if 0 <= idx < len(items):
                 item = items[idx]
-                stripe.SubscriptionItem.modify(item['id'], cancel_at_period_end=True)
+                #stripe.SubscriptionItem.modify(item['id'], cancel_at_period_end=True)
+                stripe.SubscriptionItem.delete(item['id'], proration_behavior='none')
                 name = item['price'].get('nickname') or item['price'].get('id')
                 cancelled.append(name)
         if cancelled:
