@@ -864,19 +864,19 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
             subscription_item_id = usage_item['id']
             print(f"従量課金アイテムID: {subscription_item_id}")
             
-            # Usage Record作成
-            try:
-                usage_record = stripe.SubscriptionItem.create_usage_record(
-                    subscription_item_id,
-                    quantity=1,
-                    timestamp=int(__import__('time').time()),
-                    action='increment',
-                )
-                print(f"Usage Record作成成功: {usage_record.id}")
-            except Exception as usage_error:
-                print(f"Usage Record作成エラー: {usage_error}")
-                send_line_message(reply_token, f"❌ 使用量記録の作成に失敗しました。\n\nエラー: {str(usage_error)}")
-                return
+                    # Usage Record作成
+        try:
+            usage_record = stripe.UsageRecord.create(
+                subscription_item=subscription_item_id,
+                quantity=1,
+                timestamp=int(__import__('time').time()),
+                action='increment',
+            )
+            print(f"Usage Record作成成功: {usage_record.id}")
+        except Exception as usage_error:
+            print(f"Usage Record作成エラー: {usage_error}")
+            send_line_message(reply_token, f"❌ 使用量記録の作成に失敗しました。\n\nエラー: {str(usage_error)}")
+            return
         
         # DBに記録
         try:
