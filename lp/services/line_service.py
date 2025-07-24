@@ -3,6 +3,7 @@ import sqlite3
 import psycopg2
 import os
 import stripe
+import traceback
 
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
 
@@ -12,6 +13,7 @@ def send_line_message(reply_token, message):
     """LINEメッセージ送信"""
     import requests
     import os
+    import traceback
     LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
     headers = {
         'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}',
@@ -26,6 +28,7 @@ def send_line_message(reply_token, message):
         response.raise_for_status()
     except Exception as e:
         print(f'LINEメッセージ送信エラー: {e}')
+        traceback.print_exc()
 
 def create_rich_menu():
     rich_menu = {
