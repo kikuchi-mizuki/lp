@@ -291,12 +291,24 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                 c.execute('INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type) VALUES (?, ?, ?, ?, ?)',
                           (user_id_db, 1, None, True, content['name']))
             else:
+                # usage_recordのidフィールドを安全に取得
+                usage_record_id = None
+                if usage_record and 'id' in usage_record:
+                    usage_record_id = usage_record['id']
+                elif usage_record and 'meter_event' in usage_record:
+                    usage_record_id = usage_record['meter_event']['id']
+                
                 c.execute('INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type) VALUES (?, ?, ?, ?, ?)',
-                          (user_id_db, 1, usage_record.id if usage_record else None, False, content['name']))
+                          (user_id_db, 1, usage_record_id, False, content['name']))
             conn.commit()
             conn.close()
+            print(f'DB登録成功: user_id={user_id_db}, is_free={is_free}, usage_record_id={usage_record_id}')
         except Exception as db_error:
-            pass
+            print(f'DB登録エラー: {db_error}')
+            import traceback
+            print(traceback.format_exc())
+            send_line_message(reply_token, f"❌ データベース登録に失敗しました。\n\nエラー: {str(db_error)}")
+            return
         if is_free:
             success_message = f"""🎉 コンテンツ追加完了！
 
