@@ -72,16 +72,9 @@ def line_webhook():
                     handle_content_confirmation(event['replyToken'], user_id_db, stripe_subscription_id, '1', False)
                 elif '@' in text and '.' in text and len(text) < 100:
                     # メールアドレスっぽい文字列が来た場合
-                    import time
-                    found = False
-                    for _ in range(3):
-                        c.execute('SELECT id, line_user_id FROM users WHERE email = ?', (text.strip(),))
-                        user = c.fetchone()
-                        if user:
-                            found = True
-                            break
-                        time.sleep(2)
-                    if found:
+                    c.execute('SELECT id, line_user_id FROM users WHERE email = ?', (text.strip(),))
+                    user = c.fetchone()
+                    if user:
                         if user[1] is None:
                             c.execute('UPDATE users SET line_user_id = ? WHERE id = ?', (user_id, user[0]))
                             conn.commit()

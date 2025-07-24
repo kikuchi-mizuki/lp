@@ -111,9 +111,35 @@ app.register_blueprint(stripe_bp)
 def index():
     return render_template('index.html')
 
+@app.route('/wait_for_registration')
+def wait_for_registration():
+    email = request.args.get('email')
+    if not email:
+        return redirect(url_for('index'))
+    
+    return render_template('wait_for_registration.html', email=email)
+
+@app.route('/check_registration')
+def check_registration():
+    email = request.args.get('email')
+    if not email:
+        return jsonify({'registered': False})
+    
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute('SELECT id FROM users WHERE email = ?', (email,))
+    user = c.fetchone()
+    conn.close()
+    
+    if user:
+        return jsonify({'registered': True, 'redirect_url': url_for('thanks', email=email, _external=True)})
+    else:
+        return jsonify({'registered': False})
+
 @app.route('/thanks')
 def thanks():
-    return render_template('thanks.html')
+    email = request.args.get('email')
+    return render_template('thanks.html', email=email)
 
 @app.route('/static/<path:filename>')
 def static_files(filename):
@@ -261,18 +287,13 @@ def subscribe():
     # Stripe Checkoutセッション作成
     session = stripe.checkout.Session.create(
         payment_method_types=['card'],
+        line_items=[{
+            'price': MONTHLY_PRICE_ID,
+            'quantity': 1,
+        }],
         mode='subscription',
-        customer_email=email,
-        line_items=[
-            {
-                'price': MONTHLY_PRICE_ID,
-                'quantity': 1,
-            },
-        ],
-        subscription_data={
-            'trial_period_days': 7
-        },
-        success_url=url_for('thanks', _external=True),
+        subscription_data={'trial_period_days': 7},
+        success_url=url_for('wait_for_registration', _external=True) + f"?email={email}",
         cancel_url=url_for('index', _external=True),
     )
     return redirect(session.url, code=303)
