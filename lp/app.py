@@ -683,22 +683,34 @@ def handle_add_content(reply_token, user_id_db, stripe_subscription_id):
             return
         
         subscription_item_id = usage_item['id']
+        print(f"従量課金アイテムID: {subscription_item_id}")
         
         # Usage Record作成
-        usage_record = stripe.UsageRecord.create(
-            subscription_item=subscription_item_id,
-            quantity=1,
-            timestamp=int(__import__('time').time()),
-            action='increment',
-        )
+        try:
+            usage_record = stripe.UsageRecord.create(
+                subscription_item=subscription_item_id,
+                quantity=1,
+                timestamp=int(__import__('time').time()),
+                action='increment',
+            )
+            print(f"Usage Record作成成功: {usage_record.id}")
+        except Exception as usage_error:
+            print(f"Usage Record作成エラー: {usage_error}")
+            send_line_message(reply_token, f"❌ 使用量記録の作成に失敗しました。\n\nエラー: {str(usage_error)}")
+            return
         
         # DBに記録
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute('INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id) VALUES (?, ?, ?)',
-                  (user_id_db, 1, usage_record.id))
-        conn.commit()
-        conn.close()
+        try:
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute('INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id) VALUES (?, ?, ?)',
+                      (user_id_db, 1, usage_record.id))
+            conn.commit()
+            conn.close()
+            print(f"DB記録成功: user_id={user_id_db}")
+        except Exception as db_error:
+            print(f"DB記録エラー: {db_error}")
+            # DBエラーでもUsage Recordは作成済みなので、成功メッセージを送信
         
         # 成功メッセージ
         success_message = """✅ コンテンツ追加を受け付けました！
