@@ -12,6 +12,7 @@ import psycopg2
 from urllib.parse import urlparse
 from PIL import Image, ImageDraw, ImageFont
 import io
+from utils.message_templates import get_default_message, get_menu_message, get_help_message
 
 load_dotenv()
 
@@ -631,14 +632,6 @@ def get_welcome_message():
 
 何かご質問がございましたら、お気軽にお声かけください！"""
 
-def get_menu_message():
-    """メニュー表示"""
-    return """📖 メニュー\n\n1️⃣ コンテンツ追加：「追加」\n2️⃣ コンテンツ解約：「解約」\n3️⃣ 利用状況確認：「状態」\n4️⃣ ヘルプ：「ヘルプ」\n\nご希望のコマンドを入力してください。"""
-
-def get_help_message():
-    """ヘルプメッセージ"""
-    return """🆘 ヘルプ\n\n• 「追加」… 利用したいコンテンツを選んで追加できます（1個目は無料）\n• 「解約」… 契約中のコンテンツや月額を選んで解約できます（請求期間終了まで利用可）\n• 「状態」… 現在の利用状況や料金を確認できます\n• 「メニュー」… 機能一覧を表示します\n\nご不明な点は「ヘルプ」と入力してください。"""
-
 def get_not_registered_message():
     """未登録ユーザーメッセージ"""
     return """⚠️ ご登録情報が見つかりません
@@ -649,10 +642,6 @@ AIコレクションズをご利用いただくには、先にLPからご登録�
 https://lp-production-xxxx.up.railway.app
 
 ご登録後、再度お声かけください！"""
-
-def get_default_message():
-    """デフォルトメッセージ"""
-    return """�� 何かお手伝いできることはありますか？\n\n📋 利用可能なコマンド：\n• 「追加」- コンテンツを追加\n• 「解約」- コンテンツや月額の解約\n• 「メニュー」- 機能一覧を表示\n• 「状態」- 利用状況を確認\n• 「ヘルプ」- 使い方ガイド\n\nお気軽にお声かけください！"""
 
 def handle_add_content(reply_token, user_id_db, stripe_subscription_id):
     """コンテンツ選択メニュー表示"""
