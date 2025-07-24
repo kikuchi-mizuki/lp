@@ -44,33 +44,54 @@
             width: 0%;
             transition: width 0.3s ease;
         }
+        .retry-btn {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 10px 30px;
+            background: #3498db;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .retry-btn:disabled {
+            background: #aaa;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body>
     <div class="loading-container">
         <h1>登録処理中...</h1>
         <div class="spinner"></div>
-        <div class="status-text">お客様の登録情報を処理しています</div>
+        <div class="status-text">お客様の登録情報を処理しています。<br>あと少しで完了しますので、そのままお待ちください。</div>
         <div class="progress-bar">
             <div class="progress-fill" id="progressFill"></div>
         </div>
         <p>しばらくお待ちください。処理が完了すると自動的に次のページに進みます。</p>
+        <button class="retry-btn" id="retryBtn" style="display:none;">再チェック</button>
     </div>
 
     <script>
         const email = '{{ email }}';
         let checkCount = 0;
-        const maxChecks = 30; // 最大30回チェック（約30秒）
-        
+        const maxChecks = 60; // 最大60回チェック（約2分）
+        let isTimeout = false;
+
         function updateProgress() {
             const progress = (checkCount / maxChecks) * 100;
             document.getElementById('progressFill').style.width = progress + '%';
         }
-        
+
+        function setStatusText(text) {
+            document.querySelector('.status-text').innerHTML = text;
+        }
+
         function checkRegistration() {
             checkCount++;
             updateProgress();
-            
+            isTimeout = false;
             fetch(`/check_registration?email=${encodeURIComponent(email)}`)
                 .then(response => response.json())
                 .then(data => {
@@ -79,11 +100,13 @@
                         window.location.href = data.redirect_url;
                     } else if (checkCount >= maxChecks) {
                         // タイムアウト
-                        document.querySelector('.status-text').textContent = '登録処理がタイムアウトしました。';
+                        isTimeout = true;
+                        setStatusText('登録処理がタイムアウトしました。<br>サーバーの混雑や通信状況により遅れる場合があります。<br>「再チェック」ボタンを押すと再度確認できます。');
                         document.querySelector('.spinner').style.display = 'none';
-                        document.querySelector('p').innerHTML = 
+                        document.querySelector('p').innerHTML =
                             '申し訳ございませんが、登録処理に時間がかかっています。<br>' +
                             '<a href="/" style="color: #3498db;">トップページに戻る</a>';
+                        document.getElementById('retryBtn').style.display = 'inline-block';
                     } else {
                         // まだ登録されていない、2秒後に再チェック
                         setTimeout(checkRegistration, 2000);
@@ -92,17 +115,32 @@
                 .catch(error => {
                     console.error('Error checking registration:', error);
                     if (checkCount >= maxChecks) {
-                        document.querySelector('.status-text').textContent = 'エラーが発生しました。';
+                        isTimeout = true;
+                        setStatusText('エラーが発生しました。<br>「再チェック」ボタンを押すと再度確認できます。');
                         document.querySelector('.spinner').style.display = 'none';
-                        document.querySelector('p').innerHTML = 
+                        document.querySelector('p').innerHTML =
                             '申し訳ございませんが、エラーが発生しました。<br>' +
                             '<a href="/" style="color: #3498db;">トップページに戻る</a>';
+                        document.getElementById('retryBtn').style.display = 'inline-block';
                     } else {
                         setTimeout(checkRegistration, 2000);
                     }
                 });
         }
-        
+
+        document.getElementById('retryBtn').addEventListener('click', function() {
+            // 再チェック
+            checkCount = 0;
+            isTimeout = false;
+            document.querySelector('.spinner').style.display = 'block';
+            setStatusText('再度確認しています。しばらくお待ちください。');
+            document.getElementById('retryBtn').style.display = 'none';
+            document.querySelector('p').innerHTML =
+                'しばらくお待ちください。処理が完了すると自動的に次のページに進みます。';
+            updateProgress();
+            setTimeout(checkRegistration, 1000);
+        });
+
         // 初回チェック開始
         setTimeout(checkRegistration, 1000);
     </script>
