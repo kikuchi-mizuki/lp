@@ -28,6 +28,7 @@ def line_webhook():
     try:
         events = json.loads(body).get('events', [])
         for event in events:
+            # テキストメッセージの処理
             if event.get('type') == 'message' and event['message'].get('type') == 'text':
                 user_id = event['source']['userId']
                 text = event['message']['text']
@@ -78,10 +79,6 @@ def line_webhook():
                         email = unicodedata.normalize('NFKC', email)
                         return email
                     normalized_email = normalize_email(text)
-                    # デバッグ: DB内の全メールアドレスを取得
-                    c.execute('SELECT email FROM users')
-                    all_emails = [row[0] for row in c.fetchall()]
-                    debug_msg = f"[DEBUG]\n検索: {normalized_email}\nDB: {all_emails}"
                     c.execute('SELECT id, line_user_id FROM users WHERE email = ?', (normalized_email,))
                     user = c.fetchone()
                     if user:
@@ -101,14 +98,50 @@ def line_webhook():
                             send_line_message(event['replyToken'], 'メールアドレスが見つかりませんでしたが、直近の登録ユーザーにLINE連携しました。メニューや追加コマンドが利用できます。')
                         else:
                             send_line_message(event['replyToken'], 'ご登録メールアドレスが見つかりません。LPでご登録済みかご確認ください。')
-                    # デバッグメッセージを送信
-                    send_line_message(event['replyToken'], debug_msg)
-                    conn.close()
-                    continue
                 else:
                     send_line_message(event['replyToken'], get_default_message())
                 conn.close()
-            # postbackイベントも同様に移動（省略）
+            # リッチメニューのpostbackイベントの処理
+            elif event.get('type') == 'postback':
+                user_id = event['source']['userId']
+                postback_data = event['postback']['data']
+                conn = get_db_connection()
+                c = conn.cursor()
+                c.execute('SELECT id, stripe_subscription_id, line_user_id FROM users WHERE line_user_id = ?', (user_id,))
+                user = c.fetchone()
+                if not user:
+                    send_line_message(event['replyToken'], get_not_registered_message())
+                    conn.close()
+                    continue
+                user_id_db = user[0]
+                stripe_subscription_id = user[1]
+                # postbackデータに基づいて処理
+                if postback_data == 'action=add_content':
+                    user_states[user_id] = 'add_select'
+                    handle_add_content(event['replyToken'], user_id_db, stripe_subscription_id)
+                elif postback_data == 'action=check_status':
+                    handle_status_check(event['replyToken'], user_id_db)
+                elif postback_data == 'action=cancel_content':
+                    user_states[user_id] = 'cancel_select'
+                    handle_cancel_request(event['replyToken'], user_id_db, stripe_subscription_id)
+                elif postback_data == 'action=help':
+                    send_line_message(event['replyToken'], get_help_message())
+                elif postback_data == 'action=share':
+                    share_message = """📢 友達に紹介
+
+AIコレクションズをご利用いただき、ありがとうございます！
+
+🤝 友達にもおすすめしませんか？
+• 1個目のコンテンツは無料
+• 月額5,000円で複数のAIツールを利用可能
+• 従量課金で必要な分だけ追加
+
+🔗 紹介URL：
+https://lp-production-9e2c.up.railway.app
+
+友達が登録すると、あなたにも特典があります！"""
+                    send_line_message(event['replyToken'], share_message)
+                conn.close()
     except Exception as e:
         import traceback
         traceback.print_exc()
