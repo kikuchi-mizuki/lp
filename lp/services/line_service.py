@@ -696,43 +696,39 @@ def handle_cancel_request(reply_token, user_id_db, stripe_subscription_id):
         items = subscription['items']['data']
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute('SELECT content_type, is_free FROM usage_logs WHERE user_id = %s', (user_id_db,))
-        usage_free_map = {}
-        for row in c.fetchall():
-            usage_free_map[row[0]] = usage_free_map.get(row[0], False) or row[1]
+        
+        # 実際に追加されたコンテンツを取得
+        c.execute('SELECT content_type, is_free FROM usage_logs WHERE user_id = %s ORDER BY created_at', (user_id_db,))
+        added_contents = c.fetchall()
         conn.close()
+        
         content_choices = []
-        for idx, item in enumerate(items, 1):
+        choice_index = 1
+        
+        # 月額基本料金を最初に表示
+        for item in items:
             price = item['price']
             price_id = price.get('id', '')
-            product_id = price.get('product', '')
-            nickname = price.get('nickname', '')
             unit_amount = price.get('unit_amount', 0)
             
-            print(f'[DEBUG] 解約対象: price_id={price_id}, product_id={product_id}, nickname={nickname}, unit_amount={unit_amount}')
-            
-            # Price IDに基づいて日本語名を判定
             if 'price_1Rofzxlxg6C5hAVdDp7fcqds' in price_id or unit_amount >= 3900:
-                jp_name = '月額基本料金'
-            elif 'price_1Rog1nlxg6C5hAVdnqB5MJiT' in price_id or unit_amount == 1500:
-                jp_name = '従量課金（コンテンツ追加）'
-            elif 'schedule' in nickname.lower() or 'prod_SgSj7btk61lSNI' in product_id:
-                jp_name = 'AI予定秘書'
-            elif 'accounting' in nickname.lower() or 'prod_SgSnVeUB5DAihu' in product_id:
-                jp_name = 'AI経理秘書'
-            elif 'task' in nickname.lower():
-                jp_name = 'AIタスクコンシェルジュ'
-            else:
-                jp_name = f'コンテンツ{idx}'
-            
-            amount_jpy = int(unit_amount) if unit_amount else 0
-            is_free = usage_free_map.get(jp_name, False)
-            display_price = '0円' if is_free else f'{amount_jpy:,}円'
-            content_choices.append(f"{idx}. {jp_name}（{display_price}/月）")
-            print(f'[DEBUG] 解約選択肢: {idx}. {jp_name}（{display_price}/月）')
+                content_choices.append(f"{choice_index}. 月額基本料金（3,900円/月）")
+                print(f'[DEBUG] 解約選択肢: {choice_index}. 月額基本料金（3,900円/月）')
+                choice_index += 1
+                break
+        
+        # 実際に追加されたコンテンツを表示
+        for content_type, is_free in added_contents:
+            if content_type in ['AI予定秘書', 'AI経理秘書', 'AIタスクコンシェルジュ']:
+                display_price = '0円' if is_free else '1,500円'
+                content_choices.append(f"{choice_index}. {content_type}（{display_price}/件）")
+                print(f'[DEBUG] 解約選択肢: {choice_index}. {content_type}（{display_price}/件）')
+                choice_index += 1
+        
         if not content_choices:
             send_line_message(reply_token, [{"type": "text", "text": "現在契約中のコンテンツはありません。"}])
             return
+        
         choice_message = "\n".join(content_choices)
         send_line_message(reply_token, [{"type": "text", "text": f"解約したいコンテンツを選んでください（カンマ区切りで複数選択可）:\n{choice_message}\n\n例: 1,2"}])
     except Exception as e:
@@ -742,33 +738,34 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
     try:
         subscription = stripe.Subscription.retrieve(stripe_subscription_id)
         items = subscription['items']['data']
-        indices = [int(x.strip())-1 for x in selection_text.split(',') if x.strip().isdigit()]
+        
+        # 実際に追加されたコンテンツを取得
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute('SELECT content_type, is_free FROM usage_logs WHERE user_id = %s ORDER BY created_at', (user_id_db,))
+        added_contents = c.fetchall()
+        conn.close()
+        
+        # 選択された番号を解析
+        selected_indices = [int(x.strip()) for x in selection_text.split(',') if x.strip().isdigit()]
+        
         cancelled = []
-        for idx in indices:
-            if 0 <= idx < len(items):
-                item = items[idx]
-                stripe.SubscriptionItem.delete(item['id'], proration_behavior='none')
-                price = item['price']
-                price_id = price.get('id', '')
-                product_id = price.get('product', '')
-                nickname = price.get('nickname', '')
-                unit_amount = price.get('unit_amount', 0)
-                
-                # Price IDに基づいて日本語名を判定
-                if 'price_1Rofzxlxg6C5hAVdDp7fcqds' in price_id or unit_amount >= 3900:
-                    jp_name = '月額基本料金'
-                elif 'price_1Rog1nlxg6C5hAVdnqB5MJiT' in price_id or unit_amount == 1500:
-                    jp_name = '従量課金（コンテンツ追加）'
-                elif 'schedule' in nickname.lower() or 'prod_SgSj7btk61lSNI' in product_id:
-                    jp_name = 'AI予定秘書'
-                elif 'accounting' in nickname.lower() or 'prod_SgSnVeUB5DAihu' in product_id:
-                    jp_name = 'AI経理秘書'
-                elif 'task' in nickname.lower():
-                    jp_name = 'AIタスクコンシェルジュ'
-                else:
-                    jp_name = f'コンテンツ{idx+1}'
-                
-                cancelled.append(jp_name)
+        choice_index = 1
+        
+        # 月額基本料金の処理
+        has_monthly = any('price_1Rofzxlxg6C5hAVdDp7fcqds' in item['price'].get('id', '') or item['price'].get('unit_amount', 0) >= 3900 for item in items)
+        if has_monthly and choice_index in selected_indices:
+            # 月額基本料金の解約処理（実際には削除せず、メッセージのみ）
+            cancelled.append('月額基本料金')
+        choice_index += 1
+        
+        # 実際に追加されたコンテンツの処理
+        for content_type, is_free in added_contents:
+            if content_type in ['AI予定秘書', 'AI経理秘書', 'AIタスクコンシェルジュ']:
+                if choice_index in selected_indices:
+                    cancelled.append(content_type)
+                choice_index += 1
+        
         if cancelled:
             send_line_message(reply_token, [{"type": "text", "text": f"以下のコンテンツの解約を受け付けました（請求期間終了まで利用可能です）：\n" + "\n".join(cancelled)}])
         else:
