@@ -508,7 +508,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                 return
             subscription_item_id = usage_item['id']
             try:
-                # Meter付き従量課金の場合はsubscription_items/{id}/usage_records APIを使用
+                # 新しいMeter付き従量課金システムの場合はbilling/meter_events APIを使用
                 import requests
                 import os
                 import time
@@ -520,22 +520,22 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                     'Content-Type': 'application/x-www-form-urlencoded'
                 }
                 
-                # Meter付き従量課金の場合はsubscription_items/{id}/usage_records APIを使用
+                # 新しいMeter付き従量課金システムの場合はbilling/meter_events APIを使用
                 response = requests.post(
-                    f'https://api.stripe.com/v1/subscription_items/{subscription_item_id}/usage_records',
+                    'https://api.stripe.com/v1/billing/meter_events',
                     headers=headers,
                     data={
-                        'quantity': 1,
-                        'timestamp': int(time.time()),
-                        'action': 'increment'
+                        'meter': 'mtr_test_61SuTp31IPUvCq22o41Ixg6C5hAVd1Gi',
+                        'value': 1,
+                        'timestamp': int(time.time())
                     }
                 )
                 
                 if response.status_code == 200:
                     usage_record = response.json()
-                    print(f'Meter使用量レコード作成成功: {usage_record}')
+                    print(f'新しいMeter使用量レコード作成成功: {usage_record}')
                 else:
-                    print(f'[DEBUG] Meter使用量レコード作成エラー: {response.status_code} - {response.text}')
+                    print(f'[DEBUG] 新しいMeter使用量レコード作成エラー: {response.status_code} - {response.text}')
                     
                     # サブスクリプションがキャンセルされている場合の特別な処理
                     if "subscription has been canceled" in response.text:
@@ -565,7 +565,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                         send_line_message(reply_token, [{"type": "text", "text": f"❌ 使用量記録の作成に失敗しました。\n\nエラー: {response.text}"}])
                     return
             except Exception as usage_error:
-                print(f'[DEBUG] Meter使用量レコード作成例外: {usage_error}')
+                print(f'[DEBUG] 新しいMeter使用量レコード作成例外: {usage_error}')
                 import traceback
                 print(traceback.format_exc())
                 
