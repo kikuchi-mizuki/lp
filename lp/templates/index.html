@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AIコレクションズ - AI秘書サブスクリプション</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://js.stripe.com/v3/"></script>
 </head>
 <body>
     <header>
@@ -21,7 +22,7 @@
             <div class="hero-content">
                 <h1 class="hero-title">AIがあなたの<br>秘書になる時代</h1>
                 <p class="hero-subtitle">スマホに話しかけるだけで<br>日常のタスクがどんどん片付いていく</p>
-                <form action="/subscribe" method="post" class="hero-form">
+                <form id="subscription-form" class="hero-form">
                     <input type="email" name="email" placeholder="メールアドレスを入力" required class="hero-input">
                     <button type="submit" class="hero-btn">１週間無料トライアル中！</button>
                 </form>
@@ -105,5 +106,46 @@
         </div>
         <div class="footer-copyright">&copy; 2024 AIコレクションズ</div>
     </footer>
+
+    <script>
+        document.getElementById('subscription-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const email = document.querySelector('input[name="email"]').value;
+            const submitButton = document.querySelector('.hero-btn');
+            
+            // ボタンを無効化
+            submitButton.disabled = true;
+            submitButton.textContent = '処理中...';
+            
+            try {
+                const response = await fetch('/subscribe', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email: email })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    alert('エラーが発生しました: ' + data.error);
+                    submitButton.disabled = false;
+                    submitButton.textContent = '１週間無料トライアル中！';
+                    return;
+                }
+                
+                // Stripeの決済ページにリダイレクト
+                window.location.href = data.url;
+                
+            } catch (error) {
+                console.error('Error:', error);
+                alert('エラーが発生しました。もう一度お試しください。');
+                submitButton.disabled = false;
+                submitButton.textContent = '１週間無料トライアル中！';
+            }
+        });
+    </script>
 </body>
 </html>

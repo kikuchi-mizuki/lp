@@ -237,24 +237,28 @@ def subscribe():
         if not email:
             return jsonify({'error': 'Email is required'}), 400
         
-        # 顧客作成
-        customer = stripe.Customer.create(
-            email=email,
-            metadata={'source': 'web'}
-        )
-        
-        # サブスクリプション作成
-        subscription = stripe.Subscription.create(
-            customer=customer.id,
-            items=[{'price': MONTHLY_PRICE_ID}],
-            payment_behavior='default_incomplete',
-            payment_settings={'save_default_payment_method': 'on_subscription'},
-            expand=['latest_invoice.payment_intent'],
+        # Stripe Checkout Sessionを作成
+        session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            mode='subscription',
+            customer_email=email,
+            line_items=[
+                {
+                    'price': MONTHLY_PRICE_ID,
+                    'quantity': 1,
+                },
+                {
+                    'price': USAGE_PRICE_ID,
+                    'quantity': 0,
+                },
+            ],
+            success_url=url_for('thanks', _external=True) + f"?email={email}",
+            cancel_url=url_for('index', _external=True),
         )
         
         return jsonify({
-            'subscription_id': subscription.id,
-            'client_secret': subscription.latest_invoice.payment_intent.client_secret
+            'session_id': session.id,
+            'url': session.url
         })
         
     except Exception as e:
