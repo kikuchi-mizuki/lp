@@ -311,14 +311,44 @@ def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, co
             send_line_message(reply_token, [{"type": "text", "text": "無効な選択です。1-3の数字で選択してください。"}])
             return
         content = content_info[content_number]
-        # usage_countの取得はuser_idとcontent_typeの組み合わせで行う
+        # 全コンテンツの合計数を取得
         conn_count = get_db_connection()
         c_count = conn_count.cursor()
+        c_count.execute('SELECT COUNT(*) FROM usage_logs WHERE user_id = %s', (user_id_db,))
+        total_usage_count = c_count.fetchone()[0]
+        # 同じコンテンツの追加回数を確認
         c_count.execute('SELECT COUNT(*) FROM usage_logs WHERE user_id = %s AND content_type = %s', (user_id_db, content['name']))
-        usage_count = c_count.fetchone()[0]
+        same_content_count = c_count.fetchone()[0]
         conn_count.close()
-        is_free = usage_count == 0
-        price_message = "料金：無料（1個目）" if is_free else f"料金：1,500円（{usage_count + 1}個目）"
+        
+        # 同じコンテンツが既に追加されている場合
+        if same_content_count > 0:
+            already_added_message = {
+                "type": "template",
+                "altText": "すでに追加されています",
+                "template": {
+                    "type": "buttons",
+                    "title": "すでに追加されています",
+                    "text": f"{content['name']}は既に追加済みです。\n\n他のコンテンツを追加するか、利用状況を確認してください。",
+                    "actions": [
+                        {
+                            "type": "message",
+                            "label": "他のコンテンツ追加",
+                            "text": "追加"
+                        },
+                        {
+                            "type": "message",
+                            "label": "利用状況確認",
+                            "text": "状態"
+                        }
+                    ]
+                }
+            }
+            send_line_message(reply_token, [already_added_message])
+            return
+        
+        is_free = total_usage_count == 0
+        price_message = "料金：無料（1個目）" if is_free else f"料金：1,500円（{total_usage_count + 1}個目）"
         confirm_message = {
             "type": "template",
             "altText": "選択内容の確認",
@@ -638,7 +668,7 @@ def handle_status_check(reply_token, user_id_db):
                 if not is_free:
                     total_cost += 1500
                 content_list.append(f"• {content_type} ({'無料' if is_free else '1,500円'}) - {created_at}")
-            status_message = f"""�� 利用状況
+            status_message = f"""📊 利用状況
 
 📈 今月の追加回数：{len(usage_logs)}回
 💰 追加料金：{total_cost:,}円
