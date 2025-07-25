@@ -526,6 +526,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                 subscription = stripe.Subscription.retrieve(stripe_subscription_id)
                 customer_id = subscription['customer']
                 
+                # payloadを正しい形式で作成
                 payload_data = {
                     'stripe_customer_id': customer_id,
                     'value': 1
@@ -536,7 +537,8 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                     headers=headers,
                     data={
                         'event_name': 'aiコレクションズ',
-                        'payload': json.dumps(payload_data),
+                        'metadata[stripe_customer_id]': customer_id,
+                        'metadata[value]': '1',
                         'timestamp': int(time.time())
                     }
                 )
