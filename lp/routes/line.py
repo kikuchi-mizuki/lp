@@ -123,19 +123,24 @@ def line_webhook():
                 user_id_db = user[0]
                 stripe_subscription_id = user[1]
                 
-                # 既存ユーザーの初回メッセージ時に案内文を送信
-                print(f'[DEBUG] 既存ユーザーの初回メッセージ処理: user_id={user_id}')
-                try:
-                    from services.line_service import send_welcome_with_buttons
-                    send_welcome_with_buttons(event['replyToken'])
-                    print(f'[DEBUG] 既存ユーザーへの案内文送信完了: user_id={user_id}')
-                    # 案内文を送信した後は処理を終了（replyTokenは1回しか使用できない）
-                    conn.close()
-                    continue
-                except Exception as e:
-                    print(f'[DEBUG] 既存ユーザーへの案内文送信エラー: {e}')
-                    import traceback
-                    traceback.print_exc()
+                # 既存ユーザーの初回メッセージ時に案内文を送信（初回のみ）
+                if user_id not in user_states or user_states.get(user_id) != 'welcome_sent':
+                    print(f'[DEBUG] 既存ユーザーの初回メッセージ処理: user_id={user_id}')
+                    try:
+                        from services.line_service import send_welcome_with_buttons
+                        send_welcome_with_buttons(event['replyToken'])
+                        print(f'[DEBUG] 既存ユーザーへの案内文送信完了: user_id={user_id}')
+                        # 案内文送信済みフラグを設定
+                        user_states[user_id] = 'welcome_sent'
+                        # 案内文を送信した後は処理を終了（replyTokenは1回しか使用できない）
+                        conn.close()
+                        continue
+                    except Exception as e:
+                        print(f'[DEBUG] 既存ユーザーへの案内文送信エラー: {e}')
+                        import traceback
+                        traceback.print_exc()
+                else:
+                    print(f'[DEBUG] 既存ユーザーの案内文は既に送信済み: user_id={user_id}')
                 
                 state = user_states.get(user_id, None)
                 if text == '追加':
