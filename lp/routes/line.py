@@ -4,7 +4,8 @@ from services.line_service import send_line_message
 from services.line_service import (
     handle_add_content, handle_content_selection,
     handle_content_confirmation, handle_status_check, handle_cancel_request,
-    handle_cancel_selection, get_welcome_message, get_not_registered_message
+    handle_cancel_selection, handle_subscription_cancel, handle_cancel_menu,
+    get_welcome_message, get_not_registered_message
 )
 from utils.message_templates import get_menu_message, get_help_message, get_default_message
 from utils.db import get_db_connection
@@ -153,6 +154,10 @@ def line_webhook():
                 elif text == '状態':
                     handle_status_check(event['replyToken'], user_id_db)
                 elif text == '解約':
+                    handle_cancel_menu(event['replyToken'], user_id_db, stripe_subscription_id)
+                elif text == 'サブスクリプション解約':
+                    handle_subscription_cancel(event['replyToken'], user_id_db, stripe_subscription_id)
+                elif text == 'コンテンツ解約':
                     user_states[user_id] = 'cancel_select'
                     handle_cancel_request(event['replyToken'], user_id_db, stripe_subscription_id)
                 elif state == 'add_select' and text in ['1', '2', '3', '4']:
@@ -244,8 +249,7 @@ def line_webhook():
                 elif postback_data == 'action=check_status':
                     handle_status_check(event['replyToken'], user_id_db)
                 elif postback_data == 'action=cancel_content':
-                    user_states[user_id] = 'cancel_select'
-                    handle_cancel_request(event['replyToken'], user_id_db, stripe_subscription_id)
+                    handle_cancel_menu(event['replyToken'], user_id_db, stripe_subscription_id)
                 elif postback_data == 'action=help':
                     send_line_message(event['replyToken'], [get_help_message()])
                 elif postback_data == 'action=share':

@@ -776,6 +776,73 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
     except Exception as e:
         send_line_message(reply_token, [{"type": "text", "text": "❌ 解約処理に失敗しました。しばらく時間をおいて再度お試しください。"}])
 
+def handle_subscription_cancel(reply_token, user_id_db, stripe_subscription_id):
+    """サブスクリプション全体を解約"""
+    try:
+        # サブスクリプションをキャンセル
+        subscription = stripe.Subscription.modify(
+            stripe_subscription_id,
+            cancel_at_period_end=True
+        )
+        
+        # 解約確認メッセージを送信
+        cancel_message = {
+            "type": "template",
+            "altText": "サブスクリプション解約完了",
+            "template": {
+                "type": "buttons",
+                "title": "サブスクリプション解約完了",
+                "text": "サブスクリプション全体の解約を受け付けました。\n\n請求期間終了まで全てのサービスをご利用いただけます。\n\n解約をキャンセルする場合は、お問い合わせください。",
+                "actions": [
+                    {
+                        "type": "message",
+                        "label": "メニューに戻る",
+                        "text": "メニュー"
+                    }
+                ]
+            }
+        }
+        send_line_message(reply_token, [cancel_message])
+        
+    except Exception as e:
+        print(f'[ERROR] サブスクリプション解約エラー: {e}')
+        send_line_message(reply_token, [{"type": "text", "text": "❌ サブスクリプション解約に失敗しました。しばらく時間をおいて再度お試しください。"}])
+
+def handle_cancel_menu(reply_token, user_id_db, stripe_subscription_id):
+    """解約メニューを表示"""
+    try:
+        cancel_menu_message = {
+            "type": "template",
+            "altText": "解約メニュー",
+            "template": {
+                "type": "buttons",
+                "title": "解約メニュー",
+                "text": "どの解約をご希望ですか？",
+                "actions": [
+                    {
+                        "type": "message",
+                        "label": "サブスクリプション全体を解約",
+                        "text": "サブスクリプション解約"
+                    },
+                    {
+                        "type": "message",
+                        "label": "コンテンツを個別解約",
+                        "text": "コンテンツ解約"
+                    },
+                    {
+                        "type": "message",
+                        "label": "メニューに戻る",
+                        "text": "メニュー"
+                    }
+                ]
+            }
+        }
+        send_line_message(reply_token, [cancel_menu_message])
+        
+    except Exception as e:
+        print(f'[ERROR] 解約メニュー表示エラー: {e}')
+        send_line_message(reply_token, [{"type": "text", "text": "❌ 解約メニューの表示に失敗しました。しばらく時間をおいて再度お試しください。"}])
+
 def get_welcome_message():
     return "ようこそ！LINE連携が完了しました。"
 
