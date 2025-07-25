@@ -66,7 +66,7 @@ def send_welcome_with_buttons(reply_token):
                 "template": {
                     "type": "buttons",
                     "title": "ようこそ！AIコレクションズへ",
-                    "text": "AI秘書機能、会計管理、スケジュール管理、タスク管理を提供しています。\n\n料金：\n• 月額基本料金：3,900円\n• コンテンツ追加：1個目無料、2個目以降1,500円/件\n\nまずは「コンテンツ追加」からお試しください！",
+                    "text": "AI予定秘書、AI経理秘書、AIタスクコンシェルジュを提供しています。\n\n料金：\n• 月額基本料金：3,900円\n• コンテンツ追加：1個目無料、2個目以降1,500円/件\n\nまずは「コンテンツ追加」からお試しください！",
                     "actions": [
                         {
                             "type": "message",
@@ -261,23 +261,18 @@ def handle_add_content(reply_token, user_id_db, stripe_subscription_id):
                 "actions": [
                     {
                         "type": "message",
-                        "label": "AI秘書機能",
+                        "label": "AI予定秘書",
                         "text": "1"
                     },
                     {
                         "type": "message",
-                        "label": "会計管理ツール",
+                        "label": "AI経理秘書",
                         "text": "2"
                     },
                     {
                         "type": "message",
-                        "label": "スケジュール管理",
+                        "label": "AIタスクコンシェルジュ",
                         "text": "3"
-                    },
-                    {
-                        "type": "message",
-                        "label": "タスク管理",
-                        "text": "4"
                     }
                 ]
             }
@@ -291,36 +286,29 @@ def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, co
     try:
         content_info = {
             '1': {
-                'name': 'AI秘書機能',
+                'name': 'AI予定秘書',
                 'price': 1500,
-                'description': '24時間対応のAI秘書',
-                'usage': 'LINEで直接メッセージを送るだけで、予定管理、メール作成、リマインダー設定などができます。',
-                'url': 'https://lp-production-9e2c.up.railway.app/secretary'
+                'description': '日程調整のストレスから解放される、スケジュール管理の相棒',
+                'usage': 'Googleカレンダーと連携し、LINEで予定の追加・確認・空き時間の提案まで。調整のやりとりに追われる時間を、もっとクリエイティブに使えるように。',
+                'url': 'https://lp-production-9e2c.up.railway.app/schedule'
             },
             '2': {
-                'name': '会計管理ツール',
+                'name': 'AI経理秘書',
                 'price': 1500,
-                'description': '自動会計・経費管理',
-                'usage': 'レシートを撮影するだけで自動で経費を記録し、月次レポートを自動生成します。',
+                'description': '打合せ後すぐ送れる、スマートな請求書作成アシスタント',
+                'usage': 'LINEで項目を送るだけで、見積書や請求書を即作成。営業から事務処理までを一気通貫でスムーズに。',
                 'url': 'https://lp-production-9e2c.up.railway.app/accounting'
             },
             '3': {
-                'name': 'スケジュール管理',
+                'name': 'AIタスクコンシェルジュ',
                 'price': 1500,
-                'description': 'AIによる最適スケジュール',
-                'usage': '予定を入力すると、AIが最適なスケジュールを提案し、効率的な時間管理をサポートします。',
-                'url': 'https://lp-production-9e2c.up.railway.app/schedule'
-            },
-            '4': {
-                'name': 'タスク管理',
-                'price': 1500,
-                'description': 'プロジェクト管理・進捗追跡',
-                'usage': 'プロジェクトのタスクを管理し、進捗状況を自動で追跡・報告します。',
+                'description': '今日やるべきことを、ベストなタイミングで',
+                'usage': '登録したタスクを空き時間に自動で配置し、理想的な1日をAIが提案。「やりたいのにできない」を、「自然にこなせる」毎日に。',
                 'url': 'https://lp-production-9e2c.up.railway.app/task'
             }
         }
         if content_number not in content_info:
-            send_line_message(reply_token, [{"type": "text", "text": "❌ 無効な選択です。1-4の数字で選択してください。"}])
+            send_line_message(reply_token, [{"type": "text", "text": "無効な選択です。1-3の数字で選択してください。"}])
             return
         content = content_info[content_number]
         # usage_countの取得はuser_idとcontent_typeの組み合わせで行う
@@ -394,31 +382,24 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
             return
         content_info = {
             '1': {
-                'name': 'AI秘書機能',
+                'name': 'AI予定秘書',
                 'price': 1500,
-                'description': '24時間対応のAI秘書',
-                'usage': 'LINEで直接メッセージを送るだけで、予定管理、メール作成、リマインダー設定などができます。',
-                'url': 'https://lp-production-9e2c.up.railway.app/secretary'
+                'description': '日程調整のストレスから解放される、スケジュール管理の相棒',
+                'usage': 'Googleカレンダーと連携し、LINEで予定の追加・確認・空き時間の提案まで。調整のやりとりに追われる時間を、もっとクリエイティブに使えるように。',
+                'url': 'https://lp-production-9e2c.up.railway.app/schedule'
             },
             '2': {
-                'name': '会計管理ツール',
+                'name': 'AI経理秘書',
                 'price': 1500,
-                'description': '自動会計・経費管理',
-                'usage': 'レシートを撮影するだけで自動で経費を記録し、月次レポートを自動生成します。',
+                'description': '打合せ後すぐ送れる、スマートな請求書作成アシスタント',
+                'usage': 'LINEで項目を送るだけで、見積書や請求書を即作成。営業から事務処理までを一気通貫でスムーズに。',
                 'url': 'https://lp-production-9e2c.up.railway.app/accounting'
             },
             '3': {
-                'name': 'スケジュール管理',
+                'name': 'AIタスクコンシェルジュ',
                 'price': 1500,
-                'description': 'AIによる最適スケジュール',
-                'usage': '予定を入力すると、AIが最適なスケジュールを提案し、効率的な時間管理をサポートします。',
-                'url': 'https://lp-production-9e2c.up.railway.app/schedule'
-            },
-            '4': {
-                'name': 'タスク管理',
-                'price': 1500,
-                "description": "プロジェクト管理・進捗追跡",
-                'usage': 'プロジェクトのタスクを管理し、進捗状況を自動で追跡・報告します。',
+                'description': '今日やるべきことを、ベストなタイミングで',
+                'usage': '登録したタスクを空き時間に自動で配置し、理想的な1日をAIが提案。「やりたいのにできない」を、「自然にこなせる」毎日に。',
                 'url': 'https://lp-production-9e2c.up.railway.app/task'
             }
         }
@@ -711,14 +692,12 @@ def handle_cancel_request(reply_token, user_id_db, stripe_subscription_id):
         for idx, item in enumerate(items, 1):
             price = item['price']
             name = price.get('nickname') or price.get('id')
-            if 'AI秘書' in name or 'secretary' in name or 'prod_SgSj7btk61lSNI' in price.get('product',''):
-                jp_name = 'AI秘書機能'
-            elif '会計' in name or 'accounting' in name or 'prod_SgSnVeUB5DAihu' in price.get('product',''):
-                jp_name = '会計管理ツール'
-            elif 'スケジュール' in name or 'schedule' in name:
-                jp_name = 'スケジュール管理'
-            elif 'タスク' in name or 'task' in name:
-                jp_name = 'タスク管理'
+            if 'AI予定秘書' in name or 'schedule' in name or 'prod_SgSj7btk61lSNI' in price.get('product',''):
+                jp_name = 'AI予定秘書'
+            elif 'AI経理秘書' in name or 'accounting' in name or 'prod_SgSnVeUB5DAihu' in price.get('product',''):
+                jp_name = 'AI経理秘書'
+            elif 'AIタスクコンシェルジュ' in name or 'task' in name or 'prod_SgSnVeUB5DAihu' in price.get('product',''):
+                jp_name = 'AIタスクコンシェルジュ'
             elif price.get('unit_amount',0) >= 500000:
                 jp_name = '月額基本料金'
             else:
@@ -748,14 +727,12 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
                 stripe.SubscriptionItem.delete(item['id'], proration_behavior='none')
                 price = item['price']
                 name = price.get('nickname') or price.get('id')
-                if 'AI秘書' in name or 'secretary' in name or 'prod_SgSj7btk61lSNI' in price.get('product',''):
-                    jp_name = 'AI秘書機能'
-                elif '会計' in name or 'accounting' in name or 'prod_SgSnVeUB5DAihu' in price.get('product',''):
-                    jp_name = '会計管理ツール'
-                elif 'スケジュール' in name or 'schedule' in name:
-                    jp_name = 'スケジュール管理'
-                elif 'タスク' in name or 'task' in name:
-                    jp_name = 'タスク管理'
+                if 'AI予定秘書' in name or 'schedule' in name or 'prod_SgSj7btk61lSNI' in price.get('product',''):
+                    jp_name = 'AI予定秘書'
+                elif 'AI経理秘書' in name or 'accounting' in name or 'prod_SgSnVeUB5DAihu' in price.get('product',''):
+                    jp_name = 'AI経理秘書'
+                elif 'AIタスクコンシェルジュ' in name or 'task' in name or 'prod_SgSnVeUB5DAihu' in price.get('product',''):
+                    jp_name = 'AIタスクコンシェルジュ'
                 elif price.get('unit_amount',0) >= 500000:
                     jp_name = '月額基本料金'
                 else:
