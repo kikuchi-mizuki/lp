@@ -410,7 +410,37 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
         # 全コンテンツの合計数を取得
         c_count.execute('SELECT COUNT(*) FROM usage_logs WHERE user_id = %s', (user_id_db,))
         total_usage_count = c_count.fetchone()[0]
+        # 同じコンテンツの追加回数を確認
+        c_count.execute('SELECT COUNT(*) FROM usage_logs WHERE user_id = %s AND content_type = %s', (user_id_db, content['name']))
+        same_content_count = c_count.fetchone()[0]
         conn_count.close()
+        
+        # 同じコンテンツが既に追加されている場合
+        if same_content_count > 0:
+            already_added_message = {
+                "type": "template",
+                "altText": "すでに追加されています",
+                "template": {
+                    "type": "buttons",
+                    "title": "すでに追加されています",
+                    "text": f"{content['name']}は既に追加済みです。\n\n他のコンテンツを追加するか、利用状況を確認してください。",
+                    "actions": [
+                        {
+                            "type": "message",
+                            "label": "他のコンテンツ追加",
+                            "text": "追加"
+                        },
+                        {
+                            "type": "message",
+                            "label": "利用状況確認",
+                            "text": "状態"
+                        }
+                    ]
+                }
+            }
+            send_line_message(reply_token, [already_added_message])
+            return
+        
         is_free = total_usage_count == 0
         price_message = "料金：無料（1個目）" if is_free else f"料金：1,500円（{total_usage_count + 1}個目）"
         print(f"[DEBUG] content_type: {content['name']}")
