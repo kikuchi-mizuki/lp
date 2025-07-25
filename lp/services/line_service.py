@@ -420,7 +420,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
             '4': {
                 'name': 'タスク管理',
                 'price': 1500,
-                'description': 'プロジェクト管理・進捗追跡',
+                "description": "プロジェクト管理・進捗追跡",
                 'usage': 'プロジェクトのタスクを管理し、進捗状況を自動で追跡・報告します。',
                 'url': 'https://lp-production-9e2c.up.railway.app/task'
             }
@@ -508,73 +508,38 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                 return
             subscription_item_id = usage_item['id']
             try:
-                # 新しいMeter付き従量課金システムの場合はbilling/meter_events APIを使用
-                import requests
-                import os
-                import time
-                import json
-                
-                stripe_secret_key = os.getenv('STRIPE_SECRET_KEY')
-                print(f'[DEBUG] stripe_secret_key: {stripe_secret_key}')
-                headers = {
-                    'Authorization': f'Bearer {stripe_secret_key}',
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                }
-                
-                # 新しいMeter付き従量課金システムの場合はbilling/meter_events APIを使用
-                # サブスクリプションからcustomer_idを取得
-                subscription = stripe.Subscription.retrieve(stripe_subscription_id)
-                customer_id = subscription['customer']
-                
-                # payloadを正しい形式で作成
-                payload_data = {
-                    'stripe_customer_id': customer_id,
-                    'value': 1
-                }
-                
-                response = requests.post(
-                    'https://api.stripe.com/v1/billing/meter_events',
-                    headers=headers,
-                    data={
-                        'event_name': 'aiコレクションズ',
-                        'payload': json.dumps(payload_data),
-                        'timestamp': int(time.time())
-                    }
-                )
-                
-                if response.status_code == 200:
-                    usage_record = response.json()
-                    print(f'新しいMeter使用量レコード作成成功: {usage_record}')
-                else:
-                    print(f'[DEBUG] 新しいMeter使用量レコード作成エラー: {response.status_code} - {response.text}')
+                # 従量課金の使用量を記録
+                try:
+                    # 従来の従量課金システムを使用
+                    usage_record = stripe.SubscriptionItem.createUsageRecord(
+                        subscription_item_id,
+                        quantity=1,
+                        timestamp=int(time.time()),
+                        action='increment'
+                    )
+                    print(f"使用量記録作成成功: {usage_record.id}")
                     
-                    # サブスクリプションがキャンセルされている場合の特別な処理
-                    if "subscription has been canceled" in response.text:
-                        cancel_message = {
-                            "type": "template",
-                            "altText": "サブスクリプション更新が必要です",
-                            "template": {
-                                "type": "buttons",
-                                "title": "サブスクリプション更新が必要です",
-                                "text": "現在のサブスクリプションがキャンセルされています。新しいサブスクリプションを作成するか、既存のものを復活させてください。",
-                                "actions": [
-                                    {
-                                        "type": "message",
-                                        "label": "利用状況確認",
-                                        "text": "状態"
-                                    },
-                                    {
-                                        "type": "message",
-                                        "label": "ヘルプ",
-                                        "text": "ヘルプ"
-                                    }
-                                ]
-                            }
-                        }
-                        send_line_message(reply_token, [cancel_message])
-                    else:
-                        send_line_message(reply_token, [{"type": "text", "text": f"❌ 使用量記録の作成に失敗しました。\n\nエラー: {response.text}"}])
-                    return
+                    # usage_logsに記録
+                    conn = get_db_connection()
+                    c = conn.cursor()
+                    c.execute('''
+                        INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type)
+                        VALUES (%s, %s, %s, %s, %s)
+                    ''', (user_id_db, 1, usage_record.id, is_free, content['name']))
+                    conn.commit()
+                    conn.close()
+                    print(f'DB登録成功: user_id={user_id_db}, is_free={is_free}, usage_record_id={usage_record.id}')
+                except stripe.error.StripeError as e:
+                    print(f"使用量記録作成エラー: {e}")
+                    # エラーが発生してもusage_logsには記録
+                    conn = get_db_connection()
+                    c = conn.cursor()
+                    c.execute('''
+                        INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type)
+                        VALUES (%s, %s, %s, %s, %s)
+                    ''', (user_id_db, 1, None, is_free, content['name']))
+                    conn.commit()
+                    conn.close()
             except Exception as usage_error:
                 print(f'[DEBUG] 新しいMeter使用量レコード作成例外: {usage_error}')
                 import traceback
@@ -608,59 +573,24 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                 else:
                     send_line_message(reply_token, [{"type": "text", "text": f"❌ 使用量記録の作成に失敗しました。\n\nエラー: {error_str}"}])
                 return
-        # usage_logsのINSERT前にもprint
-        print(f'[DEBUG] usage_logs INSERT前: user_id={user_id_db}, is_free={is_free}, content={content["name"]}')
+        # usage_logsの全件を出力
         try:
-            conn = get_db_connection()
-            c = conn.cursor()
-            
-            # usage_record_idを初期化
-            usage_record_id = None
-            
-            if is_free:
-                print(f'usage_logs INSERT: user_id={user_id_db}, usage_record_id=None, is_free=True, content={content["name"]}')
-                c.execute('INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type) VALUES (%s, %s, %s, %s, %s)',
-                          (user_id_db, 1, None, True, content['name']))
-            else:
-                # usage_recordのidフィールドを安全に取得（Meter API対応）
-                if usage_record and 'id' in usage_record:
-                    usage_record_id = usage_record['id']
-                elif usage_record and 'meter_event' in usage_record:
-                    usage_record_id = usage_record['meter_event']['id']
-                elif usage_record and 'event' in usage_record:
-                    usage_record_id = usage_record['event']['id']
-                else:
-                    usage_record_id = None
-                print(f'usage_logs INSERT: user_id={user_id_db}, usage_record_id={usage_record_id}, is_free=False, content={content["name"]}')
-                c.execute('INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type) VALUES (%s, %s, %s, %s, %s)',
-                          (user_id_db, 1, usage_record_id, False, content['name']))
-            conn.commit()
-            conn.close()
-            print(f'DB登録成功: user_id={user_id_db}, is_free={is_free}, usage_record_id={usage_record_id}')
-            # usage_logsの全件を出力
-            try:
-                conn_debug = get_db_connection()
-                c_debug = conn_debug.cursor()
-                c_debug.execute('SELECT id, user_id, is_free, content_type, created_at FROM usage_logs ORDER BY created_at DESC LIMIT 10')
-                logs = c_debug.fetchall()
-                print('[DEBUG] usage_logs 最新10件:')
-                for log in logs:
-                    print(log)
-                # 追加: 同じuser_id・content_typeの全レコードを出力
-                c_debug.execute('SELECT id, user_id, is_free, content_type, created_at FROM usage_logs WHERE user_id = %s AND content_type = %s ORDER BY created_at DESC', (user_id_db, content['name']))
-                same_content_logs = c_debug.fetchall()
-                print(f'[DEBUG] user_id={user_id_db}, content_type={content["name"]} のusage_logs:')
-                for log in same_content_logs:
-                    print(log)
-                conn_debug.close()
-            except Exception as e:
-                print(f'[DEBUG] usage_logs全件取得エラー: {e}')
-        except Exception as db_error:
-            print(f'DB登録エラー: {db_error}')
-            import traceback
-            print(traceback.format_exc())
-            send_line_message(reply_token, [{"type": "text", "text": f"❌ データベース登録に失敗しました。\n\nエラー: {str(db_error)}"}])
-            return
+            conn_debug = get_db_connection()
+            c_debug = conn_debug.cursor()
+            c_debug.execute('SELECT id, user_id, is_free, content_type, created_at FROM usage_logs ORDER BY created_at DESC LIMIT 10')
+            logs = c_debug.fetchall()
+            print('[DEBUG] usage_logs 最新10件:')
+            for log in logs:
+                print(log)
+            # 追加: 同じuser_id・content_typeの全レコードを出力
+            c_debug.execute('SELECT id, user_id, is_free, content_type, created_at FROM usage_logs WHERE user_id = %s AND content_type = %s ORDER BY created_at DESC', (user_id_db, content['name']))
+            same_content_logs = c_debug.fetchall()
+            print(f'[DEBUG] user_id={user_id_db}, content_type={content["name"]} のusage_logs:')
+            for log in same_content_logs:
+                print(log)
+            conn_debug.close()
+        except Exception as e:
+            print(f'[DEBUG] usage_logs全件取得エラー: {e}')
         if is_free:
             success_message = {
                 "type": "template",

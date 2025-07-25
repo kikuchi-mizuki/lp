@@ -19,51 +19,56 @@ def grant_referral_free_content(user_id):
     """紹介特典の無料枠付与（今後拡張用）"""
     pass
 
-def add_metered_price_to_subscription(subscription_id, metered_price_id):
-    """
-    指定したサブスクリプションIDにMeter付き従量課金Priceを追加する。
-    すでに追加済みの場合は何もしない。
-    """
-    stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+def add_metered_price_to_subscription(subscription_id, price_id):
+    """サブスクリプションに従量課金Priceを追加"""
     try:
-        # すでに追加済みかチェック
+        # サブスクリプションを取得
         subscription = stripe.Subscription.retrieve(subscription_id)
+        
+        # 既に同じPriceが追加されているかチェック
         for item in subscription['items']['data']:
-            if item['price']['id'] == metered_price_id:
-                print(f"従量課金Priceは既に追加済み: {metered_price_id}")
-                return True
-        # Meter付き従量課金Priceを追加（quantityは指定しない）
-        result = stripe.SubscriptionItem.create(
-            subscription=subscription_id,
-            price=metered_price_id
-        )
-        print(f"Meter付き従量課金Price追加完了: {result}")
-        return True
-    except Exception as e:
-        print(f"Meter付き従量課金Price追加エラー: {e}")
-        return False 
-
-def ensure_metered_price_in_subscription(subscription_id, metered_price_id):
-    """
-    サブスクリプションにMeter付き従量課金Priceが含まれていなければ自動で追加し、
-    必ずMeter付き従量課金Priceが含まれるサブスクリプションを返す。
-    """
-    stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
-    try:
-        subscription = stripe.Subscription.retrieve(subscription_id)
-        for item in subscription['items']['data']:
-            if item['price']['id'] == metered_price_id:
-                print(f"Meter付き従量課金Priceは既に追加済み: {metered_price_id}")
+            if item['price']['id'] == price_id:
+                print(f"Price {price_id} は既にサブスクリプション {subscription_id} に追加されています")
                 return subscription
-        # なければ自動で追加
-        result = stripe.SubscriptionItem.create(
+        
+        # 従量課金Priceを追加
+        subscription_item = stripe.SubscriptionItem.create(
             subscription=subscription_id,
-            price=metered_price_id
+            price=price_id,
+            quantity=1  # 従来の従量課金システムではquantityを指定
         )
-        print(f"Meter付き従量課金Priceを自動追加: {result}")
-        # 追加後、最新のサブスクリプションを返す
-        subscription = stripe.Subscription.retrieve(subscription_id)
+        
+        print(f"従量課金Price {price_id} をサブスクリプション {subscription_id} に追加しました")
         return subscription
+        
     except Exception as e:
-        print(f"Meter付き従量課金Price自動追加エラー: {e}")
-        return None 
+        print(f"従量課金Price追加エラー: {e}")
+        raise e
+
+def ensure_metered_price_in_subscription(subscription_id, price_id):
+    """サブスクリプションに従量課金Priceが含まれていることを確認し、なければ追加する"""
+    try:
+        # サブスクリプションを取得
+        subscription = stripe.Subscription.retrieve(subscription_id)
+        
+        # 既に同じPriceが追加されているかチェック
+        for item in subscription['items']['data']:
+            if item['price']['id'] == price_id:
+                print(f"Price {price_id} は既にサブスクリプション {subscription_id} に含まれています")
+                return subscription
+        
+        # 従量課金Priceを追加
+        subscription_item = stripe.SubscriptionItem.create(
+            subscription=subscription_id,
+            price=price_id,
+            quantity=1  # 従来の従量課金システムではquantityを指定
+        )
+        
+        print(f"従量課金Price {price_id} をサブスクリプション {subscription_id} に追加しました")
+        
+        # 更新されたサブスクリプションを返す
+        return stripe.Subscription.retrieve(subscription_id)
+        
+    except Exception as e:
+        print(f"従量課金Price確認・追加エラー: {e}")
+        raise e 

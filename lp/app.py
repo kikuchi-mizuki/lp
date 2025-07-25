@@ -281,7 +281,7 @@ def subscribe():
         # 新規ユーザーまたは無効なサブスクリプションの場合、新しいサブスクリプションを作成
         print(f"新しいサブスクリプションを作成: email={email}")
         
-        # Stripe Checkout Sessionを作成（月額料金とMeter付き従量課金Priceの両方を含む）
+        # Stripe Checkout Sessionを作成（月額料金と従量課金Priceの両方を含む）
         session = stripe.checkout.Session.create(
             payment_method_types=['card'],
             mode='subscription',
@@ -293,7 +293,7 @@ def subscribe():
                 },
                 {
                     'price': USAGE_PRICE_ID,
-                    # Meter付き従量課金Priceにはquantityを指定しない
+                    'quantity': 1,  # 従来の従量課金システムではquantityを指定
                 }
             ],
             subscription_data={
