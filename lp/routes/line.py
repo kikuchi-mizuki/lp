@@ -247,7 +247,7 @@ def line_webhook():
                     user_states[user_id] = 'cancel_select'
                     handle_cancel_request(event['replyToken'], user_id_db, stripe_subscription_id)
                 elif postback_data == 'action=help':
-                    send_line_message(event['replyToken'], [{"type": "text", "text": get_help_message()}])
+                    send_line_message(event['replyToken'], [get_help_message()])
                 elif postback_data == 'action=share':
                     share_message = """📢 友達に紹介
 
