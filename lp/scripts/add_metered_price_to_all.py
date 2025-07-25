@@ -1,5 +1,7 @@
-import stripe
+import sys
 import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+import stripe
 from services.stripe_service import add_metered_price_to_subscription
 
 stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
@@ -18,7 +20,6 @@ def add_metered_price_to_all_subscriptions(metered_price_id):
     print(f'完了: {count}件処理しました')
 
 if __name__ == '__main__':
-    import sys
     if len(sys.argv) != 2:
         print('使い方: python scripts/add_metered_price_to_all.py <metered_price_id>')
         exit(1)
