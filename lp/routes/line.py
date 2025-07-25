@@ -42,10 +42,26 @@ def line_webhook():
                     if user:
                         c.execute('UPDATE users SET line_user_id = ? WHERE id = ?', (user_id, user[0]))
                         conn.commit()
-                        from services.line_service import send_welcome_with_buttons
+                        from services.line_service import send_welcome_with_buttons, send_line_message
                         from utils.message_templates import get_help_message
-                        send_welcome_with_buttons(event['replyToken'])
-                        send_line_message(event['replyToken'], get_help_message())
+                        # ボタン付きテンプレートメッセージと使い方ガイドを1回で送信
+                        messages = [
+                            {
+                                "type": "template",
+                                "altText": "ようこそ！メニューはこちら",
+                                "template": {
+                                    "type": "buttons",
+                                    "title": "ようこそ！",
+                                    "text": "ご利用を開始するには下のボタンを押してください。",
+                                    "actions": [
+                                        {"type": "message", "label": "コンテンツ追加", "text": "追加"},
+                                        {"type": "message", "label": "使い方を見る", "text": "ヘルプ"}
+                                    ]
+                                }
+                            },
+                            {"type": "text", "text": get_help_message()}
+                        ]
+                        send_line_message(event['replyToken'], messages)
                     else:
                         send_line_message(event['replyToken'], get_not_registered_message())
                     conn.close()

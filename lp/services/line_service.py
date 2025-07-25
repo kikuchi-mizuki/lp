@@ -9,8 +9,8 @@ LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
 
 # LINE関連のサービス層
 
-def send_line_message(reply_token, message):
-    """LINEメッセージ送信"""
+def send_line_message(reply_token, messages):
+    """LINEメッセージ送信（複数メッセージ対応）"""
     import requests
     import os
     import traceback
@@ -19,9 +19,12 @@ def send_line_message(reply_token, message):
         'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}',
         'Content-Type': 'application/json'
     }
+    # 単一メッセージの場合はリスト化
+    if not isinstance(messages, list):
+        messages = [messages]
     data = {
         'replyToken': reply_token,
-        'messages': [{'type': 'text', 'text': message}]
+        'messages': messages
     }
     try:
         response = requests.post('https://api.line.me/v2/bot/message/reply', headers=headers, json=data)
