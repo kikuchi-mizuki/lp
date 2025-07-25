@@ -46,10 +46,19 @@ def line_webhook():
                     print(f'[DEBUG] ユーザー紐付け完了: user_id={user_id}, db_user_id={user[0]}')
                     
                     # ボタン付きのウェルカムメッセージを送信
-                    from services.line_service import send_welcome_with_buttons
-                    send_welcome_with_buttons(event['replyToken'])
+                    try:
+                        from services.line_service import send_welcome_with_buttons
+                        send_welcome_with_buttons(event['replyToken'])
+                        print(f'[DEBUG] ウェルカムメッセージ送信完了: user_id={user_id}')
+                    except Exception as e:
+                        print(f'[DEBUG] ウェルカムメッセージ送信エラー: {e}')
+                        import traceback
+                        traceback.print_exc()
+                        # エラーが発生した場合は簡単なテキストメッセージを送信
+                        send_line_message(event['replyToken'], [{"type": "text", "text": "ようこそ！AIコレクションズへ\n\n「追加」と入力してコンテンツを追加してください。"}])
                 else:
                     # 未登録ユーザーの場合
+                    print(f'[DEBUG] 未登録ユーザー: user_id={user_id}')
                     from utils.message_templates import get_not_registered_message
                     send_line_message(event['replyToken'], [{"type": "text", "text": get_not_registered_message()}])
                 
@@ -84,9 +93,8 @@ def line_webhook():
                     if user:
                         c.execute('UPDATE users SET line_user_id = %s WHERE id = %s', (user_id, user[0]))
                         conn.commit()
-                        # 決済画面からLINEに移動した時の初回案内文
-                        from services.line_service import send_welcome_with_buttons
-                        send_welcome_with_buttons(event['replyToken'])
+                        print(f'[DEBUG] 初回メッセージ時のユーザー紐付け完了: user_id={user_id}, db_user_id={user[0]}')
+                        # 友達追加時に既に案内文を送信済みのため、ここでは送信しない
                     else:
                         send_line_message(event['replyToken'], [{"type": "text", "text": get_not_registered_message()}])
                     conn.close()
@@ -136,9 +144,8 @@ def line_webhook():
                         if user[1] is None:
                             c.execute('UPDATE users SET line_user_id = %s WHERE id = %s', (user_id, user[0]))
                             conn.commit()
-                            # 決済画面からLINEに移動した時の初回案内文
-                            from services.line_service import send_welcome_with_buttons
-                            send_welcome_with_buttons(event['replyToken'])
+                            print(f'[DEBUG] メールアドレス連携完了: user_id={user_id}, db_user_id={user[0]}')
+                            # 友達追加時に既に案内文を送信済みのため、ここでは送信しない
                         else:
                             send_line_message(event['replyToken'], [{"type": "text", "text": 'このメールアドレスは既にLINE連携済みです。'}])
                     else:
@@ -148,9 +155,8 @@ def line_webhook():
                         if fallback_user:
                             c.execute('UPDATE users SET line_user_id = %s WHERE id = %s', (user_id, fallback_user[0]))
                             conn.commit()
-                            # 決済画面からLINEに移動した時の初回案内文
-                            from services.line_service import send_welcome_with_buttons
-                            send_welcome_with_buttons(event['replyToken'])
+                            print(f'[DEBUG] 救済策でのユーザー紐付け完了: user_id={user_id}, db_user_id={fallback_user[0]}')
+                            # 友達追加時に既に案内文を送信済みのため、ここでは送信しない
                         else:
                             send_line_message(event['replyToken'], [{"type": "text", "text": 'ご登録メールアドレスが見つかりません。LPでご登録済みかご確認ください。'}])
                 else:
