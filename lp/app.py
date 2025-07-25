@@ -246,10 +246,7 @@ def subscribe():
                 {
                     'price': MONTHLY_PRICE_ID,
                     'quantity': 1,
-                },
-                {
-                    'price': USAGE_PRICE_ID
-                },
+                }
             ],
             subscription_data={
                 'trial_period_days': 7,
