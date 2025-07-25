@@ -22,10 +22,18 @@ def send_line_message(reply_token, messages):
     # 単一メッセージの場合はリスト化
     if not isinstance(messages, list):
         messages = [messages]
+    # actionsが5つ以上のボタンテンプレートがあれば4つまでに制限
+    for msg in messages:
+        if msg.get('type') == 'template' and 'template' in msg:
+            tmpl = msg['template']
+            if tmpl.get('type') == 'buttons' and 'actions' in tmpl and len(tmpl['actions']) > 4:
+                print('[WARN] actionsが5つ以上のため4つまでに自動制限します')
+                tmpl['actions'] = tmpl['actions'][:4]
     data = {
         'replyToken': reply_token,
         'messages': messages
     }
+    print('[DEBUG] LINE送信内容:', data)  # 送信内容をprint
     try:
         response = requests.post('https://api.line.me/v2/bot/message/reply', headers=headers, json=data)
         response.raise_for_status()
