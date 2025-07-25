@@ -1,5 +1,12 @@
 import sys
 import os
+# .env自動読み込み
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    print('python-dotenvがインストールされていません。pip install python-dotenv でインストールしてください。')
+    # 続行はする
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import stripe
 from lp.services.stripe_service import add_metered_price_to_subscription
