@@ -5,6 +5,7 @@ import os
 import stripe
 import traceback
 import time
+from utils.db import get_db_connection
 
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
 
@@ -245,13 +246,6 @@ def setup_rich_menu():
     set_rich_menu_image(rich_menu_id)
     set_default_rich_menu(rich_menu_id)
     return rich_menu_id 
-
-def get_db_connection():
-    DATABASE_URL = os.getenv('DATABASE_URL', 'database.db')
-    if DATABASE_URL.startswith('postgresql://'):
-        return psycopg2.connect(DATABASE_URL)
-    else:
-        return sqlite3.connect(DATABASE_URL)
 
 def handle_add_content(reply_token, user_id_db, stripe_subscription_id):
     try:
