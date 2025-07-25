@@ -42,7 +42,10 @@ def line_webhook():
                     if user:
                         c.execute('UPDATE users SET line_user_id = ? WHERE id = ?', (user_id, user[0]))
                         conn.commit()
-                        send_line_message(event['replyToken'], get_welcome_message())
+                        from services.line_service import send_welcome_with_buttons
+                        from utils.message_templates import get_help_message
+                        send_welcome_with_buttons(event['replyToken'])
+                        send_line_message(event['replyToken'], get_help_message())
                     else:
                         send_line_message(event['replyToken'], get_not_registered_message())
                     conn.close()
