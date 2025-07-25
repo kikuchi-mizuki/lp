@@ -704,22 +704,32 @@ def handle_cancel_request(reply_token, user_id_db, stripe_subscription_id):
         content_choices = []
         for idx, item in enumerate(items, 1):
             price = item['price']
-            name = price.get('nickname') or price.get('id')
-            if 'AI予定秘書' in name or 'schedule' in name or 'prod_SgSj7btk61lSNI' in price.get('product',''):
-                jp_name = 'AI予定秘書'
-            elif 'AI経理秘書' in name or 'accounting' in name or 'prod_SgSnVeUB5DAihu' in price.get('product',''):
-                jp_name = 'AI経理秘書'
-            elif 'AIタスクコンシェルジュ' in name or 'task' in name or 'prod_SgSnVeUB5DAihu' in price.get('product',''):
-                jp_name = 'AIタスクコンシェルジュ'
-            elif price.get('unit_amount',0) >= 500000:
+            price_id = price.get('id', '')
+            product_id = price.get('product', '')
+            nickname = price.get('nickname', '')
+            unit_amount = price.get('unit_amount', 0)
+            
+            print(f'[DEBUG] 解約対象: price_id={price_id}, product_id={product_id}, nickname={nickname}, unit_amount={unit_amount}')
+            
+            # Price IDに基づいて日本語名を判定
+            if 'price_1Rofzxlxg6C5hAVdDp7fcqds' in price_id or unit_amount >= 3900:
                 jp_name = '月額基本料金'
+            elif 'price_1Rog1nlxg6C5hAVdnqB5MJiT' in price_id or unit_amount == 1500:
+                jp_name = '従量課金（コンテンツ追加）'
+            elif 'schedule' in nickname.lower() or 'prod_SgSj7btk61lSNI' in product_id:
+                jp_name = 'AI予定秘書'
+            elif 'accounting' in nickname.lower() or 'prod_SgSnVeUB5DAihu' in product_id:
+                jp_name = 'AI経理秘書'
+            elif 'task' in nickname.lower():
+                jp_name = 'AIタスクコンシェルジュ'
             else:
-                jp_name = name
-            amount = price.get('unit_amount', 0)
-            amount_jpy = int(amount) // 100 if amount else 0
+                jp_name = f'コンテンツ{idx}'
+            
+            amount_jpy = int(unit_amount) // 100 if unit_amount else 0
             is_free = usage_free_map.get(jp_name, False)
             display_price = '0円' if is_free else f'{amount_jpy:,}円'
             content_choices.append(f"{idx}. {jp_name}（{display_price}/月）")
+            print(f'[DEBUG] 解約選択肢: {idx}. {jp_name}（{display_price}/月）')
         if not content_choices:
             send_line_message(reply_token, [{"type": "text", "text": "現在契約中のコンテンツはありません。"}])
             return
@@ -739,17 +749,25 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
                 item = items[idx]
                 stripe.SubscriptionItem.delete(item['id'], proration_behavior='none')
                 price = item['price']
-                name = price.get('nickname') or price.get('id')
-                if 'AI予定秘書' in name or 'schedule' in name or 'prod_SgSj7btk61lSNI' in price.get('product',''):
-                    jp_name = 'AI予定秘書'
-                elif 'AI経理秘書' in name or 'accounting' in name or 'prod_SgSnVeUB5DAihu' in price.get('product',''):
-                    jp_name = 'AI経理秘書'
-                elif 'AIタスクコンシェルジュ' in name or 'task' in name or 'prod_SgSnVeUB5DAihu' in price.get('product',''):
-                    jp_name = 'AIタスクコンシェルジュ'
-                elif price.get('unit_amount',0) >= 500000:
+                price_id = price.get('id', '')
+                product_id = price.get('product', '')
+                nickname = price.get('nickname', '')
+                unit_amount = price.get('unit_amount', 0)
+                
+                # Price IDに基づいて日本語名を判定
+                if 'price_1Rofzxlxg6C5hAVdDp7fcqds' in price_id or unit_amount >= 3900:
                     jp_name = '月額基本料金'
+                elif 'price_1Rog1nlxg6C5hAVdnqB5MJiT' in price_id or unit_amount == 1500:
+                    jp_name = '従量課金（コンテンツ追加）'
+                elif 'schedule' in nickname.lower() or 'prod_SgSj7btk61lSNI' in product_id:
+                    jp_name = 'AI予定秘書'
+                elif 'accounting' in nickname.lower() or 'prod_SgSnVeUB5DAihu' in product_id:
+                    jp_name = 'AI経理秘書'
+                elif 'task' in nickname.lower():
+                    jp_name = 'AIタスクコンシェルジュ'
                 else:
-                    jp_name = name
+                    jp_name = f'コンテンツ{idx+1}'
+                
                 cancelled.append(jp_name)
         if cancelled:
             send_line_message(reply_token, [{"type": "text", "text": f"以下のコンテンツの解約を受け付けました（請求期間終了まで利用可能です）：\n" + "\n".join(cancelled)}])
