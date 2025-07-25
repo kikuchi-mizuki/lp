@@ -21,7 +21,7 @@ def grant_referral_free_content(user_id):
 
 def add_metered_price_to_subscription(subscription_id, metered_price_id):
     """
-    指定したサブスクリプションIDに従量課金Priceを追加する。
+    指定したサブスクリプションIDにMeter付き従量課金Priceを追加する。
     すでに追加済みの場合は何もしない。
     """
     stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
@@ -32,13 +32,13 @@ def add_metered_price_to_subscription(subscription_id, metered_price_id):
             if item['price']['id'] == metered_price_id:
                 print(f"従量課金Priceは既に追加済み: {metered_price_id}")
                 return True
-        # 追加（quantityは指定しない）
+        # Meter付き従量課金Priceを追加（quantityは指定しない）
         result = stripe.SubscriptionItem.create(
             subscription=subscription_id,
             price=metered_price_id
         )
-        print(f"従量課金Price追加完了: {result}")
+        print(f"Meter付き従量課金Price追加完了: {result}")
         return True
     except Exception as e:
-        print(f"従量課金Price追加エラー: {e}")
+        print(f"Meter付き従量課金Price追加エラー: {e}")
         return False 
