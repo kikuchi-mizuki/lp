@@ -537,8 +537,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                     headers=headers,
                     data={
                         'event_name': 'aiコレクションズ',
-                        'metadata[stripe_customer_id]': customer_id,
-                        'metadata[value]': '1',
+                        'payload': json.dumps(payload_data),
                         'timestamp': int(time.time())
                     }
                 )
