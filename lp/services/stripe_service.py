@@ -32,11 +32,10 @@ def add_metered_price_to_subscription(subscription_id, metered_price_id):
             if item['price']['id'] == metered_price_id:
                 print(f"従量課金Priceは既に追加済み: {metered_price_id}")
                 return True
-        # 追加
+        # 追加（quantityは指定しない）
         result = stripe.SubscriptionItem.create(
             subscription=subscription_id,
-            price=metered_price_id,
-            quantity=1
+            price=metered_price_id
         )
         print(f"従量課金Price追加完了: {result}")
         return True
