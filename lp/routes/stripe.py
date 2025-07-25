@@ -63,11 +63,18 @@ def stripe_webhook():
                     # 従量課金アイテムを追加
                     try:
                         USAGE_PRICE_ID = os.getenv('STRIPE_USAGE_PRICE_ID')
-                        result = stripe.SubscriptionItem.create(
-                            subscription=subscription_id,
-                            price=USAGE_PRICE_ID
+                        subscription = stripe.Subscription.retrieve(subscription_id)
+                        already_exists = any(
+                            item['price']['id'] == USAGE_PRICE_ID for item in subscription['items']['data']
                         )
-                        print(f'従量課金アイテム追加完了: subscription_id={subscription_id}, usage_price_id={USAGE_PRICE_ID}, result={result}')
+                        if not already_exists:
+                            result = stripe.SubscriptionItem.create(
+                                subscription=subscription_id,
+                                price=USAGE_PRICE_ID
+                            )
+                            print(f'従量課金アイテム追加完了: subscription_id={subscription_id}, usage_price_id={USAGE_PRICE_ID}, result={result}')
+                        else:
+                            print(f'従量課金アイテムは既に追加済み: subscription_id={subscription_id}, usage_price_id={USAGE_PRICE_ID}')
                     except Exception as e:
                         import traceback
                         print(f'従量課金アイテム追加エラー: {e}')
