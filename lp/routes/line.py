@@ -124,6 +124,28 @@ def line_webhook():
                 user_id_db = user[0]
                 stripe_subscription_id = user[1]
                 
+                # サブスクリプションIDが存在しない場合
+                if not stripe_subscription_id:
+                    payment_message = {
+                        "type": "template",
+                        "altText": "決済が必要です",
+                        "template": {
+                            "type": "buttons",
+                            "title": "決済が必要です",
+                            "text": "サブスクリプションが設定されていません。\n\n決済画面から登録してください。",
+                            "actions": [
+                                {
+                                    "type": "uri",
+                                    "label": "決済画面へ",
+                                    "uri": "https://lp-production-9e2c.up.railway.app"
+                                }
+                            ]
+                        }
+                    }
+                    send_line_message(event['replyToken'], [payment_message])
+                    conn.close()
+                    continue
+                
                 # 既存ユーザーの初回メッセージ時に案内文を送信（初回のみ）
                 if user_id not in user_states:
                     user_states[user_id] = None

@@ -256,8 +256,101 @@ def setup_rich_menu():
     set_default_rich_menu(rich_menu_id)
     return rich_menu_id 
 
+def check_subscription_status(stripe_subscription_id):
+    """サブスクリプションの状態をチェック"""
+    try:
+        subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+        status = subscription['status']
+        cancel_at_period_end = subscription.get('cancel_at_period_end', False)
+        
+        print(f'[DEBUG] サブスクリプション状態: status={status}, cancel_at_period_end={cancel_at_period_end}')
+        
+        # 有効な状態かチェック
+        is_active = status in ['active', 'trialing'] and not cancel_at_period_end
+        
+        return {
+            'is_active': is_active,
+            'status': status,
+            'cancel_at_period_end': cancel_at_period_end,
+            'current_period_end': subscription.get('current_period_end'),
+            'subscription': subscription
+        }
+    except Exception as e:
+        print(f'[ERROR] サブスクリプション状態確認エラー: {e}')
+        return {
+            'is_active': False,
+            'status': 'error',
+            'error': str(e)
+        }
+
 def handle_add_content(reply_token, user_id_db, stripe_subscription_id):
     try:
+        # サブスクリプション状態をチェック
+        subscription_status = check_subscription_status(stripe_subscription_id)
+        
+        if not subscription_status['is_active']:
+            if subscription_status['status'] == 'canceled':
+                # サブスクリプションが解約済み
+                payment_message = {
+                    "type": "template",
+                    "altText": "サブスクリプション解約済み",
+                    "template": {
+                        "type": "buttons",
+                        "title": "サブスクリプション解約済み",
+                        "text": "サブスクリプションが解約されています。\n\nコンテンツを追加するには、新しいサブスクリプションが必要です。",
+                        "actions": [
+                            {
+                                "type": "uri",
+                                "label": "決済画面へ",
+                                "uri": "https://lp-production-9e2c.up.railway.app"
+                            }
+                        ]
+                    }
+                }
+                send_line_message(reply_token, [payment_message])
+                return
+            elif subscription_status['cancel_at_period_end']:
+                # 期間終了時に解約予定
+                payment_message = {
+                    "type": "template",
+                    "altText": "サブスクリプション解約予定",
+                    "template": {
+                        "type": "buttons",
+                        "title": "サブスクリプション解約予定",
+                        "text": "サブスクリプションが期間終了時に解約予定です。\n\nコンテンツを追加するには、サブスクリプションを更新してください。",
+                        "actions": [
+                            {
+                                "type": "uri",
+                                "label": "決済画面へ",
+                                "uri": "https://lp-production-9e2c.up.railway.app"
+                            }
+                        ]
+                    }
+                }
+                send_line_message(reply_token, [payment_message])
+                return
+            else:
+                # その他の無効な状態
+                payment_message = {
+                    "type": "template",
+                    "altText": "サブスクリプション無効",
+                    "template": {
+                        "type": "buttons",
+                        "title": "サブスクリプション無効",
+                        "text": "サブスクリプションが無効な状態です。\n\nコンテンツを追加するには、有効なサブスクリプションが必要です。",
+                        "actions": [
+                            {
+                                "type": "uri",
+                                "label": "決済画面へ",
+                                "uri": "https://lp-production-9e2c.up.railway.app"
+                            }
+                        ]
+                    }
+                }
+                send_line_message(reply_token, [payment_message])
+                return
+        
+        # サブスクリプションが有効な場合、通常のコンテンツ選択メニューを表示
         content_menu = {
             "type": "template",
             "altText": "コンテンツ選択メニュー",
@@ -287,6 +380,8 @@ def handle_add_content(reply_token, user_id_db, stripe_subscription_id):
         send_line_message(reply_token, [content_menu])
     except Exception as e:
         print(f'コンテンツ選択メニューエラー: {e}')
+        import traceback
+        traceback.print_exc()
         send_line_message(reply_token, [{"type": "text", "text": "エラーが発生しました。しばらく時間をおいて再度お試しください。"}])
 
 def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, content_number):
@@ -417,6 +512,71 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
             }
             send_line_message(reply_token, [cancel_message])
             return
+        
+        # サブスクリプション状態をチェック
+        subscription_status = check_subscription_status(stripe_subscription_id)
+        
+        if not subscription_status['is_active']:
+            if subscription_status['status'] == 'canceled':
+                # サブスクリプションが解約済み
+                payment_message = {
+                    "type": "template",
+                    "altText": "サブスクリプション解約済み",
+                    "template": {
+                        "type": "buttons",
+                        "title": "サブスクリプション解約済み",
+                        "text": "サブスクリプションが解約されています。\n\nコンテンツを追加するには、新しいサブスクリプションが必要です。",
+                        "actions": [
+                            {
+                                "type": "uri",
+                                "label": "決済画面へ",
+                                "uri": "https://lp-production-9e2c.up.railway.app"
+                            }
+                        ]
+                    }
+                }
+                send_line_message(reply_token, [payment_message])
+                return
+            elif subscription_status['cancel_at_period_end']:
+                # 期間終了時に解約予定
+                payment_message = {
+                    "type": "template",
+                    "altText": "サブスクリプション解約予定",
+                    "template": {
+                        "type": "buttons",
+                        "title": "サブスクリプション解約予定",
+                        "text": "サブスクリプションが期間終了時に解約予定です。\n\nコンテンツを追加するには、サブスクリプションを更新してください。",
+                        "actions": [
+                            {
+                                "type": "uri",
+                                "label": "決済画面へ",
+                                "uri": "https://lp-production-9e2c.up.railway.app"
+                            }
+                        ]
+                    }
+                }
+                send_line_message(reply_token, [payment_message])
+                return
+            else:
+                # その他の無効な状態
+                payment_message = {
+                    "type": "template",
+                    "altText": "サブスクリプション無効",
+                    "template": {
+                        "type": "buttons",
+                        "title": "サブスクリプション無効",
+                        "text": "サブスクリプションが無効な状態です。\n\nコンテンツを追加するには、有効なサブスクリプションが必要です。",
+                        "actions": [
+                            {
+                                "type": "uri",
+                                "label": "決済画面へ",
+                                "uri": "https://lp-production-9e2c.up.railway.app"
+                            }
+                        ]
+                    }
+                }
+                send_line_message(reply_token, [payment_message])
+                return
         content_info = {
             '1': {
                 'name': 'AI予定秘書',
@@ -651,20 +811,69 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
 
 def handle_status_check(reply_token, user_id_db):
     try:
+        # ユーザーのサブスクリプション情報を取得
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute('SELECT stripe_subscription_id FROM users WHERE id = %s', (user_id_db,))
+        user = c.fetchone()
+        conn.close()
+        
+        if not user or not user[0]:
+            payment_message = {
+                "type": "template",
+                "altText": "決済が必要です",
+                "template": {
+                    "type": "buttons",
+                    "title": "決済が必要です",
+                    "text": "サブスクリプションが設定されていません。\n\n決済画面から登録してください。",
+                    "actions": [
+                        {
+                            "type": "uri",
+                            "label": "決済画面へ",
+                            "uri": "https://lp-production-9e2c.up.railway.app"
+                        }
+                    ]
+                }
+            }
+            send_line_message(reply_token, [payment_message])
+            return
+        
+        stripe_subscription_id = user[0]
+        
+        # サブスクリプション状態をチェック
+        subscription_status = check_subscription_status(stripe_subscription_id)
+        
+        # データベースから利用状況を取得
         conn = get_db_connection()
         c = conn.cursor()
         c.execute('SELECT content_type, is_free, created_at FROM usage_logs WHERE user_id = %s ORDER BY created_at DESC', (user_id_db,))
         usage_logs = c.fetchall()
         conn.close()
+        
+        # ステータスメッセージを構築
+        status_lines = ["📊 利用状況"]
+        
+        # サブスクリプション状態を追加
+        if subscription_status['is_active']:
+            if subscription_status['cancel_at_period_end']:
+                status_lines.append("🔴 サブスクリプション: 期間終了時に解約予定")
+            else:
+                status_lines.append("🟢 サブスクリプション: 有効")
+        else:
+            if subscription_status['status'] == 'canceled':
+                status_lines.append("🔴 サブスクリプション: 解約済み")
+            else:
+                status_lines.append("🔴 サブスクリプション: 無効")
+        
+        status_lines.append("")  # 空行
+        
         if not usage_logs:
-            status_message = """📊 利用状況
-
-📈 今月の追加回数：0回
-💰 追加料金：0円
-
-💡 ヒント：
-• 「追加」でコンテンツを追加
-• 「メニュー」で機能一覧を確認"""
+            status_lines.append("📈 今月の追加回数：0回")
+            status_lines.append("💰 追加料金：0円")
+            status_lines.append("")
+            status_lines.append("💡 ヒント：")
+            status_lines.append("• 「追加」でコンテンツを追加")
+            status_lines.append("• 「メニュー」で機能一覧を確認")
         else:
             total_cost = 0
             content_list = []
@@ -675,19 +884,23 @@ def handle_status_check(reply_token, user_id_db):
                 if not is_free:
                     total_cost += 1500
                 content_list.append(f"• {content_type} ({'無料' if is_free else '1,500円'}) - {created_at}")
-            status_message = f"""📊 利用状況
-
-📈 今月の追加回数：{len(usage_logs)}回
-💰 追加料金：{total_cost:,}円
-
-📚 追加済みコンテンツ：
-{chr(10).join(content_list[:5])}  # 最新5件まで表示
-
-💡 ヒント：
-• 「追加」でコンテンツを追加
-• 「メニュー」で機能一覧を確認"""
+            
+            status_lines.append(f"📈 今月の追加回数：{len(usage_logs)}回")
+            status_lines.append(f"💰 追加料金：{total_cost:,}円")
+            status_lines.append("")
+            status_lines.append("📚 追加済みコンテンツ：")
+            status_lines.extend(content_list[:5])  # 最新5件まで表示
+            status_lines.append("")
+            status_lines.append("💡 ヒント：")
+            status_lines.append("• 「追加」でコンテンツを追加")
+            status_lines.append("• 「メニュー」で機能一覧を確認")
+        
+        status_message = "\n".join(status_lines)
         send_line_message(reply_token, [{"type": "text", "text": status_message}])
     except Exception as e:
+        print(f'利用状況確認エラー: {e}')
+        import traceback
+        traceback.print_exc()
         send_line_message(reply_token, [{"type": "text", "text": "❌ 利用状況の取得に失敗しました。しばらく時間をおいて再度お試しください。"}])
 
 def handle_cancel_request(reply_token, user_id_db, stripe_subscription_id):
@@ -810,6 +1023,72 @@ def handle_subscription_cancel(reply_token, user_id_db, stripe_subscription_id):
 def handle_cancel_menu(reply_token, user_id_db, stripe_subscription_id):
     """解約メニューを表示"""
     try:
+        # サブスクリプション状態をチェック
+        subscription_status = check_subscription_status(stripe_subscription_id)
+        
+        if not subscription_status['is_active']:
+            if subscription_status['status'] == 'canceled':
+                # サブスクリプションが解約済み
+                payment_message = {
+                    "type": "template",
+                    "altText": "サブスクリプション解約済み",
+                    "template": {
+                        "type": "buttons",
+                        "title": "サブスクリプション解約済み",
+                        "text": "サブスクリプションが解約されています。\n\n新しいサブスクリプションを開始してください。",
+                        "actions": [
+                            {
+                                "type": "uri",
+                                "label": "決済画面へ",
+                                "uri": "https://lp-production-9e2c.up.railway.app"
+                            }
+                        ]
+                    }
+                }
+                send_line_message(reply_token, [payment_message])
+                return
+            elif subscription_status['cancel_at_period_end']:
+                # 期間終了時に解約予定
+                payment_message = {
+                    "type": "template",
+                    "altText": "サブスクリプション解約予定",
+                    "template": {
+                        "type": "buttons",
+                        "title": "サブスクリプション解約予定",
+                        "text": "サブスクリプションが期間終了時に解約予定です。\n\nサブスクリプションを更新してください。",
+                        "actions": [
+                            {
+                                "type": "uri",
+                                "label": "決済画面へ",
+                                "uri": "https://lp-production-9e2c.up.railway.app"
+                            }
+                        ]
+                    }
+                }
+                send_line_message(reply_token, [payment_message])
+                return
+            else:
+                # その他の無効な状態
+                payment_message = {
+                    "type": "template",
+                    "altText": "サブスクリプション無効",
+                    "template": {
+                        "type": "buttons",
+                        "title": "サブスクリプション無効",
+                        "text": "サブスクリプションが無効な状態です。\n\n有効なサブスクリプションが必要です。",
+                        "actions": [
+                            {
+                                "type": "uri",
+                                "label": "決済画面へ",
+                                "uri": "https://lp-production-9e2c.up.railway.app"
+                            }
+                        ]
+                    }
+                }
+                send_line_message(reply_token, [payment_message])
+                return
+        
+        # サブスクリプションが有効な場合、通常の解約メニューを表示
         cancel_menu_message = {
             "type": "template",
             "altText": "解約メニュー",
@@ -840,6 +1119,8 @@ def handle_cancel_menu(reply_token, user_id_db, stripe_subscription_id):
         
     except Exception as e:
         print(f'[ERROR] 解約メニュー表示エラー: {e}')
+        import traceback
+        traceback.print_exc()
         send_line_message(reply_token, [{"type": "text", "text": "❌ 解約メニューの表示に失敗しました。しばらく時間をおいて再度お試しください。"}])
 
 def get_welcome_message():
