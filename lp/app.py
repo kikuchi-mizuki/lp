@@ -251,6 +251,9 @@ def subscribe():
                     'price': USAGE_PRICE_ID
                 },
             ],
+            subscription_data={
+                'trial_period_days': 7,
+            },
             success_url=url_for('thanks', _external=True) + f"?email={email}",
             cancel_url=url_for('index', _external=True),
         )
