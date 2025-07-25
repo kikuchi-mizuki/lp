@@ -84,25 +84,9 @@ def line_webhook():
                     if user:
                         c.execute('UPDATE users SET line_user_id = %s WHERE id = %s', (user_id, user[0]))
                         conn.commit()
-                        from utils.message_templates import get_help_message
-                        # ボタン付きテンプレートメッセージと使い方ガイドを1回で送信
-                        messages = [
-                            {
-                                "type": "template",
-                                "altText": "ようこそ！メニューはこちら",
-                                "template": {
-                                    "type": "buttons",
-                                    "title": "ようこそ！",
-                                    "text": "ご利用を開始するには下のボタンを押してください。",
-                                    "actions": [
-                                        {"type": "message", "label": "コンテンツ追加", "text": "追加"},
-                                        {"type": "message", "label": "使い方を見る", "text": "ヘルプ"}
-                                    ]
-                                }
-                            },
-                            {"type": "text", "text": get_help_message()}
-                        ]
-                        send_line_message(event['replyToken'], messages)
+                        # 決済画面からLINEに移動した時の初回案内文
+                        from services.line_service import send_welcome_with_buttons
+                        send_welcome_with_buttons(event['replyToken'])
                     else:
                         send_line_message(event['replyToken'], [{"type": "text", "text": get_not_registered_message()}])
                     conn.close()
@@ -152,7 +136,9 @@ def line_webhook():
                         if user[1] is None:
                             c.execute('UPDATE users SET line_user_id = %s WHERE id = %s', (user_id, user[0]))
                             conn.commit()
-                            send_line_message(event['replyToken'], [{"type": "text", "text": 'LINE連携が完了しました。メニューや追加コマンドが利用できます。'}])
+                            # 決済画面からLINEに移動した時の初回案内文
+                            from services.line_service import send_welcome_with_buttons
+                            send_welcome_with_buttons(event['replyToken'])
                         else:
                             send_line_message(event['replyToken'], [{"type": "text", "text": 'このメールアドレスは既にLINE連携済みです。'}])
                     else:
@@ -162,7 +148,9 @@ def line_webhook():
                         if fallback_user:
                             c.execute('UPDATE users SET line_user_id = %s WHERE id = %s', (user_id, fallback_user[0]))
                             conn.commit()
-                            send_line_message(event['replyToken'], [{"type": "text", "text": 'メールアドレスが見つかりませんでしたが、直近の登録ユーザーにLINE連携しました。メニューや追加コマンドが利用できます。'}])
+                            # 決済画面からLINEに移動した時の初回案内文
+                            from services.line_service import send_welcome_with_buttons
+                            send_welcome_with_buttons(event['replyToken'])
                         else:
                             send_line_message(event['replyToken'], [{"type": "text", "text": 'ご登録メールアドレスが見つかりません。LPでご登録済みかご確認ください。'}])
                 else:
