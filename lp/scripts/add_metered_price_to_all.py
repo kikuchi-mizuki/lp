@@ -2,7 +2,7 @@ import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import stripe
-from services.stripe_service import add_metered_price_to_subscription
+from lp.services.stripe_service import add_metered_price_to_subscription
 
 stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
 
