@@ -147,9 +147,9 @@ def line_webhook():
                     user_states[user_id] = 'add_select'
                     handle_add_content(event['replyToken'], user_id_db, stripe_subscription_id)
                 elif text == 'メニュー':
-                    send_line_message(event['replyToken'], [{"type": "text", "text": get_menu_message()}])
+                    send_line_message(event['replyToken'], [get_menu_message()])
                 elif text == 'ヘルプ':
-                    send_line_message(event['replyToken'], [{"type": "text", "text": get_help_message()}])
+                    send_line_message(event['replyToken'], [get_help_message()])
                 elif text == '状態':
                     handle_status_check(event['replyToken'], user_id_db)
                 elif text == '解約':
@@ -221,7 +221,7 @@ def line_webhook():
                         else:
                             send_line_message(event['replyToken'], [{"type": "text", "text": 'ご登録メールアドレスが見つかりません。LPでご登録済みかご確認ください。'}])
                 else:
-                    send_line_message(event['replyToken'], [{"type": "text", "text": get_default_message()}])
+                    send_line_message(event['replyToken'], [get_default_message()])
                 conn.close()
             # リッチメニューのpostbackイベントの処理
             elif event.get('type') == 'postback':
