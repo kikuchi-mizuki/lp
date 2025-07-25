@@ -534,7 +534,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
             try:
                 # 従量課金の使用量を記録
                 try:
-                    # 正しいStripe APIを使用
+                    # 既存のSubscription Itemを使用して使用量を記録
                     usage_record = stripe.UsageRecord.create(
                         subscription_item=subscription_item_id,
                         quantity=1,
@@ -564,79 +564,22 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                     ''', (user_id_db, 1, None, is_free, content['name']))
                     conn.commit()
                     conn.close()
+                    print(f'DB登録成功（エラー時）: user_id={user_id_db}, is_free={is_free}, usage_record_id=None')
             except Exception as usage_error:
-                print(f'[DEBUG] 新しいMeter使用量レコード作成例外: {usage_error}')
+                print(f'[DEBUG] 使用量記録作成例外: {usage_error}')
                 import traceback
                 print(traceback.format_exc())
                 
-                # サブスクリプションがキャンセルされている場合の特別な処理
-                error_str = str(usage_error)
-                if "subscription has been canceled" in error_str:
-                    print(f'[DEBUG] サブスクリプションがキャンセルされています。新しいサブスクリプションを作成します。')
-                    
-                    # ユーザー情報を取得
-                    conn = get_db_connection()
-                    c = conn.cursor()
-                    c.execute('SELECT email, stripe_customer_id FROM users WHERE id = %s', (user_id_db,))
-                    user_info = c.fetchone()
-                    conn.close()
-                    
-                    if user_info:
-                        email, customer_id = user_info
-                        try:
-                            # 新しいサブスクリプションを作成
-                            MONTHLY_PRICE_ID = os.getenv('STRIPE_MONTHLY_PRICE_ID')
-                            USAGE_PRICE_ID = os.getenv('STRIPE_USAGE_PRICE_ID')
-                            
-                            new_subscription = stripe.Subscription.create(
-                                customer=customer_id,
-                                items=[
-                                    {
-                                        'price': MONTHLY_PRICE_ID,
-                                        'quantity': 1,
-                                    },
-                                    {
-                                        'price': USAGE_PRICE_ID,
-                                    }
-                                ],
-                                trial_period_days=7,
-                            )
-                            
-                            # データベースを更新
-                            conn = get_db_connection()
-                            c = conn.cursor()
-                            c.execute('UPDATE users SET stripe_subscription_id = %s WHERE id = %s', (new_subscription.id, user_id_db))
-                            conn.commit()
-                            conn.close()
-                            
-                            print(f'[DEBUG] 新しいサブスクリプション作成完了: {new_subscription.id}')
-                            
-                            # 成功メッセージを送信
-                            success_message = {
-                                "type": "text",
-                                "text": f"新しいサブスクリプションを作成しました！\n\n追加内容：{content['name']}\n料金：{content['price']:,}円（次回請求時）\n\nアクセスURL：\n{content['url']}"
-                            }
-                            send_line_message(reply_token, [success_message])
-                            return
-                            
-                        except Exception as create_error:
-                            print(f'[DEBUG] 新しいサブスクリプション作成エラー: {create_error}')
-                            cancel_message = {
-                                "type": "text",
-                                "text": "サブスクリプションの作成に失敗しました。\n\n新しいサブスクリプションを作成するか、既存のものを復活させてください。"
-                            }
-                            send_line_message(reply_token, [cancel_message])
-                            return
-                    else:
-                        cancel_message = {
-                            "type": "text",
-                            "text": "ユーザー情報が見つかりません。\n\n新しいサブスクリプションを作成するか、既存のものを復活させてください。"
-                        }
-                        send_line_message(reply_token, [cancel_message])
-                        return
-                else:
-                    send_line_message(reply_token, [{"type": "text", "text": f"❌ 使用量記録の作成に失敗しました。\n\nエラー: {error_str}"}])
-                return
+                # エラーが発生してもusage_logsには記録
+                conn = get_db_connection()
+                c = conn.cursor()
+                c.execute('''
+                    INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type)
+                    VALUES (%s, %s, %s, %s, %s)
+                ''', (user_id_db, 1, None, is_free, content['name']))
+                conn.commit()
+                conn.close()
+                print(f'DB登録成功（例外時）: user_id={user_id_db}, is_free={is_free}, usage_record_id=None')
         # usage_logsの全件を出力
         try:
             conn_debug = get_db_connection()
@@ -695,7 +638,7 @@ def handle_status_check(reply_token, user_id_db):
                 if not is_free:
                     total_cost += 1500
                 content_list.append(f"• {content_type} ({'無料' if is_free else '1,500円'}) - {created_at}")
-            status_message = f"""📊 利用状況
+            status_message = f"""�� 利用状況
 
 📈 今月の追加回数：{len(usage_logs)}回
 💰 追加料金：{total_cost:,}円
