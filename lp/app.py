@@ -223,6 +223,18 @@ def add_user():
     except Exception as e:
         return jsonify({'error': str(e)})
 
+@app.route('/debug/usage_logs')
+def debug_usage_logs():
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute('SELECT * FROM usage_logs ORDER BY created_at DESC LIMIT 20')
+        logs = c.fetchall()
+        conn.close()
+        return jsonify({'usage_logs': logs})
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
 @app.route('/subscribe', methods=['POST'])
 def subscribe():
     """Stripeサブスクリプション作成"""
