@@ -432,8 +432,21 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
         is_free = usage_count == 0
         print(f"[DEBUG] content_type: {content['name']}")
         print(f"[DEBUG] DATABASE_URL: {os.getenv('DATABASE_URL')}")
-        # INSERT用のコネクションは今まで通り
-        if not is_free:
+        print(f"[DEBUG] is_free: {is_free}")
+        
+        # 無料の場合はデータベースにのみ記録
+        if is_free:
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute('''
+                INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type)
+                VALUES (%s, %s, %s, %s, %s)
+            ''', (user_id_db, 1, None, is_free, content['name']))
+            conn.commit()
+            conn.close()
+            print(f'DB登録成功: user_id={user_id_db}, is_free={is_free}, usage_record_id=None')
+        else:
+            # 有料の場合はStripeの使用量記録も作成
             print('[DEBUG] Stripe課金API呼び出し開始')
             try:
                 subscription = stripe.Subscription.retrieve(stripe_subscription_id)
