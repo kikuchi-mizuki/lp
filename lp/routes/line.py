@@ -131,7 +131,7 @@ def line_webhook():
                 state = user_states.get(user_id, None)
                 print(f'[DEBUG] ユーザー状態: user_id={user_id}, state={state}')
                 
-                if state != 'welcome_sent':
+                if state is None:
                     print(f'[DEBUG] 既存ユーザーの初回メッセージ処理: user_id={user_id}')
                     try:
                         from services.line_service import send_welcome_with_buttons
@@ -146,8 +146,10 @@ def line_webhook():
                         print(f'[DEBUG] 既存ユーザーへの案内文送信エラー: {e}')
                         import traceback
                         traceback.print_exc()
-                else:
+                elif state == 'welcome_sent':
                     print(f'[DEBUG] 既存ユーザーの案内文は既に送信済み: user_id={user_id}')
+                else:
+                    print(f'[DEBUG] ユーザーは特定の状態: user_id={user_id}, state={state}')
                 if text == '追加':
                     user_states[user_id] = 'add_select'
                     handle_add_content(event['replyToken'], user_id_db, stripe_subscription_id)
