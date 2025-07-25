@@ -407,12 +407,15 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
         # usage_logsから再度カウントしてis_freeを決定
         conn_count = get_db_connection()
         c_count = conn_count.cursor()
-        c_count.execute('SELECT COUNT(*) FROM usage_logs WHERE user_id = %s AND content_type = %s', (user_id_db, content['name']))
-        usage_count = c_count.fetchone()[0]
+        # 全コンテンツの合計数を取得
+        c_count.execute('SELECT COUNT(*) FROM usage_logs WHERE user_id = %s', (user_id_db,))
+        total_usage_count = c_count.fetchone()[0]
         conn_count.close()
-        is_free = usage_count == 0
+        is_free = total_usage_count == 0
+        price_message = "料金：無料（1個目）" if is_free else f"料金：1,500円（{total_usage_count + 1}個目）"
         print(f"[DEBUG] content_type: {content['name']}")
         print(f"[DEBUG] DATABASE_URL: {os.getenv('DATABASE_URL')}")
+        print(f"[DEBUG] total_usage_count: {total_usage_count}")
         print(f"[DEBUG] is_free: {is_free}")
         
         # 無料の場合はデータベースにのみ記録
@@ -630,7 +633,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
         else:
             success_message = {
                 "type": "text",
-                "text": f"コンテンツ追加完了！\n\n追加内容：{content['name']}\n料金：1,500円（次回請求時に反映）\n\nアクセスURL：\n{content['url']}\n\n他のコンテンツも追加できます。"
+                "text": f"コンテンツ追加完了！\n\n追加内容：{content['name']}\n料金：1,500円（{total_usage_count + 1}個目、次回請求時に反映）\n\nアクセスURL：\n{content['url']}\n\n他のコンテンツも追加できます。"
             }
         send_line_message(reply_token, [success_message])
     except Exception as e:
