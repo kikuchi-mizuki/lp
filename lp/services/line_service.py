@@ -296,11 +296,12 @@ def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, co
             send_line_message(reply_token, [{"type": "text", "text": "❌ 無効な選択です。1-4の数字で選択してください。"}])
             return
         content = content_info[content_number]
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute('SELECT COUNT(*) FROM usage_logs WHERE user_id = %s', (user_id_db,))
-        usage_count = c.fetchone()[0]
-        conn.close()
+        # usage_countの取得は別コネクションで行う
+        conn_count = get_db_connection()
+        c_count = conn_count.cursor()
+        c_count.execute('SELECT COUNT(*) FROM usage_logs WHERE user_id = %s', (user_id_db,))
+        usage_count = c_count.fetchone()[0]
+        conn_count.close()
         is_free = usage_count == 0
         price_message = "🎉 **1個目は無料です！**" if is_free else f"💰 料金：{content['price']:,}円"
         confirm_message = f"""📋 選択内容の確認
@@ -356,13 +357,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
             }
         }
         content = content_info[content_number]
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute('SELECT COUNT(*) FROM usage_logs WHERE user_id = %s', (user_id_db,))
-        usage_count = c.fetchone()[0]
-        conn.close()
-        is_free = usage_count == 0
-        usage_record = None
+        # INSERT用のコネクションは今まで通り
         if not is_free:
             subscription = stripe.Subscription.retrieve(stripe_subscription_id)
             usage_item = None
