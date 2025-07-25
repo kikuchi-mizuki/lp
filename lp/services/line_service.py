@@ -34,6 +34,51 @@ def send_line_message(reply_token, message):
             f.write('LINEメッセージ送信エラー: ' + str(e) + '\n')
             f.write(traceback.format_exc() + '\n')
 
+def send_welcome_with_buttons(reply_token):
+    import requests
+    import os
+    LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
+    headers = {
+        'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}',
+        'Content-Type': 'application/json'
+    }
+    data = {
+        'replyToken': reply_token,
+        'messages': [
+            {
+                "type": "template",
+                "altText": "ようこそ！メニューはこちら",
+                "template": {
+                    "type": "buttons",
+                    "title": "ようこそ！",
+                    "text": "ご利用を開始するには下のボタンを押してください。",
+                    "actions": [
+                        {
+                            "type": "message",
+                            "label": "コンテンツ追加",
+                            "text": "追加"
+                        },
+                        {
+                            "type": "message",
+                            "label": "使い方を見る",
+                            "text": "ヘルプ"
+                        }
+                    ]
+                }
+            }
+        ]
+    }
+    try:
+        response = requests.post('https://api.line.me/v2/bot/message/reply', headers=headers, json=data)
+        response.raise_for_status()
+    except Exception as e:
+        print(f'LINEテンプレートメッセージ送信エラー: {e}')
+        import traceback
+        traceback.print_exc()
+        with open('error.log', 'a', encoding='utf-8') as f:
+            f.write('LINEテンプレートメッセージ送信エラー: ' + str(e) + '\n')
+            f.write(traceback.format_exc() + '\n')
+
 def create_rich_menu():
     rich_menu = {
         "size": {"width": 2500, "height": 843},
