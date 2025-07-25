@@ -145,6 +145,9 @@ def stripe_webhook():
             subscription_id = subscription['id']
             customer = stripe.Customer.retrieve(customer_id)
             email = customer.get('email')
+            if not email:
+                print(f'[Stripe Webhook] メールアドレスが取得できません: customer_id={customer_id}')
+                return jsonify({'status': 'skipped_no_email'})
             email = normalize_email(email)
             conn = get_db_connection()
             c = conn.cursor()
