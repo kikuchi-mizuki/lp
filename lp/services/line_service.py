@@ -779,7 +779,7 @@ def handle_subscription_cancel(reply_token, user_id_db, stripe_subscription_id):
             "template": {
                 "type": "buttons",
                 "title": "サブスクリプション解約完了",
-                "text": "サブスクリプション全体の解約を受け付けました。\n\n請求期間終了まで全てのサービスをご利用いただけます。\n\n解約をキャンセルする場合は、お問い合わせください。",
+                "text": "サブスクリプション全体の解約を受け付けました。\n\n請求期間終了まで全てのサービスをご利用いただけます。",
                 "actions": [
                     {
                         "type": "message",
