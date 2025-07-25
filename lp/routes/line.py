@@ -39,6 +39,7 @@ def line_webhook():
                 c = conn.cursor()
                 c.execute('SELECT id, stripe_subscription_id FROM users WHERE line_user_id IS NULL ORDER BY created_at DESC LIMIT 1')
                 user = c.fetchone()
+                print(f'[DEBUG] 友達追加時の未紐付けユーザー検索結果: {user}')
                 
                 if user:
                     c.execute('UPDATE users SET line_user_id = %s WHERE id = %s', (user_id, user[0]))
@@ -83,13 +84,20 @@ def line_webhook():
             if event.get('type') == 'message' and event['message'].get('type') == 'text':
                 user_id = event['source']['userId']
                 text = event['message']['text']
+                print(f'[DEBUG] テキストメッセージ受信: user_id={user_id}, text={text}')
+                
                 conn = get_db_connection()
                 c = conn.cursor()
                 c.execute('SELECT id, stripe_subscription_id, line_user_id FROM users WHERE line_user_id = %s', (user_id,))
                 user = c.fetchone()
+                print(f'[DEBUG] 既存ユーザー検索結果: {user}')
+                
                 if not user:
+                    print(f'[DEBUG] 既存ユーザーが見つからないため、未紐付けユーザーを検索')
                     c.execute('SELECT id, stripe_subscription_id FROM users WHERE line_user_id IS NULL ORDER BY created_at DESC LIMIT 1')
                     user = c.fetchone()
+                    print(f'[DEBUG] 未紐付けユーザー検索結果: {user}')
+                    
                     if user:
                         c.execute('UPDATE users SET line_user_id = %s WHERE id = %s', (user_id, user[0]))
                         conn.commit()
@@ -106,6 +114,7 @@ def line_webhook():
                             # エラーが発生した場合は簡単なテキストメッセージを送信
                             send_line_message(event['replyToken'], [{"type": "text", "text": "ようこそ！AIコレクションズへ\n\n「追加」と入力してコンテンツを追加してください。"}])
                     else:
+                        print(f'[DEBUG] 未紐付けユーザーも見つからない')
                         send_line_message(event['replyToken'], [{"type": "text", "text": get_not_registered_message()}])
                     conn.close()
                     continue
