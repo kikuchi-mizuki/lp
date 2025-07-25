@@ -443,6 +443,12 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                 print('[DEBUG] usage_logs 最新10件:')
                 for log in logs:
                     print(log)
+                # 追加: 同じuser_id・content_typeの全レコードを出力
+                c_debug.execute('SELECT id, user_id, is_free, content_type, created_at FROM usage_logs WHERE user_id = %s AND content_type = %s ORDER BY created_at DESC', (user_id_db, content['name']))
+                same_content_logs = c_debug.fetchall()
+                print(f'[DEBUG] user_id={user_id_db}, content_type={content["name"]} のusage_logs:')
+                for log in same_content_logs:
+                    print(log)
                 conn_debug.close()
             except Exception as e:
                 print(f'[DEBUG] usage_logs全件取得エラー: {e}')
