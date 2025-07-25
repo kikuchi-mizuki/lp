@@ -7,6 +7,7 @@ stripe_bp = Blueprint('stripe', __name__)
 
 @stripe_bp.route('/webhook', methods=['POST'])
 def stripe_webhook():
+    print(f"[Stripe Webhook] リクエスト受信: {request.method}")
     payload = request.data
     sig_header = request.headers.get('Stripe-Signature')
     event = None
@@ -59,6 +60,18 @@ def stripe_webhook():
                               (email, customer_id, subscription_id))
                     conn.commit()
                     print(f'ユーザー登録完了: customer_id={customer_id}, subscription_id={subscription_id}')
+                    # 従量課金アイテムを追加
+                    try:
+                        USAGE_PRICE_ID = os.getenv('STRIPE_USAGE_PRICE_ID')
+                        result = stripe.SubscriptionItem.create(
+                            subscription=subscription_id,
+                            price=USAGE_PRICE_ID
+                        )
+                        print(f'従量課金アイテム追加完了: subscription_id={subscription_id}, usage_price_id={USAGE_PRICE_ID}, result={result}')
+                    except Exception as e:
+                        import traceback
+                        print(f'従量課金アイテム追加エラー: {e}')
+                        print(traceback.format_exc())
                 else:
                     print(f'既存ユーザーが存在（email重複）: {existing_user_by_email[0]}')
             else:
