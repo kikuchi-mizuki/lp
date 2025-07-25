@@ -256,55 +256,5 @@ def subscribe():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/webhook', methods=['POST'])
-def stripe_webhook():
-    """Stripe Webhook処理（旧版、routes/stripe.pyに移行済み）"""
-    payload = request.data
-    sig_header = request.headers.get('Stripe-Signature')
-    event = None
-    
-    try:
-        event = stripe.Webhook.construct_event(
-            payload, sig_header, STRIPE_WEBHOOK_SECRET
-        )
-    except Exception as e:
-        print(f"[Stripe Webhook] 検証エラー: {e}")
-        return '', 400
-    
-    try:
-        event_type = event['type']
-        print(f"[Stripe Webhook] イベント受信: {event_type}")
-        
-        if event_type == 'invoice.payment_succeeded':
-            invoice = event['data']['object']
-            customer_id = invoice.get('customer')
-            subscription_id = invoice.get('subscription')
-            email = invoice.get('customer_email')
-            
-            if not subscription_id:
-                print('subscription_idが存在しません。スキップします。')
-                return jsonify({'status': 'skipped'})
-            
-            conn = get_db_connection()
-            c = conn.cursor()
-            c.execute('SELECT id FROM users WHERE stripe_customer_id = ?', (customer_id,))
-            existing_user = c.fetchone()
-            
-            if not existing_user:
-                c.execute('INSERT INTO users (email, stripe_customer_id, stripe_subscription_id) VALUES (?, ?, ?)',
-                          (email, customer_id, subscription_id))
-                conn.commit()
-                print(f'ユーザー登録完了: customer_id={customer_id}, subscription_id={subscription_id}')
-            else:
-                print(f'既存ユーザーが存在: {existing_user[0]}')
-            
-            conn.close()
-            
-    except Exception as e:
-        print(f"[Stripe Webhook] イベント処理エラー: {e}")
-        return '', 500
-    
-    return '', 200
-
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 5000))) 

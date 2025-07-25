@@ -5,7 +5,7 @@ from utils.db import get_db_connection
 
 stripe_bp = Blueprint('stripe', __name__)
 
-@stripe_bp.route('/stripe_webhook', methods=['POST'])
+@stripe_bp.route('/webhook', methods=['POST'])
 def stripe_webhook():
     payload = request.data
     sig_header = request.headers.get('Stripe-Signature')
@@ -35,6 +35,7 @@ def stripe_webhook():
         # email = normalize_email(email)
         # c.execute('INSERT INTO users (email, ...) VALUES (?, ...)', (email, ...))
         event_type = event['type']
+        print(f"[Stripe Webhook] イベント受信: {event_type}")
         if event_type == 'invoice.payment_succeeded':
             invoice = event['data']['object']
             customer_id = invoice.get('customer')
