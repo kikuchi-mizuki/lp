@@ -772,6 +772,16 @@ def handle_subscription_cancel(reply_token, user_id_db, stripe_subscription_id):
             cancel_at_period_end=True
         )
         
+        # データベースから全てのコンテンツを削除
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute('DELETE FROM usage_logs WHERE user_id = %s', (user_id_db,))
+        deleted_count = c.rowcount
+        conn.commit()
+        conn.close()
+        
+        print(f'[DEBUG] サブスクリプション解約: user_id={user_id_db}, deleted_count={deleted_count}')
+        
         # 解約確認メッセージを送信
         cancel_message = {
             "type": "template",
@@ -793,6 +803,8 @@ def handle_subscription_cancel(reply_token, user_id_db, stripe_subscription_id):
         
     except Exception as e:
         print(f'[ERROR] サブスクリプション解約エラー: {e}')
+        import traceback
+        traceback.print_exc()
         send_line_message(reply_token, [{"type": "text", "text": "❌ サブスクリプション解約に失敗しました。しばらく時間をおいて再度お試しください。"}])
 
 def handle_cancel_menu(reply_token, user_id_db, stripe_subscription_id):
