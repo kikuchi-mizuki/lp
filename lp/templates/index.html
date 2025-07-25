@@ -136,7 +136,15 @@
                     return;
                 }
                 
-                // Stripeの決済ページにリダイレクト
+                // 既存のサブスクリプションがある場合
+                if (data.existing_subscription) {
+                    console.log('既存のサブスクリプションが有効です:', data.subscription_id);
+                    // 直接成功ページにリダイレクト
+                    window.location.href = data.redirect_url;
+                    return;
+                }
+                
+                // 新しいサブスクリプションの場合、Stripeの決済ページにリダイレクト
                 window.location.href = data.url;
                 
             } catch (error) {

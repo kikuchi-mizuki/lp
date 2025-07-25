@@ -251,6 +251,36 @@ def subscribe():
         if not email:
             return jsonify({'error': 'Email is required'}), 400
         
+        # 既存ユーザーの確認
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute('SELECT id, stripe_customer_id, stripe_subscription_id FROM users WHERE email = %s', (email,))
+        existing_user = c.fetchone()
+        conn.close()
+        
+        if existing_user:
+            user_id, customer_id, subscription_id = existing_user
+            print(f"既存ユーザー発見: user_id={user_id}, customer_id={customer_id}, subscription_id={subscription_id}")
+            
+            # 既存のサブスクリプションの状態を確認
+            try:
+                subscription = stripe.Subscription.retrieve(subscription_id)
+                if subscription['status'] in ['active', 'trialing']:
+                    print(f"既存のサブスクリプションが有効: {subscription_id}")
+                    # 既存のサブスクリプションが有効な場合は、そのまま成功ページにリダイレクト
+                    return jsonify({
+                        'existing_subscription': True,
+                        'subscription_id': subscription_id,
+                        'redirect_url': url_for('thanks', _external=True) + f"?email={email}"
+                    })
+                else:
+                    print(f"既存のサブスクリプションが無効: {subscription_id}, status={subscription['status']}")
+            except Exception as e:
+                print(f"既存サブスクリプション確認エラー: {e}")
+        
+        # 新規ユーザーまたは無効なサブスクリプションの場合、新しいサブスクリプションを作成
+        print(f"新しいサブスクリプションを作成: email={email}")
+        
         # Stripe Checkout Sessionを作成
         session = stripe.checkout.Session.create(
             payment_method_types=['card'],
