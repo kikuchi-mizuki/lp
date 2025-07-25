@@ -36,7 +36,35 @@ def stripe_webhook():
         # c.execute('INSERT INTO users (email, ...) VALUES (?, ...)', (email, ...))
         event_type = event['type']
         print(f"[Stripe Webhook] イベント受信: {event_type}")
-        if event_type == 'invoice.payment_succeeded':
+        if event_type == 'checkout.session.completed':
+            session = event['data']['object']
+            customer_id = session.get('customer')
+            subscription_id = session.get('subscription')
+            customer_email = session.get('customer_email')
+            
+            if not subscription_id:
+                print('subscription_idが存在しません。スキップします。')
+                return jsonify({'status': 'skipped'})
+            
+            email = normalize_email(customer_email)
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute('SELECT id FROM users WHERE stripe_customer_id = ?', (customer_id,))
+            existing_user = c.fetchone()
+            if not existing_user:
+                c.execute('SELECT id FROM users WHERE email = ?', (email,))
+                existing_user_by_email = c.fetchone()
+                if not existing_user_by_email:
+                    c.execute('INSERT INTO users (email, stripe_customer_id, stripe_subscription_id) VALUES (?, ?, ?)',
+                              (email, customer_id, subscription_id))
+                    conn.commit()
+                    print(f'ユーザー登録完了: customer_id={customer_id}, subscription_id={subscription_id}')
+                else:
+                    print(f'既存ユーザーが存在（email重複）: {existing_user_by_email[0]}')
+            else:
+                print(f'既存ユーザーが存在: {existing_user[0]}')
+            conn.close()
+        elif event_type == 'invoice.payment_succeeded':
             invoice = event['data']['object']
             customer_id = invoice.get('customer')
             subscription_id = invoice.get('subscription')
