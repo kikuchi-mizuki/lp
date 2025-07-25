@@ -1,23 +1,32 @@
+#!/usr/bin/env python3
+"""
+現在のサブスクリプションに新しい従量課金Priceを追加するスクリプト
+"""
+
 import sys
 import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-from lp.services.stripe_service import ensure_metered_price_in_subscription
-from dotenv import load_dotenv
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from dotenv import load_dotenv
 load_dotenv()
 
+import stripe
+stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+
+from services.stripe_service import add_metered_price_to_subscription
+
+def fix_current_subscription():
+    """現在のサブスクリプションを修正"""
+    subscription_id = 'sub_1Roqi5Ixg6C5hAVd86ASCYle'  # 現在のサブスクリプションID
+    usage_price_id = 'price_1Rog1nIxg6C5hAVdnqB5MJiT'  # 新しい従量課金Price ID
+    
+    print(f"サブスクリプション {subscription_id} に従量課金Price {usage_price_id} を追加します...")
+    
+    try:
+        result = add_metered_price_to_subscription(subscription_id, usage_price_id)
+        print(f"✅ 成功: {result}")
+    except Exception as e:
+        print(f"❌ エラー: {e}")
+
 if __name__ == '__main__':
-    # 現在のサブスクリプションID
-    subscription_id = "sub_1RoqUqIxg6C5hAVdkwij7PyP"
-    # Meter付き従量課金Price ID
-    metered_price_id = "price_1RokfbIxg6C5hAVd1v0J5ATb"
-    
-    print(f"サブスクリプション {subscription_id} にMeter付き従量課金Priceを追加中...")
-    
-    result = ensure_metered_price_in_subscription(subscription_id, metered_price_id)
-    
-    if result:
-        print("✅ Meter付き従量課金Priceの追加に成功しました")
-        print(f"サブスクリプション状態: {result['status']}")
-    else:
-        print("❌ Meter付き従量課金Priceの追加に失敗しました") 
+    fix_current_subscription() 
