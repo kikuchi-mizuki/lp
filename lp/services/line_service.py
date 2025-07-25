@@ -255,10 +255,10 @@ def handle_add_content(reply_token, user_id_db, stripe_subscription_id):
             "「4」- タスク管理\n"
             "または、番号を直接入力してください。"
         )
-        send_line_message(reply_token, content_menu)
+        send_line_message(reply_token, [{"type": "text", "text": content_menu}])
     except Exception as e:
         print(f'コンテンツ選択メニューエラー: {e}')
-        send_line_message(reply_token, "❌ エラーが発生しました。しばらく時間をおいて再度お試しください。")
+        send_line_message(reply_token, [{"type": "text", "text": "❌ エラーが発生しました。しばらく時間をおいて再度お試しください。"}])
 
 def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, content_number):
     try:
@@ -293,7 +293,7 @@ def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, co
             }
         }
         if content_number not in content_info:
-            send_line_message(reply_token, "❌ 無効な選択です。1-4の数字で選択してください。")
+            send_line_message(reply_token, [{"type": "text", "text": "❌ 無効な選択です。1-4の数字で選択してください。"}])
             return
         content = content_info[content_number]
         conn = get_db_connection()
@@ -313,15 +313,16 @@ def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, co
 
 ✅ 追加する場合は「はい」と入力
 ❌ キャンセルする場合は「いいえ」と入力"""
-        send_line_message(reply_token, confirm_message)
+        send_line_message(reply_token, [{"type": "text", "text": confirm_message}])
+        
     except Exception as e:
         print(f'コンテンツ選択エラー: {e}')
-        send_line_message(reply_token, "❌ エラーが発生しました。しばらく時間をおいて再度お試しください。")
+        send_line_message(reply_token, [{"type": "text", "text": "❌ エラーが発生しました。しばらく時間をおいて再度お試しください。"}])
 
 def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id, content_number, confirmed):
     try:
         if not confirmed:
-            send_line_message(reply_token, "❌ キャンセルしました。\n\n何か他にお手伝いできることはありますか？")
+            send_line_message(reply_token, [{"type": "text", "text": "❌ キャンセルしました。\n\n何か他にお手伝いできることはありますか？"}])
             return
         content_info = {
             '1': {
@@ -369,7 +370,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                     usage_item = item
                     break
             if not usage_item:
-                send_line_message(reply_token, f"❌ 従量課金アイテムが見つかりません。\n\n設定されている価格ID: {os.getenv('STRIPE_USAGE_PRICE_ID')}\n\nサポートにお問い合わせください。")
+                send_line_message(reply_token, [{"type": "text", "text": f"❌ 従量課金アイテムが見つかりません。\n\n設定されている価格ID: {os.getenv('STRIPE_USAGE_PRICE_ID')}\n\nサポートにお問い合わせください。"}])
                 return
             subscription_item_id = usage_item['id']
             try:
@@ -401,11 +402,11 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                     print(f'使用量レコード作成成功: {usage_record}')
                 else:
                     print(f'使用量レコード作成エラー: {response.status_code} - {response.text}')
-                    send_line_message(reply_token, f"❌ 使用量記録の作成に失敗しました。\n\nエラー: {response.text}")
+                    send_line_message(reply_token, [{"type": "text", "text": f"❌ 使用量記録の作成に失敗しました。\n\nエラー: {response.text}"}])
                     return
             except Exception as usage_error:
                 print(f'使用量レコード作成エラー: {usage_error}')
-                send_line_message(reply_token, f"❌ 使用量記録の作成に失敗しました。\n\nエラー: {str(usage_error)}")
+                send_line_message(reply_token, [{"type": "text", "text": f"❌ 使用量記録の作成に失敗しました。\n\nエラー: {str(usage_error)}"}])
                 return
         try:
             conn = get_db_connection()
@@ -433,7 +434,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
             print(f'DB登録エラー: {db_error}')
             import traceback
             print(traceback.format_exc())
-            send_line_message(reply_token, f"❌ データベース登録に失敗しました。\n\nエラー: {str(db_error)}")
+            send_line_message(reply_token, [{"type": "text", "text": f"❌ データベース登録に失敗しました。\n\nエラー: {str(db_error)}"}])
             return
         if is_free:
             success_message = f"""🎉 コンテンツ追加完了！
@@ -467,9 +468,9 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
 {content['url']}
 
 何か他にお手伝いできることはありますか？"""
-        send_line_message(reply_token, success_message)
+        send_line_message(reply_token, [{"type": "text", "text": success_message}])
     except Exception as e:
-        send_line_message(reply_token, "❌ エラーが発生しました。しばらく時間をおいて再度お試しください。")
+        send_line_message(reply_token, [{"type": "text", "text": "❌ エラーが発生しました。しばらく時間をおいて再度お試しください。"}])
 
 def handle_status_check(reply_token, user_id_db):
     try:
@@ -508,9 +509,9 @@ def handle_status_check(reply_token, user_id_db):
 💡 ヒント：
 • 「追加」でコンテンツを追加
 • 「メニュー」で機能一覧を確認"""
-        send_line_message(reply_token, status_message)
+        send_line_message(reply_token, [{"type": "text", "text": status_message}])
     except Exception as e:
-        send_line_message(reply_token, "❌ 利用状況の取得に失敗しました。しばらく時間をおいて再度お試しください。")
+        send_line_message(reply_token, [{"type": "text", "text": "❌ 利用状況の取得に失敗しました。しばらく時間をおいて再度お試しください。"}])
 
 def handle_cancel_request(reply_token, user_id_db, stripe_subscription_id):
     try:
@@ -545,12 +546,12 @@ def handle_cancel_request(reply_token, user_id_db, stripe_subscription_id):
             display_price = '0円' if is_free else f'{amount_jpy:,}円'
             content_choices.append(f"{idx}. {jp_name}（{display_price}/月）")
         if not content_choices:
-            send_line_message(reply_token, "現在契約中のコンテンツはありません。")
+            send_line_message(reply_token, [{"type": "text", "text": "現在契約中のコンテンツはありません。"}])
             return
         choice_message = "\n".join(content_choices)
-        send_line_message(reply_token, f"解約したいコンテンツを選んでください（カンマ区切りで複数選択可）:\n{choice_message}\n\n例: 1,2")
+        send_line_message(reply_token, [{"type": "text", "text": f"解約したいコンテンツを選んでください（カンマ区切りで複数選択可）:\n{choice_message}\n\n例: 1,2"}])
     except Exception as e:
-        send_line_message(reply_token, "❌ 契約中コンテンツの取得に失敗しました。しばらく時間をおいて再度お試しください。")
+        send_line_message(reply_token, [{"type": "text", "text": "❌ 契約中コンテンツの取得に失敗しました。しばらく時間をおいて再度お試しください。"}])
 
 def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, selection_text):
     try:
@@ -578,11 +579,11 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
                     jp_name = name
                 cancelled.append(jp_name)
         if cancelled:
-            send_line_message(reply_token, f"以下のコンテンツの解約を受け付けました（請求期間終了まで利用可能です）：\n" + "\n".join(cancelled))
+            send_line_message(reply_token, [{"type": "text", "text": f"以下のコンテンツの解約を受け付けました（請求期間終了まで利用可能です）：\n" + "\n".join(cancelled)}])
         else:
-            send_line_message(reply_token, "有効な番号が選択されませんでした。もう一度お試しください。")
+            send_line_message(reply_token, [{"type": "text", "text": "有効な番号が選択されませんでした。もう一度お試しください。"}])
     except Exception as e:
-        send_line_message(reply_token, "❌ 解約処理に失敗しました。しばらく時間をおいて再度お試しください。")
+        send_line_message(reply_token, [{"type": "text", "text": "❌ 解約処理に失敗しました。しばらく時間をおいて再度お試しください。"}])
 
 def get_welcome_message():
     return "ようこそ！LINE連携が完了しました。"

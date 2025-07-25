@@ -64,7 +64,7 @@ def line_webhook():
                         ]
                         send_line_message(event['replyToken'], messages)
                     else:
-                        send_line_message(event['replyToken'], get_not_registered_message())
+                        send_line_message(event['replyToken'], [{"type": "text", "text": get_not_registered_message()}])
                     conn.close()
                     continue
                 user_id_db = user[0]
@@ -74,9 +74,9 @@ def line_webhook():
                     user_states[user_id] = 'add_select'
                     handle_add_content(event['replyToken'], user_id_db, stripe_subscription_id)
                 elif text == 'メニュー':
-                    send_line_message(event['replyToken'], get_menu_message())
+                    send_line_message(event['replyToken'], [{"type": "text", "text": get_menu_message()}])
                 elif text == 'ヘルプ':
-                    send_line_message(event['replyToken'], get_help_message())
+                    send_line_message(event['replyToken'], [{"type": "text", "text": get_help_message()}])
                 elif text == '状態':
                     handle_status_check(event['replyToken'], user_id_db)
                 elif text == '解約':
@@ -105,9 +105,9 @@ def line_webhook():
                         if user[1] is None:
                             c.execute('UPDATE users SET line_user_id = ? WHERE id = ?', (user_id, user[0]))
                             conn.commit()
-                            send_line_message(event['replyToken'], 'LINE連携が完了しました。メニューや追加コマンドが利用できます。')
+                            send_line_message(event['replyToken'], [{"type": "text", "text": 'LINE連携が完了しました。メニューや追加コマンドが利用できます。'}])
                         else:
-                            send_line_message(event['replyToken'], 'このメールアドレスは既にLINE連携済みです。')
+                            send_line_message(event['replyToken'], [{"type": "text", "text": 'このメールアドレスは既にLINE連携済みです。'}])
                     else:
                         # 救済策: 直近のline_user_id未設定ユーザーを自動で紐付け
                         c.execute('SELECT id FROM users WHERE line_user_id IS NULL ORDER BY created_at DESC LIMIT 1')
@@ -115,11 +115,11 @@ def line_webhook():
                         if fallback_user:
                             c.execute('UPDATE users SET line_user_id = ? WHERE id = ?', (user_id, fallback_user[0]))
                             conn.commit()
-                            send_line_message(event['replyToken'], 'メールアドレスが見つかりませんでしたが、直近の登録ユーザーにLINE連携しました。メニューや追加コマンドが利用できます。')
+                            send_line_message(event['replyToken'], [{"type": "text", "text": 'メールアドレスが見つかりませんでしたが、直近の登録ユーザーにLINE連携しました。メニューや追加コマンドが利用できます。'}])
                         else:
-                            send_line_message(event['replyToken'], 'ご登録メールアドレスが見つかりません。LPでご登録済みかご確認ください。')
+                            send_line_message(event['replyToken'], [{"type": "text", "text": 'ご登録メールアドレスが見つかりません。LPでご登録済みかご確認ください。'}])
                 else:
-                    send_line_message(event['replyToken'], get_default_message())
+                    send_line_message(event['replyToken'], [{"type": "text", "text": get_default_message()}])
                 conn.close()
             # リッチメニューのpostbackイベントの処理
             elif event.get('type') == 'postback':
@@ -130,7 +130,7 @@ def line_webhook():
                 c.execute('SELECT id, stripe_subscription_id, line_user_id FROM users WHERE line_user_id = ?', (user_id,))
                 user = c.fetchone()
                 if not user:
-                    send_line_message(event['replyToken'], get_not_registered_message())
+                    send_line_message(event['replyToken'], [{"type": "text", "text": get_not_registered_message()}])
                     conn.close()
                     continue
                 user_id_db = user[0]
@@ -145,7 +145,7 @@ def line_webhook():
                     user_states[user_id] = 'cancel_select'
                     handle_cancel_request(event['replyToken'], user_id_db, stripe_subscription_id)
                 elif postback_data == 'action=help':
-                    send_line_message(event['replyToken'], get_help_message())
+                    send_line_message(event['replyToken'], [{"type": "text", "text": get_help_message()}])
                 elif postback_data == 'action=share':
                     share_message = """📢 友達に紹介
 
@@ -160,7 +160,7 @@ AIコレクションズをご利用いただき、ありがとうございます
 https://lp-production-9e2c.up.railway.app
 
 友達が登録すると、あなたにも特典があります！"""
-                    send_line_message(event['replyToken'], share_message)
+                    send_line_message(event['replyToken'], [{"type": "text", "text": share_message}])
                 conn.close()
     except Exception as e:
         import traceback
