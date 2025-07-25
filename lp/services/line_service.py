@@ -525,8 +525,8 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                     'https://api.stripe.com/v1/billing/meter_events',
                     headers=headers,
                     data={
-                        'subscription_item_id': subscription_item_id,
-                        'quantity': 1,
+                        'meter': 'mtr_test_61SuTp31IPUvCq22o41Ixg6C5hAVd1Gi',
+                        'value': 1,
                         'timestamp': int(time.time())
                     }
                 )
