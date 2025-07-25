@@ -140,9 +140,10 @@ def thanks():
     
     email = request.args.get('email')
     if email:
-    email = normalize_email(email)
-    return render_template('thanks.html', email=email)
-    return render_template('thanks.html', email=None)
+        email = normalize_email(email)
+        return render_template('thanks.html', email=email)
+    else:
+        return render_template('thanks.html', email=None)
 
 @app.route('/static/<path:filename>')
 def static_files(filename):
