@@ -545,28 +545,68 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                 # サブスクリプションがキャンセルされている場合の特別な処理
                 error_str = str(usage_error)
                 if "subscription has been canceled" in error_str:
-                    cancel_message = {
-                        "type": "template",
-                        "altText": "サブスクリプション更新が必要です",
-                        "template": {
-                            "type": "buttons",
-                            "title": "サブスクリプション更新が必要です",
-                            "text": "現在のサブスクリプションがキャンセルされています。新しいサブスクリプションを作成するか、既存のものを復活させてください。",
-                            "actions": [
-                                {
-                                    "type": "message",
-                                    "label": "利用状況確認",
-                                    "text": "状態"
-                                },
-                                {
-                                    "type": "message",
-                                    "label": "ヘルプ",
-                                    "text": "ヘルプ"
-                                }
-                            ]
+                    print(f'[DEBUG] サブスクリプションがキャンセルされています。新しいサブスクリプションを作成します。')
+                    
+                    # ユーザー情報を取得
+                    conn = get_db_connection()
+                    c = conn.cursor()
+                    c.execute('SELECT email, stripe_customer_id FROM users WHERE id = %s', (user_id_db,))
+                    user_info = c.fetchone()
+                    conn.close()
+                    
+                    if user_info:
+                        email, customer_id = user_info
+                        try:
+                            # 新しいサブスクリプションを作成
+                            MONTHLY_PRICE_ID = os.getenv('STRIPE_MONTHLY_PRICE_ID')
+                            USAGE_PRICE_ID = os.getenv('STRIPE_USAGE_PRICE_ID')
+                            
+                            new_subscription = stripe.Subscription.create(
+                                customer=customer_id,
+                                items=[
+                                    {
+                                        'price': MONTHLY_PRICE_ID,
+                                        'quantity': 1,
+                                    },
+                                    {
+                                        'price': USAGE_PRICE_ID,
+                                    }
+                                ],
+                                trial_period_days=7,
+                            )
+                            
+                            # データベースを更新
+                            conn = get_db_connection()
+                            c = conn.cursor()
+                            c.execute('UPDATE users SET stripe_subscription_id = %s WHERE id = %s', (new_subscription.id, user_id_db))
+                            conn.commit()
+                            conn.close()
+                            
+                            print(f'[DEBUG] 新しいサブスクリプション作成完了: {new_subscription.id}')
+                            
+                            # 成功メッセージを送信
+                            success_message = {
+                                "type": "text",
+                                "text": f"新しいサブスクリプションを作成しました！\n\n追加内容：{content['name']}\n料金：{content['price']:,}円（次回請求時）\n\nアクセスURL：\n{content['url']}"
+                            }
+                            send_line_message(reply_token, [success_message])
+                            return
+                            
+                        except Exception as create_error:
+                            print(f'[DEBUG] 新しいサブスクリプション作成エラー: {create_error}')
+                            cancel_message = {
+                                "type": "text",
+                                "text": "サブスクリプションの作成に失敗しました。\n\n新しいサブスクリプションを作成するか、既存のものを復活させてください。"
+                            }
+                            send_line_message(reply_token, [cancel_message])
+                            return
+                    else:
+                        cancel_message = {
+                            "type": "text",
+                            "text": "ユーザー情報が見つかりません。\n\n新しいサブスクリプションを作成するか、既存のものを復活させてください。"
                         }
-                    }
-                    send_line_message(reply_token, [cancel_message])
+                        send_line_message(reply_token, [cancel_message])
+                        return
                 else:
                     send_line_message(reply_token, [{"type": "text", "text": f"❌ 使用量記録の作成に失敗しました。\n\nエラー: {error_str}"}])
                 return
