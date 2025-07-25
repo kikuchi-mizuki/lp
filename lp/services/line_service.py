@@ -512,6 +512,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                 import requests
                 import os
                 import time
+                import json
                 
                 stripe_secret_key = os.getenv('STRIPE_SECRET_KEY')
                 print(f'[DEBUG] stripe_secret_key: {stripe_secret_key}')
@@ -521,12 +522,21 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                 }
                 
                 # 新しいMeter付き従量課金システムの場合はbilling/meter_events APIを使用
+                # サブスクリプションからcustomer_idを取得
+                subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+                customer_id = subscription['customer']
+                
+                payload_data = {
+                    'stripe_customer_id': customer_id,
+                    'value': 1
+                }
+                
                 response = requests.post(
                     'https://api.stripe.com/v1/billing/meter_events',
                     headers=headers,
                     data={
-                        'meter': 'mtr_test_61SuTp31IPUvCq22o41Ixg6C5hAVd1Gi',
-                        'value': 1,
+                        'event_name': 'aiコレクションズ',
+                        'payload': json.dumps(payload_data),
                         'timestamp': int(time.time())
                     }
                 )
