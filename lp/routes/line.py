@@ -136,6 +136,9 @@ def line_webhook():
                         from services.line_service import send_welcome_with_buttons
                         send_welcome_with_buttons(event['replyToken'])
                         print(f'[DEBUG] 最近作成ユーザーへの案内文送信完了: user_id={user_id}')
+                        # 案内文を送信した後は処理を終了（replyTokenは1回しか使用できない）
+                        conn.close()
+                        continue
                     except Exception as e:
                         print(f'[DEBUG] 最近作成ユーザーへの案内文送信エラー: {e}')
                         import traceback
