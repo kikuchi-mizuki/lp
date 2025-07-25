@@ -725,7 +725,7 @@ def handle_cancel_request(reply_token, user_id_db, stripe_subscription_id):
             else:
                 jp_name = f'コンテンツ{idx}'
             
-            amount_jpy = int(unit_amount) // 100 if unit_amount else 0
+            amount_jpy = int(unit_amount) if unit_amount else 0
             is_free = usage_free_map.get(jp_name, False)
             display_price = '0円' if is_free else f'{amount_jpy:,}円'
             content_choices.append(f"{idx}. {jp_name}（{display_price}/月）")
