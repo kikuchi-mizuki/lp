@@ -803,7 +803,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                 "template": {
                     "type": "buttons",
                     "title": "コンテンツ追加完了！",
-                    "text": f"追加内容：{content['name']}\n料金：無料（1個目）\n\nアクセスURL：\n{content['url']}\n\n他のコンテンツも追加できます。",
+                    "text": f"追加内容：{content['name']}\n料金：無料（1個目）",
                     "actions": [
                         {
                             "type": "message",
@@ -830,7 +830,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                 "template": {
                     "type": "buttons",
                     "title": "コンテンツ追加完了！",
-                    "text": f"追加内容：{content['name']}\n料金：1,500円（{total_usage_count + 1}個目、次回請求時に反映）\n\nアクセスURL：\n{content['url']}\n\n他のコンテンツも追加できます。",
+                    "text": f"追加内容：{content['name']}\n料金：1,500円（{total_usage_count + 1}個目）",
                     "actions": [
                         {
                             "type": "message",
@@ -850,7 +850,16 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                     ]
                 }
             }
+        
+        # テンプレートメッセージを送信
         send_line_message(reply_token, [success_message])
+        
+        # アクセスURLを別メッセージで送信
+        url_message = {
+            "type": "text",
+            "text": f"アクセスURL：\n{content['url']}"
+        }
+        send_line_message(reply_token, [url_message])
     except Exception as e:
         send_line_message(reply_token, [{"type": "text", "text": "❌ エラーが発生しました。しばらく時間をおいて再度お試しください。"}])
 
@@ -1018,7 +1027,7 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
                 "template": {
                     "type": "buttons",
                     "title": "コンテンツ解約完了",
-                    "text": f"以下のコンテンツの解約を受け付けました（請求期間終了まで利用可能です）：\n" + "\n".join(cancelled),
+                    "text": f"以下のコンテンツの解約を受け付けました：\n" + "\n".join(cancelled),
                     "actions": [
                         {
                             "type": "message",
@@ -1039,6 +1048,13 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
                 }
             }
             send_line_message(reply_token, [cancel_success_message])
+            
+            # 請求期間についての説明を別メッセージで送信
+            period_message = {
+                "type": "text",
+                "text": "請求期間終了まで利用可能です。"
+            }
+            send_line_message(reply_token, [period_message])
         else:
             send_line_message(reply_token, [{"type": "text", "text": "有効な番号が選択されませんでした。もう一度お試しください。"}])
     except Exception as e:
