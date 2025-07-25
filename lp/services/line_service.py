@@ -50,6 +50,7 @@ def send_line_message(reply_token, messages):
             f.write(traceback.format_exc() + '\n')
 
 def send_welcome_with_buttons(reply_token):
+    print(f'[DEBUG] send_welcome_with_buttons開始: reply_token={reply_token}')
     import requests
     import os
     LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
@@ -89,8 +90,10 @@ def send_welcome_with_buttons(reply_token):
         ]
     }
     try:
+        print(f'[DEBUG] LINE API送信開始: data={data}')
         response = requests.post('https://api.line.me/v2/bot/message/reply', headers=headers, json=data)
         response.raise_for_status()
+        print(f'[DEBUG] LINE API送信成功: status_code={response.status_code}')
     except Exception as e:
         print(f'LINEテンプレートメッセージ送信エラー: {e}')
         import traceback

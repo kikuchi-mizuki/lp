@@ -99,10 +99,12 @@ def line_webhook():
                     print(f'[DEBUG] 未紐付けユーザー検索結果: {user}')
                     
                     if user:
+                        print(f'[DEBUG] 未紐付けユーザー発見、紐付け処理開始: user_id={user_id}, db_user_id={user[0]}')
                         c.execute('UPDATE users SET line_user_id = %s WHERE id = %s', (user_id, user[0]))
                         conn.commit()
                         print(f'[DEBUG] 初回メッセージ時のユーザー紐付け完了: user_id={user_id}, db_user_id={user[0]}')
                         # 決済画面からLINEに移動した時の初回案内文
+                        print(f'[DEBUG] 案内文送信開始: user_id={user_id}, replyToken={event["replyToken"]}')
                         try:
                             from services.line_service import send_welcome_with_buttons
                             send_welcome_with_buttons(event['replyToken'])
