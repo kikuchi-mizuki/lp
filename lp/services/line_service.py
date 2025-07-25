@@ -41,6 +41,8 @@ def send_line_message(reply_token, messages):
         response.raise_for_status()
     except Exception as e:
         print(f'LINEメッセージ送信エラー: {e}')
+        if hasattr(e, 'response') and e.response is not None:
+            print(f'LINE API エラー詳細: {e.response.text}')
         traceback.print_exc()
         # エラー詳細をerror.logにも追記
         with open('error.log', 'a', encoding='utf-8') as f:
@@ -588,57 +590,13 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
             print(f'[DEBUG] usage_logs全件取得エラー: {e}')
         if is_free:
             success_message = {
-                "type": "template",
-                "altText": "コンテンツ追加完了",
-                "template": {
-                    "type": "buttons",
-                    "title": "コンテンツ追加完了！",
-                    "text": f"追加内容：{content['name']}\n料金：無料\n\nアクセスURL：\n{content['url']}",
-                    "actions": [
-                        {
-                            "type": "message",
-                            "label": "他のコンテンツを追加",
-                            "text": "追加"
-                        },
-                        {
-                            "type": "message",
-                            "label": "利用状況確認",
-                            "text": "状態"
-                        },
-                        {
-                            "type": "message",
-                            "label": "ヘルプ",
-                            "text": "ヘルプ"
-                        }
-                    ]
-                }
+                "type": "text",
+                "text": f"コンテンツ追加完了！\n\n追加内容：{content['name']}\n料金：無料\n\nアクセスURL：\n{content['url']}"
             }
         else:
             success_message = {
-                "type": "template",
-                "altText": "コンテンツ追加完了",
-                "template": {
-                    "type": "buttons",
-                    "title": "コンテンツ追加完了！",
-                    "text": f"追加内容：{content['name']}\n料金：{content['price']:,}円（次回請求時）\n\nアクセスURL：\n{content['url']}",
-                    "actions": [
-                        {
-                            "type": "message",
-                            "label": "他のコンテンツを追加",
-                            "text": "追加"
-                        },
-                        {
-                            "type": "message",
-                            "label": "利用状況確認",
-                            "text": "状態"
-                        },
-                        {
-                            "type": "message",
-                            "label": "ヘルプ",
-                            "text": "ヘルプ"
-                        }
-                    ]
-                }
+                "type": "text",
+                "text": f"コンテンツ追加完了！\n\n追加内容：{content['name']}\n料金：{content['price']:,}円（次回請求時）\n\nアクセスURL：\n{content['url']}"
             }
         send_line_message(reply_token, [success_message])
     except Exception as e:
