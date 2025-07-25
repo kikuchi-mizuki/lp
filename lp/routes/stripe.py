@@ -80,8 +80,16 @@ def stripe_webhook():
                         print(traceback.format_exc())
                 else:
                     print(f'既存ユーザーが存在（email重複）: {existing_user_by_email[0]}')
+                    # 既存ユーザーにもsubscription_idをUPDATE
+                    c.execute('UPDATE users SET stripe_customer_id = %s, stripe_subscription_id = %s WHERE id = %s', (customer_id, subscription_id, existing_user_by_email[0]))
+                    conn.commit()
+                    print(f'既存ユーザーのsubscription_idをUPDATE: id={existing_user_by_email[0]}, subscription_id={subscription_id}')
             else:
                 print(f'既存ユーザーが存在: {existing_user[0]}')
+                # 既存ユーザーにもsubscription_idをUPDATE
+                c.execute('UPDATE users SET stripe_customer_id = %s, stripe_subscription_id = %s WHERE id = %s', (customer_id, subscription_id, existing_user[0]))
+                conn.commit()
+                print(f'既存ユーザーのsubscription_idをUPDATE: id={existing_user[0]}, subscription_id={subscription_id}')
             conn.close()
         elif event_type == 'invoice.payment_succeeded':
             invoice = event['data']['object']
@@ -117,8 +125,16 @@ def stripe_webhook():
                         print(traceback.format_exc())
                 else:
                     print(f'既存ユーザーが存在（email重複）: {existing_user_by_email[0]}')
+                    # 既存ユーザーにもsubscription_idをUPDATE
+                    c.execute('UPDATE users SET stripe_customer_id = %s, stripe_subscription_id = %s WHERE id = %s', (customer_id, subscription_id, existing_user_by_email[0]))
+                    conn.commit()
+                    print(f'既存ユーザーのsubscription_idをUPDATE: id={existing_user_by_email[0]}, subscription_id={subscription_id}')
             else:
                 print(f'既存ユーザーが存在: {existing_user[0]}')
+                # 既存ユーザーにもsubscription_idをUPDATE
+                c.execute('UPDATE users SET stripe_customer_id = %s, stripe_subscription_id = %s WHERE id = %s', (customer_id, subscription_id, existing_user[0]))
+                conn.commit()
+                print(f'既存ユーザーのsubscription_idをUPDATE: id={existing_user[0]}, subscription_id={subscription_id}')
             conn.close()
         elif event_type == 'customer.subscription.created':
             subscription = event['data']['object']
@@ -152,8 +168,16 @@ def stripe_webhook():
                         print(traceback.format_exc())
                 else:
                     print(f'既存ユーザーが存在（email重複）: {existing_user_by_email[0]}')
+                    # 既存ユーザーにもsubscription_idをUPDATE
+                    c.execute('UPDATE users SET stripe_customer_id = %s, stripe_subscription_id = %s WHERE id = %s', (customer_id, subscription_id, existing_user_by_email[0]))
+                    conn.commit()
+                    print(f'既存ユーザーのsubscription_idをUPDATE: id={existing_user_by_email[0]}, subscription_id={subscription_id}')
             else:
                 print(f'既存ユーザーが存在: {existing_user[0]}')
+                # 既存ユーザーにもsubscription_idをUPDATE
+                c.execute('UPDATE users SET stripe_customer_id = %s, stripe_subscription_id = %s WHERE id = %s', (customer_id, subscription_id, existing_user[0]))
+                conn.commit()
+                print(f'既存ユーザーのsubscription_idをUPDATE: id={existing_user[0]}, subscription_id={subscription_id}')
             conn.close()
     except Exception as e:
         import traceback
