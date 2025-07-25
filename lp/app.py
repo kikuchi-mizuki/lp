@@ -273,9 +273,9 @@ def subscribe():
                         'subscription_id': subscription_id,
                         'redirect_url': url_for('thanks', _external=True) + f"?email={email}"
                     })
-            else:
+                else:
                     print(f"既存のサブスクリプションが無効: {subscription_id}, status={subscription['status']}")
-    except Exception as e:
+            except Exception as e:
                 print(f"既存サブスクリプション確認エラー: {e}")
         
         # 新規ユーザーまたは無効なサブスクリプションの場合、新しいサブスクリプションを作成
