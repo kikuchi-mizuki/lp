@@ -43,7 +43,6 @@ def line_webhook():
                     if user:
                         c.execute('UPDATE users SET line_user_id = ? WHERE id = ?', (user_id, user[0]))
                         conn.commit()
-                        from services.line_service import send_welcome_with_buttons, send_line_message
                         from utils.message_templates import get_help_message
                         # ボタン付きテンプレートメッセージと使い方ガイドを1回で送信
                         messages = [
