@@ -430,16 +430,73 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
         # INSERT用のコネクションは今まで通り
         if not is_free:
             print('[DEBUG] Stripe課金API呼び出し開始')
-            subscription = stripe.Subscription.retrieve(stripe_subscription_id)
-            usage_item = None
-            for item in subscription['items']['data']:
-                print(f'[DEBUG] Stripe item: {item}')
-                if item['price']['id'] == os.getenv('STRIPE_USAGE_PRICE_ID'):
-                    usage_item = item
-                    break
-            if not usage_item:
-                print('[DEBUG] usage_itemが見つからずreturn')
-                send_line_message(reply_token, [{"type": "text", "text": f"❌ 従量課金アイテムが見つかりません。\n\n設定されている価格ID: {os.getenv('STRIPE_USAGE_PRICE_ID')}\n\nサポートにお問い合わせください。"}])
+            try:
+                subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+                
+                # サブスクリプションの状態をチェック
+                if subscription['status'] == 'canceled':
+                    cancel_message = {
+                        "type": "template",
+                        "altText": "サブスクリプション更新が必要です",
+                        "template": {
+                            "type": "buttons",
+                            "title": "⚠️ サブスクリプション更新が必要です",
+                            "text": "現在のサブスクリプションがキャンセルされているため、コンテンツを追加できません。\n\n新しいサブスクリプションを作成するか、既存のサブスクリプションを復活させてください。",
+                            "actions": [
+                                {
+                                    "type": "message",
+                                    "label": "📊 利用状況確認",
+                                    "text": "状態"
+                                },
+                                {
+                                    "type": "message",
+                                    "label": "❓ ヘルプ",
+                                    "text": "ヘルプ"
+                                }
+                            ]
+                        }
+                    }
+                    send_line_message(reply_token, [cancel_message])
+                    return
+                
+                usage_item = None
+                for item in subscription['items']['data']:
+                    print(f'[DEBUG] Stripe item: {item}')
+                    if item['price']['id'] == os.getenv('STRIPE_USAGE_PRICE_ID'):
+                        usage_item = item
+                        break
+                if not usage_item:
+                    print('[DEBUG] usage_itemが見つからずreturn')
+                    send_line_message(reply_token, [{"type": "text", "text": f"❌ 従量課金アイテムが見つかりません。\n\n設定されている価格ID: {os.getenv('STRIPE_USAGE_PRICE_ID')}\n\nサポートにお問い合わせください。"}])
+                    return
+            except Exception as subscription_error:
+                print(f'[DEBUG] サブスクリプション取得エラー: {subscription_error}')
+                error_str = str(subscription_error)
+                if "subscription has been canceled" in error_str or "No such subscription" in error_str:
+                    cancel_message = {
+                        "type": "template",
+                        "altText": "サブスクリプション更新が必要です",
+                        "template": {
+                            "type": "buttons",
+                            "title": "⚠️ サブスクリプション更新が必要です",
+                            "text": "現在のサブスクリプションがキャンセルされているか、存在しません。\n\n新しいサブスクリプションを作成してください。",
+                            "actions": [
+                                {
+                                    "type": "message",
+                                    "label": "📊 利用状況確認",
+                                    "text": "状態"
+                                },
+                                {
+                                    "type": "message",
+                                    "label": "❓ ヘルプ",
+                                    "text": "ヘルプ"
+                                }
+                            ]
+                        }
+                    }
+                    send_line_message(reply_token, [cancel_message])
+                else:
+                    send_line_message(reply_token, [{"type": "text", "text": f"❌ サブスクリプションの取得に失敗しました。\n\nエラー: {error_str}"}])
                 return
             subscription_item_id = usage_item['id']
             try:
@@ -470,13 +527,66 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                     print(f'使用量レコード作成成功: {usage_record}')
                 else:
                     print(f'[DEBUG] 使用量レコード作成エラー: {response.status_code} - {response.text}')
-                    send_line_message(reply_token, [{"type": "text", "text": f"❌ 使用量記録の作成に失敗しました。\n\nエラー: {response.text}"}])
+                    
+                    # サブスクリプションがキャンセルされている場合の特別な処理
+                    if "subscription has been canceled" in response.text:
+                        cancel_message = {
+                            "type": "template",
+                            "altText": "サブスクリプション更新が必要です",
+                            "template": {
+                                "type": "buttons",
+                                "title": "⚠️ サブスクリプション更新が必要です",
+                                "text": "現在のサブスクリプションがキャンセルされているため、コンテンツを追加できません。\n\n新しいサブスクリプションを作成するか、既存のサブスクリプションを復活させてください。",
+                                "actions": [
+                                    {
+                                        "type": "message",
+                                        "label": "📊 利用状況確認",
+                                        "text": "状態"
+                                    },
+                                    {
+                                        "type": "message",
+                                        "label": "❓ ヘルプ",
+                                        "text": "ヘルプ"
+                                    }
+                                ]
+                            }
+                        }
+                        send_line_message(reply_token, [cancel_message])
+                    else:
+                        send_line_message(reply_token, [{"type": "text", "text": f"❌ 使用量記録の作成に失敗しました。\n\nエラー: {response.text}"}])
                     return
             except Exception as usage_error:
                 print(f'[DEBUG] 使用量レコード作成例外: {usage_error}')
                 import traceback
                 print(traceback.format_exc())
-                send_line_message(reply_token, [{"type": "text", "text": f"❌ 使用量記録の作成に失敗しました。\n\nエラー: {str(usage_error)}"}])
+                
+                # サブスクリプションがキャンセルされている場合の特別な処理
+                error_str = str(usage_error)
+                if "subscription has been canceled" in error_str:
+                    cancel_message = {
+                        "type": "template",
+                        "altText": "サブスクリプション更新が必要です",
+                        "template": {
+                            "type": "buttons",
+                            "title": "⚠️ サブスクリプション更新が必要です",
+                            "text": "現在のサブスクリプションがキャンセルされているため、コンテンツを追加できません。\n\n新しいサブスクリプションを作成するか、既存のサブスクリプションを復活させてください。",
+                            "actions": [
+                                {
+                                    "type": "message",
+                                    "label": "📊 利用状況確認",
+                                    "text": "状態"
+                                },
+                                {
+                                    "type": "message",
+                                    "label": "❓ ヘルプ",
+                                    "text": "ヘルプ"
+                                }
+                            ]
+                        }
+                    }
+                    send_line_message(reply_token, [cancel_message])
+                else:
+                    send_line_message(reply_token, [{"type": "text", "text": f"❌ 使用量記録の作成に失敗しました。\n\nエラー: {error_str}"}])
                 return
         # usage_logsのINSERT前にもprint
         print(f'[DEBUG] usage_logs INSERT前: user_id={user_id_db}, is_free={is_free}, content={content["name"]}')
