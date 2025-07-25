@@ -508,7 +508,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                 return
             subscription_item_id = usage_item['id']
             try:
-                # Meter付き従量課金の場合はbilling/meter_events APIを使用
+                # Meter付き従量課金の場合はsubscription_items/{id}/usage_records APIを使用
                 import requests
                 import os
                 import time
@@ -520,14 +520,14 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                     'Content-Type': 'application/x-www-form-urlencoded'
                 }
                 
-                # Meter付き従量課金の場合はbilling/meter_events APIを使用
+                # Meter付き従量課金の場合はsubscription_items/{id}/usage_records APIを使用
                 response = requests.post(
-                    'https://api.stripe.com/v1/billing/meter_events',
+                    f'https://api.stripe.com/v1/subscription_items/{subscription_item_id}/usage_records',
                     headers=headers,
                     data={
-                        'meter': 'mtr_test_61SuTp31IPUvCq22o41Ixg6C5hAVd1Gi',
                         'quantity': 1,
-                        'timestamp': int(time.time())
+                        'timestamp': int(time.time()),
+                        'action': 'increment'
                     }
                 )
                 
