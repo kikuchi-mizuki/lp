@@ -375,6 +375,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                     usage_item = item
                     break
             if not usage_item:
+                print('[DEBUG] usage_itemが見つからずreturn')
                 send_line_message(reply_token, [{"type": "text", "text": f"❌ 従量課金アイテムが見つかりません。\n\n設定されている価格ID: {os.getenv('STRIPE_USAGE_PRICE_ID')}\n\nサポートにお問い合わせください。"}])
                 return
             subscription_item_id = usage_item['id']
@@ -404,13 +405,17 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                     usage_record = response.json()
                     print(f'使用量レコード作成成功: {usage_record}')
                 else:
-                    print(f'使用量レコード作成エラー: {response.status_code} - {response.text}')
+                    print(f'[DEBUG] 使用量レコード作成エラー: {response.status_code} - {response.text}')
                     send_line_message(reply_token, [{"type": "text", "text": f"❌ 使用量記録の作成に失敗しました。\n\nエラー: {response.text}"}])
                     return
             except Exception as usage_error:
-                print(f'使用量レコード作成エラー: {usage_error}')
+                print(f'[DEBUG] 使用量レコード作成例外: {usage_error}')
+                import traceback
+                print(traceback.format_exc())
                 send_line_message(reply_token, [{"type": "text", "text": f"❌ 使用量記録の作成に失敗しました。\n\nエラー: {str(usage_error)}"}])
                 return
+        # usage_logsのINSERT前にもprint
+        print(f'[DEBUG] usage_logs INSERT前: user_id={user_id_db}, is_free={is_free}, content={content["name"]}')
         try:
             conn = get_db_connection()
             c = conn.cursor()
