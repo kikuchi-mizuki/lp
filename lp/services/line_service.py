@@ -730,9 +730,8 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
         # 実際に追加されたコンテンツを取得
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute('SELECT content_type, is_free FROM usage_logs WHERE user_id = %s ORDER BY created_at', (user_id_db,))
+        c.execute('SELECT id, content_type, is_free FROM usage_logs WHERE user_id = %s ORDER BY created_at', (user_id_db,))
         added_contents = c.fetchall()
-        conn.close()
         
         # 選択された番号を解析
         selected_indices = [int(x.strip()) for x in selection_text.split(',') if x.strip().isdigit()]
@@ -741,17 +740,27 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
         choice_index = 1
         
         # 実際に追加されたコンテンツの処理
-        for content_type, is_free in added_contents:
+        for usage_id, content_type, is_free in added_contents:
             if content_type in ['AI予定秘書', 'AI経理秘書', 'AIタスクコンシェルジュ']:
                 if choice_index in selected_indices:
+                    # データベースからusage_logsを削除
+                    c.execute('DELETE FROM usage_logs WHERE id = %s', (usage_id,))
                     cancelled.append(content_type)
+                    print(f'[DEBUG] 解約処理: content_type={content_type}, usage_id={usage_id}')
                 choice_index += 1
+        
+        # データベースの変更をコミット
+        conn.commit()
+        conn.close()
         
         if cancelled:
             send_line_message(reply_token, [{"type": "text", "text": f"以下のコンテンツの解約を受け付けました（請求期間終了まで利用可能です）：\n" + "\n".join(cancelled)}])
         else:
             send_line_message(reply_token, [{"type": "text", "text": "有効な番号が選択されませんでした。もう一度お試しください。"}])
     except Exception as e:
+        print(f'[ERROR] 解約処理エラー: {e}')
+        import traceback
+        traceback.print_exc()
         send_line_message(reply_token, [{"type": "text", "text": "❌ 解約処理に失敗しました。しばらく時間をおいて再度お試しください。"}])
 
 def handle_subscription_cancel(reply_token, user_id_db, stripe_subscription_id):
