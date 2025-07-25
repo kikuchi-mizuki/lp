@@ -364,6 +364,8 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
         usage_count = c_count.fetchone()[0]
         conn_count.close()
         is_free = usage_count == 0
+        print(f"[DEBUG] content_type: {content['name']}")
+        print(f"[DEBUG] DATABASE_URL: {os.getenv('DATABASE_URL')}")
         # INSERT用のコネクションは今まで通り
         if not is_free:
             subscription = stripe.Subscription.retrieve(stripe_subscription_id)
@@ -432,6 +434,18 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
             conn.commit()
             conn.close()
             print(f'DB登録成功: user_id={user_id_db}, is_free={is_free}, usage_record_id={usage_record_id}')
+            # usage_logsの全件を出力
+            try:
+                conn_debug = get_db_connection()
+                c_debug = conn_debug.cursor()
+                c_debug.execute('SELECT id, user_id, is_free, content_type, created_at FROM usage_logs ORDER BY created_at DESC LIMIT 10')
+                logs = c_debug.fetchall()
+                print('[DEBUG] usage_logs 最新10件:')
+                for log in logs:
+                    print(log)
+                conn_debug.close()
+            except Exception as e:
+                print(f'[DEBUG] usage_logs全件取得エラー: {e}')
         except Exception as db_error:
             print(f'DB登録エラー: {db_error}')
             import traceback
