@@ -122,6 +122,25 @@ def line_webhook():
                     continue
                 user_id_db = user[0]
                 stripe_subscription_id = user[1]
+                
+                # 最近作成されたユーザー（30分以内）の場合は案内文を送信
+                c.execute('SELECT created_at FROM users WHERE id = %s', (user_id_db,))
+                user_created_at = c.fetchone()[0]
+                import datetime
+                now = datetime.datetime.utcnow()
+                time_diff = now - user_created_at
+                
+                if time_diff.total_seconds() < 1800:  # 30分以内
+                    print(f'[DEBUG] 最近作成されたユーザー: user_id={user_id}, created_at={user_created_at}, time_diff={time_diff.total_seconds()}秒')
+                    try:
+                        from services.line_service import send_welcome_with_buttons
+                        send_welcome_with_buttons(event['replyToken'])
+                        print(f'[DEBUG] 最近作成ユーザーへの案内文送信完了: user_id={user_id}')
+                    except Exception as e:
+                        print(f'[DEBUG] 最近作成ユーザーへの案内文送信エラー: {e}')
+                        import traceback
+                        traceback.print_exc()
+                
                 state = user_states.get(user_id, None)
                 if text == '追加':
                     user_states[user_id] = 'add_select'
