@@ -508,7 +508,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                 return
             subscription_item_id = usage_item['id']
             try:
-                # 新しいStripe APIを使用して使用量レコードを作成
+                # Meter付き従量課金の場合はbilling/meter_events APIを使用
                 import requests
                 import os
                 import time
@@ -520,21 +520,22 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                     'Content-Type': 'application/x-www-form-urlencoded'
                 }
                 
+                # Meter付き従量課金の場合はbilling/meter_events APIを使用
                 response = requests.post(
-                    f'https://api.stripe.com/v1/subscription_items/{subscription_item_id}/usage_records',
+                    'https://api.stripe.com/v1/billing/meter_events',
                     headers=headers,
                     data={
-                        'quantity': 1,
-                        'timestamp': int(time.time()),
-                        'action': 'increment'
+                        'subscription_item': subscription_item_id,
+                        'value': 1,
+                        'timestamp': int(time.time())
                     }
                 )
                 
                 if response.status_code == 200:
                     usage_record = response.json()
-                    print(f'使用量レコード作成成功: {usage_record}')
+                    print(f'Meter使用量レコード作成成功: {usage_record}')
                 else:
-                    print(f'[DEBUG] 使用量レコード作成エラー: {response.status_code} - {response.text}')
+                    print(f'[DEBUG] Meter使用量レコード作成エラー: {response.status_code} - {response.text}')
                     
                     # サブスクリプションがキャンセルされている場合の特別な処理
                     if "subscription has been canceled" in response.text:
@@ -564,7 +565,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                         send_line_message(reply_token, [{"type": "text", "text": f"❌ 使用量記録の作成に失敗しました。\n\nエラー: {response.text}"}])
                     return
             except Exception as usage_error:
-                print(f'[DEBUG] 使用量レコード作成例外: {usage_error}')
+                print(f'[DEBUG] Meter使用量レコード作成例外: {usage_error}')
                 import traceback
                 print(traceback.format_exc())
                 
@@ -610,11 +611,15 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                 c.execute('INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type) VALUES (%s, %s, %s, %s, %s)',
                           (user_id_db, 1, None, True, content['name']))
             else:
-                # usage_recordのidフィールドを安全に取得
+                # usage_recordのidフィールドを安全に取得（Meter API対応）
                 if usage_record and 'id' in usage_record:
                     usage_record_id = usage_record['id']
                 elif usage_record and 'meter_event' in usage_record:
                     usage_record_id = usage_record['meter_event']['id']
+                elif usage_record and 'event' in usage_record:
+                    usage_record_id = usage_record['event']['id']
+                else:
+                    usage_record_id = None
                 print(f'usage_logs INSERT: user_id={user_id_db}, usage_record_id={usage_record_id}, is_free=False, content={content["name"]}')
                 c.execute('INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type) VALUES (%s, %s, %s, %s, %s)',
                           (user_id_db, 1, usage_record_id, False, content['name']))
