@@ -293,7 +293,7 @@ def subscribe():
                 },
                 {
                     'price': USAGE_PRICE_ID,
-                    'quantity': 1,
+                    # Meter付き従量課金Priceにはquantityを指定しない
                 }
             ],
             subscription_data={
