@@ -293,7 +293,7 @@ def subscribe():
                 },
                 {
                     'price': USAGE_PRICE_ID,
-                    'quantity': 1,  # 従来の従量課金システムではquantityを指定
+                    # 従量課金Priceにはquantityを指定しない
                 }
             ],
             subscription_data={
