@@ -156,7 +156,7 @@ def line_webhook():
                 elif text == 'メニュー':
                     send_line_message(event['replyToken'], [get_menu_message()])
                 elif text == 'ヘルプ':
-                    send_line_message(event['replyToken'], [get_help_message()])
+                    send_line_message(event['replyToken'], get_help_message())
                 elif text == '状態':
                     handle_status_check(event['replyToken'], user_id_db)
                 elif text == '解約':
@@ -258,7 +258,7 @@ def line_webhook():
                 elif postback_data == 'action=cancel_content':
                     handle_cancel_menu(event['replyToken'], user_id_db, stripe_subscription_id)
                 elif postback_data == 'action=help':
-                    send_line_message(event['replyToken'], [get_help_message()])
+                    send_line_message(event['replyToken'], get_help_message())
                 elif postback_data == 'action=share':
                     share_message = """📢 友達に紹介
 
