@@ -296,10 +296,10 @@ def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, co
             send_line_message(reply_token, [{"type": "text", "text": "❌ 無効な選択です。1-4の数字で選択してください。"}])
             return
         content = content_info[content_number]
-        # usage_countの取得は別コネクションで行う
+        # usage_countの取得はuser_idとcontent_typeの組み合わせで行う
         conn_count = get_db_connection()
         c_count = conn_count.cursor()
-        c_count.execute('SELECT COUNT(*) FROM usage_logs WHERE user_id = %s', (user_id_db,))
+        c_count.execute('SELECT COUNT(*) FROM usage_logs WHERE user_id = %s AND content_type = %s', (user_id_db, content['name']))
         usage_count = c_count.fetchone()[0]
         conn_count.close()
         is_free = usage_count == 0
