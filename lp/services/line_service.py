@@ -357,6 +357,13 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
             }
         }
         content = content_info[content_number]
+        # usage_logsから再度カウントしてis_freeを決定
+        conn_count = get_db_connection()
+        c_count = conn_count.cursor()
+        c_count.execute('SELECT COUNT(*) FROM usage_logs WHERE user_id = %s AND content_type = %s', (user_id_db, content['name']))
+        usage_count = c_count.fetchone()[0]
+        conn_count.close()
+        is_free = usage_count == 0
         # INSERT用のコネクションは今まで通り
         if not is_free:
             subscription = stripe.Subscription.retrieve(stripe_subscription_id)
