@@ -705,19 +705,7 @@ def handle_cancel_request(reply_token, user_id_db, stripe_subscription_id):
         content_choices = []
         choice_index = 1
         
-        # 月額基本料金を最初に表示
-        for item in items:
-            price = item['price']
-            price_id = price.get('id', '')
-            unit_amount = price.get('unit_amount', 0)
-            
-            if 'price_1Rofzxlxg6C5hAVdDp7fcqds' in price_id or unit_amount >= 3900:
-                content_choices.append(f"{choice_index}. 月額基本料金（3,900円/月）")
-                print(f'[DEBUG] 解約選択肢: {choice_index}. 月額基本料金（3,900円/月）')
-                choice_index += 1
-                break
-        
-        # 実際に追加されたコンテンツを表示
+        # 実際に追加されたコンテンツのみを表示
         for content_type, is_free in added_contents:
             if content_type in ['AI予定秘書', 'AI経理秘書', 'AIタスクコンシェルジュ']:
                 display_price = '0円' if is_free else '1,500円'
@@ -751,13 +739,6 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
         
         cancelled = []
         choice_index = 1
-        
-        # 月額基本料金の処理
-        has_monthly = any('price_1Rofzxlxg6C5hAVdDp7fcqds' in item['price'].get('id', '') or item['price'].get('unit_amount', 0) >= 3900 for item in items)
-        if has_monthly and choice_index in selected_indices:
-            # 月額基本料金の解約処理（実際には削除せず、メッセージのみ）
-            cancelled.append('月額基本料金')
-        choice_index += 1
         
         # 実際に追加されたコンテンツの処理
         for content_type, is_free in added_contents:
