@@ -526,7 +526,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                     headers=headers,
                     data={
                         'meter': 'mtr_test_61SuTp31IPUvCq22o41Ixg6C5hAVd1Gi',
-                        'value': 1,
+                        'quantity': 1,
                         'timestamp': int(time.time())
                     }
                 )
