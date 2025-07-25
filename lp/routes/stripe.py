@@ -64,11 +64,14 @@ def stripe_webhook():
                         USAGE_PRICE_ID = os.getenv('STRIPE_USAGE_PRICE_ID')
                         subscription = stripe.Subscription.retrieve(subscription_id)
                         # 従量課金（metered）Price IDのみ追加
+                        usage_item_exists = False
                         for item in subscription['items']['data']:
                             if item['price']['id'] == USAGE_PRICE_ID:
                                 print(f'従量課金アイテムは既に追加済み: subscription_id={subscription_id}, usage_price_id={USAGE_PRICE_ID}')
+                                usage_item_exists = True
                                 break
-                        else:
+                        
+                        if not usage_item_exists:
                             result = stripe.SubscriptionItem.create(
                                 subscription=subscription_id,
                                 price=USAGE_PRICE_ID

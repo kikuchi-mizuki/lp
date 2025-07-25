@@ -510,9 +510,9 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
             try:
                 # 従量課金の使用量を記録
                 try:
-                    # 従来の従量課金システムを使用
-                    usage_record = stripe.SubscriptionItem.createUsageRecord(
-                        subscription_item_id,
+                    # 正しいStripe APIを使用
+                    usage_record = stripe.UsageRecord.create(
+                        subscription_item=subscription_item_id,
                         quantity=1,
                         timestamp=int(time.time()),
                         action='increment'
