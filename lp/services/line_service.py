@@ -4,6 +4,7 @@ import psycopg2
 import os
 import stripe
 import traceback
+import time
 
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
 
