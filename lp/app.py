@@ -227,8 +227,12 @@ def add_user():
 def subscribe():
     """Stripeサブスクリプション作成"""
     try:
-        data = request.get_json()
-        email = data.get('email')
+        # フォームデータとJSONの両方に対応
+        if request.is_json:
+            data = request.get_json()
+            email = data.get('email')
+        else:
+            email = request.form.get('email')
         
         if not email:
             return jsonify({'error': 'Email is required'}), 400
