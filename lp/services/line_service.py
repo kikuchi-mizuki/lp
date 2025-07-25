@@ -65,22 +65,22 @@ def send_welcome_with_buttons(reply_token):
                 "altText": "ようこそ！AIコレクションズへ",
                 "template": {
                     "type": "buttons",
-                    "title": "🎉 ようこそ！AIコレクションズへ",
-                    "text": "はじめに「追加」ボタンからコンテンツを選んでご利用ください。\n1つ目は無料、2つ目以降は従量課金（¥1,500/件）です。",
+                    "title": "ようこそ！AIコレクションズへ",
+                    "text": "AI秘書機能、会計管理、スケジュール管理、タスク管理を提供しています。\n\n料金：\n• 月額基本料金：3,900円\n• コンテンツ追加：1個目無料、2個目以降1,500円/件\n\nまずは「コンテンツ追加」からお試しください！",
                     "actions": [
                         {
                             "type": "message",
-                            "label": "📚 コンテンツ追加",
+                            "label": "コンテンツ追加",
                             "text": "追加"
                         },
                         {
                             "type": "message",
-                            "label": "📊 利用状況確認",
+                            "label": "利用状況確認",
                             "text": "状態"
                         },
                         {
                             "type": "message",
-                            "label": "❓ 使い方を見る",
+                            "label": "使い方を見る",
                             "text": "ヘルプ"
                         }
                     ]
@@ -256,27 +256,27 @@ def handle_add_content(reply_token, user_id_db, stripe_subscription_id):
             "altText": "コンテンツ選択メニュー",
             "template": {
                 "type": "buttons",
-                "title": "📚 コンテンツ選択メニュー",
-                "text": "利用可能なコンテンツを選択してください。\n\n1つ目は無料、2つ目以降は¥1,500/件です。",
+                "title": "コンテンツ選択メニュー",
+                "text": "利用したいコンテンツを選択してください。\n\n料金：\n• 1個目：無料\n• 2個目以降：1,500円/件\n\n各コンテンツの詳細は選択後に表示されます。",
                 "actions": [
                     {
                         "type": "message",
-                        "label": "1️⃣ AI秘書機能",
+                        "label": "AI秘書機能",
                         "text": "1"
                     },
                     {
                         "type": "message",
-                        "label": "2️⃣ 会計管理ツール",
+                        "label": "会計管理ツール",
                         "text": "2"
                     },
                     {
                         "type": "message",
-                        "label": "3️⃣ スケジュール管理",
+                        "label": "スケジュール管理",
                         "text": "3"
                     },
                     {
                         "type": "message",
-                        "label": "4️⃣ タスク管理",
+                        "label": "タスク管理",
                         "text": "4"
                     }
                 ]
@@ -285,7 +285,7 @@ def handle_add_content(reply_token, user_id_db, stripe_subscription_id):
         send_line_message(reply_token, [content_menu])
     except Exception as e:
         print(f'コンテンツ選択メニューエラー: {e}')
-        send_line_message(reply_token, [{"type": "text", "text": "❌ エラーが発生しました。しばらく時間をおいて再度お試しください。"}])
+        send_line_message(reply_token, [{"type": "text", "text": "エラーが発生しました。しばらく時間をおいて再度お試しください。"}])
 
 def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, content_number):
     try:
@@ -330,23 +330,23 @@ def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, co
         usage_count = c_count.fetchone()[0]
         conn_count.close()
         is_free = usage_count == 0
-        price_message = "🎉 **1個目は無料です！**" if is_free else f"💰 料金：{content['price']:,}円"
+        price_message = "料金：無料（1個目）" if is_free else f"料金：1,500円（{usage_count + 1}個目）"
         confirm_message = {
             "type": "template",
             "altText": "選択内容の確認",
             "template": {
                 "type": "buttons",
-                "title": "📋 選択内容の確認",
-                "text": f"📚 コンテンツ：{content['name']}\n📝 内容：{content['description']}\n{price_message}\n\nこのコンテンツを追加しますか？",
+                "title": "選択内容の確認",
+                "text": f"コンテンツ：{content['name']}\n内容：{content['description']}\n{price_message}\n\nこのコンテンツを追加しますか？",
                 "actions": [
                     {
                         "type": "message",
-                        "label": "✅ はい、追加する",
+                        "label": "はい、追加する",
                         "text": "はい"
                     },
                     {
                         "type": "message",
-                        "label": "❌ いいえ、キャンセル",
+                        "label": "いいえ、キャンセル",
                         "text": "いいえ"
                     }
                 ]
@@ -644,12 +644,12 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
         if is_free:
             success_message = {
                 "type": "text",
-                "text": f"コンテンツ追加完了！\n\n追加内容：{content['name']}\n料金：無料\n\nアクセスURL：\n{content['url']}"
+                "text": f"コンテンツ追加完了！\n\n追加内容：{content['name']}\n料金：無料（1個目）\n\nアクセスURL：\n{content['url']}\n\n他のコンテンツも追加できます。"
             }
         else:
             success_message = {
                 "type": "text",
-                "text": f"コンテンツ追加完了！\n\n追加内容：{content['name']}\n料金：{content['price']:,}円（次回請求時）\n\nアクセスURL：\n{content['url']}"
+                "text": f"コンテンツ追加完了！\n\n追加内容：{content['name']}\n料金：1,500円（次回請求時に反映）\n\nアクセスURL：\n{content['url']}\n\n他のコンテンツも追加できます。"
             }
         send_line_message(reply_token, [success_message])
     except Exception as e:
