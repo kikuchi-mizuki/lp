@@ -105,13 +105,13 @@ def stripe_webhook():
                 return jsonify({'status': 'skipped'})
             conn = get_db_connection()
             c = conn.cursor()
-            c.execute('SELECT id FROM users WHERE stripe_customer_id = %s', (customer_id,))
+            c.execute('SELECT id FROM users WHERE stripe_customer_id = ?', (customer_id,))
             existing_user = c.fetchone()
             if not existing_user:
-                c.execute('SELECT id FROM users WHERE email = %s', (email,))
+                c.execute('SELECT id FROM users WHERE email = ?', (email,))
                 existing_user_by_email = c.fetchone()
                 if not existing_user_by_email:
-                    c.execute('INSERT INTO users (email, stripe_customer_id, stripe_subscription_id) VALUES (%s, %s, %s)', (email, customer_id, subscription_id))
+                    c.execute('INSERT INTO users (email, stripe_customer_id, stripe_subscription_id) VALUES (?, ?, ?)', (email, customer_id, subscription_id))
                     conn.commit()
                     print(f'ユーザー登録完了: customer_id={customer_id}, subscription_id={subscription_id}')
                     # 従量課金アイテムを追加
@@ -129,13 +129,13 @@ def stripe_webhook():
                 else:
                     print(f'既存ユーザーが存在（email重複）: {existing_user_by_email[0]}')
                     # 既存ユーザーにもsubscription_idをUPDATE
-                    c.execute('UPDATE users SET stripe_customer_id = %s, stripe_subscription_id = %s WHERE id = %s', (customer_id, subscription_id, existing_user_by_email[0]))
+                    c.execute('UPDATE users SET stripe_customer_id = ?, stripe_subscription_id = ? WHERE id = ?', (customer_id, subscription_id, existing_user_by_email[0]))
                     conn.commit()
                     print(f'既存ユーザーのsubscription_idをUPDATE: id={existing_user_by_email[0]}, subscription_id={subscription_id}')
             else:
                 print(f'既存ユーザーが存在: {existing_user[0]}')
                 # 既存ユーザーにもsubscription_idをUPDATE
-                c.execute('UPDATE users SET stripe_customer_id = %s, stripe_subscription_id = %s WHERE id = %s', (customer_id, subscription_id, existing_user[0]))
+                c.execute('UPDATE users SET stripe_customer_id = ?, stripe_subscription_id = ? WHERE id = ?', (customer_id, subscription_id, existing_user[0]))
                 conn.commit()
                 print(f'既存ユーザーのsubscription_idをUPDATE: id={existing_user[0]}, subscription_id={subscription_id}')
             conn.close()
@@ -148,13 +148,13 @@ def stripe_webhook():
             email = normalize_email(email)
             conn = get_db_connection()
             c = conn.cursor()
-            c.execute('SELECT id FROM users WHERE stripe_customer_id = %s', (customer_id,))
+            c.execute('SELECT id FROM users WHERE stripe_customer_id = ?', (customer_id,))
             existing_user = c.fetchone()
             if not existing_user:
-                c.execute('SELECT id FROM users WHERE email = %s', (email,))
+                c.execute('SELECT id FROM users WHERE email = ?', (email,))
                 existing_user_by_email = c.fetchone()
                 if not existing_user_by_email:
-                    c.execute('INSERT INTO users (email, stripe_customer_id, stripe_subscription_id) VALUES (%s, %s, %s)', (email, customer_id, subscription_id))
+                    c.execute('INSERT INTO users (email, stripe_customer_id, stripe_subscription_id) VALUES (?, ?, ?)', (email, customer_id, subscription_id))
                     conn.commit()
                     print(f'ユーザー登録完了: customer_id={customer_id}, subscription_id={subscription_id}')
                     # 従量課金アイテムを追加
@@ -172,13 +172,13 @@ def stripe_webhook():
                 else:
                     print(f'既存ユーザーが存在（email重複）: {existing_user_by_email[0]}')
                     # 既存ユーザーにもsubscription_idをUPDATE
-                    c.execute('UPDATE users SET stripe_customer_id = %s, stripe_subscription_id = %s WHERE id = %s', (customer_id, subscription_id, existing_user_by_email[0]))
+                    c.execute('UPDATE users SET stripe_customer_id = ?, stripe_subscription_id = ? WHERE id = ?', (customer_id, subscription_id, existing_user_by_email[0]))
                     conn.commit()
                     print(f'既存ユーザーのsubscription_idをUPDATE: id={existing_user_by_email[0]}, subscription_id={subscription_id}')
             else:
                 print(f'既存ユーザーが存在: {existing_user[0]}')
                 # 既存ユーザーにもsubscription_idをUPDATE
-                c.execute('UPDATE users SET stripe_customer_id = %s, stripe_subscription_id = %s WHERE id = %s', (customer_id, subscription_id, existing_user[0]))
+                c.execute('UPDATE users SET stripe_customer_id = ?, stripe_subscription_id = ? WHERE id = ?', (customer_id, subscription_id, existing_user[0]))
                 conn.commit()
                 print(f'既存ユーザーのsubscription_idをUPDATE: id={existing_user[0]}, subscription_id={subscription_id}')
             conn.close()

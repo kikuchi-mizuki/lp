@@ -119,7 +119,7 @@ def check_registration():
     
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute('SELECT id, line_user_id FROM users WHERE email = %s', (normalized_email,))
+    c.execute('SELECT id, line_user_id FROM users WHERE email = ?', (email,))
     user = c.fetchone()
     conn.close()
     
@@ -204,7 +204,7 @@ def update_subscription_id(new_subscription_id):
     try:
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute('UPDATE users SET stripe_subscription_id = %s WHERE id = 1', (new_subscription_id,))
+        c.execute('UPDATE users SET stripe_subscription_id = ? WHERE id = 1', (new_subscription_id,))
         conn.commit()
         conn.close()
         return jsonify({'success': True, 'message': f'Updated subscription ID to {new_subscription_id}'})
@@ -217,7 +217,7 @@ def add_user():
     try:
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute('INSERT INTO users (email, stripe_customer_id, stripe_subscription_id) VALUES (%s, %s, %s)',
+        c.execute('INSERT INTO users (email, stripe_customer_id, stripe_subscription_id) VALUES (?, ?, ?)',
                   ('test@example.com', 'cus_test123', 'sub_test123'))
         conn.commit()
         conn.close()
