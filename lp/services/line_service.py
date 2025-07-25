@@ -320,6 +320,7 @@ def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, co
         send_line_message(reply_token, [{"type": "text", "text": "❌ エラーが発生しました。しばらく時間をおいて再度お試しください。"}])
 
 def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id, content_number, confirmed):
+    print(f'handle_content_confirmation called: user_id_db={user_id_db}, content_number={content_number}, confirmed={confirmed}')
     try:
         if not confirmed:
             send_line_message(reply_token, [{"type": "text", "text": "❌ キャンセルしました。\n\n何か他にお手伝いできることはありますか？"}])
@@ -414,6 +415,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
             usage_record_id = None
             
             if is_free:
+                print(f'usage_logs INSERT: user_id={user_id_db}, usage_record_id=None, is_free=True, content={content["name"]}')
                 c.execute('INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type) VALUES (%s, %s, %s, %s, %s)',
                           (user_id_db, 1, None, True, content['name']))
             else:
@@ -422,7 +424,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                     usage_record_id = usage_record['id']
                 elif usage_record and 'meter_event' in usage_record:
                     usage_record_id = usage_record['meter_event']['id']
-                
+                print(f'usage_logs INSERT: user_id={user_id_db}, usage_record_id={usage_record_id}, is_free=False, content={content["name"]}')
                 c.execute('INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type) VALUES (%s, %s, %s, %s, %s)',
                           (user_id_db, 1, usage_record_id, False, content['name']))
             conn.commit()
