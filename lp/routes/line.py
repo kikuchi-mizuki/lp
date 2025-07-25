@@ -29,6 +29,47 @@ def line_webhook():
     try:
         events = json.loads(body).get('events', [])
         for event in events:
+            # 友達追加イベントの処理
+            if event.get('type') == 'follow':
+                user_id = event['source']['userId']
+                print(f'[DEBUG] 友達追加イベント: user_id={user_id}')
+                
+                # 直近のline_user_id未設定ユーザーを自動で紐付け
+                conn = get_db_connection()
+                c = conn.cursor()
+                c.execute('SELECT id, stripe_subscription_id FROM users WHERE line_user_id IS NULL ORDER BY created_at DESC LIMIT 1')
+                user = c.fetchone()
+                
+                if user:
+                    c.execute('UPDATE users SET line_user_id = %s WHERE id = %s', (user_id, user[0]))
+                    conn.commit()
+                    print(f'[DEBUG] ユーザー紐付け完了: user_id={user_id}, db_user_id={user[0]}')
+                    
+                    # ボタン付きのウェルカムメッセージを送信
+                    from services.line_service import send_welcome_with_buttons
+                    send_welcome_with_buttons(event['replyToken'])
+                else:
+                    # 未登録ユーザーの場合
+                    from utils.message_templates import get_not_registered_message
+                    send_line_message(event['replyToken'], [{"type": "text", "text": get_not_registered_message()}])
+                
+                conn.close()
+                continue
+            
+            # 友達削除イベントの処理
+            elif event.get('type') == 'unfollow':
+                user_id = event['source']['userId']
+                print(f'[DEBUG] 友達削除イベント: user_id={user_id}')
+                
+                # line_user_idをクリア（ブロックされた場合の対応）
+                conn = get_db_connection()
+                c = conn.cursor()
+                c.execute('UPDATE users SET line_user_id = NULL WHERE line_user_id = %s', (user_id,))
+                conn.commit()
+                conn.close()
+                print(f'[DEBUG] ユーザー紐付け解除: user_id={user_id}')
+                continue
+            
             # テキストメッセージの処理
             if event.get('type') == 'message' and event['message'].get('type') == 'text':
                 user_id = event['source']['userId']
