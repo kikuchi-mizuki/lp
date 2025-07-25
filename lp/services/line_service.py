@@ -385,16 +385,14 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                     'Content-Type': 'application/x-www-form-urlencoded'
                 }
                 
-                data = {
-                    'subscription_item': subscription_item_id,
-                    'value': 1,
-                    'timestamp': int(time.time())
-                }
-                
                 response = requests.post(
-                    'https://api.stripe.com/v1/billing/meter_events',
+                    f'https://api.stripe.com/v1/subscription_items/{subscription_item_id}/usage_records',
                     headers=headers,
-                    data=data
+                    data={
+                        'quantity': 1,
+                        'timestamp': int(time.time()),
+                        'action': 'increment'
+                    }
                 )
                 
                 if response.status_code == 200:
