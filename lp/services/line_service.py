@@ -298,7 +298,7 @@ def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, co
         content = content_info[content_number]
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute('SELECT COUNT(*) FROM usage_logs WHERE user_id = ?', (user_id_db,))
+        c.execute('SELECT COUNT(*) FROM usage_logs WHERE user_id = %s', (user_id_db,))
         usage_count = c.fetchone()[0]
         conn.close()
         is_free = usage_count == 0
@@ -357,7 +357,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
         content = content_info[content_number]
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute('SELECT COUNT(*) FROM usage_logs WHERE user_id = ?', (user_id_db,))
+        c.execute('SELECT COUNT(*) FROM usage_logs WHERE user_id = %s', (user_id_db,))
         usage_count = c.fetchone()[0]
         conn.close()
         is_free = usage_count == 0
@@ -474,7 +474,7 @@ def handle_status_check(reply_token, user_id_db):
     try:
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute('SELECT content_type, is_free, created_at FROM usage_logs WHERE user_id = ? ORDER BY created_at DESC', (user_id_db,))
+        c.execute('SELECT content_type, is_free, created_at FROM usage_logs WHERE user_id = %s ORDER BY created_at DESC', (user_id_db,))
         usage_logs = c.fetchall()
         conn.close()
         if not usage_logs:
@@ -517,7 +517,7 @@ def handle_cancel_request(reply_token, user_id_db, stripe_subscription_id):
         items = subscription['items']['data']
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute('SELECT content_type, is_free FROM usage_logs WHERE user_id = ?', (user_id_db,))
+        c.execute('SELECT content_type, is_free FROM usage_logs WHERE user_id = %s', (user_id_db,))
         usage_free_map = {}
         for row in c.fetchall():
             usage_free_map[row[0]] = usage_free_map.get(row[0], False) or row[1]

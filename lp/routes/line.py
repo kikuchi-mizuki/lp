@@ -35,13 +35,13 @@ def line_webhook():
                 text = event['message']['text']
                 conn = get_db_connection()
                 c = conn.cursor()
-                c.execute('SELECT id, stripe_subscription_id, line_user_id FROM users WHERE line_user_id = ?', (user_id,))
+                c.execute('SELECT id, stripe_subscription_id, line_user_id FROM users WHERE line_user_id = %s', (user_id,))
                 user = c.fetchone()
                 if not user:
                     c.execute('SELECT id, stripe_subscription_id FROM users WHERE line_user_id IS NULL ORDER BY created_at DESC LIMIT 1')
                     user = c.fetchone()
                     if user:
-                        c.execute('UPDATE users SET line_user_id = ? WHERE id = ?', (user_id, user[0]))
+                        c.execute('UPDATE users SET line_user_id = %s WHERE id = %s', (user_id, user[0]))
                         conn.commit()
                         from utils.message_templates import get_help_message
                         # ボタン付きテンプレートメッセージと使い方ガイドを1回で送信
@@ -105,11 +105,11 @@ def line_webhook():
                         email = unicodedata.normalize('NFKC', email)
                         return email
                     normalized_email = normalize_email(text)
-                    c.execute('SELECT id, line_user_id FROM users WHERE email = ?', (normalized_email,))
+                    c.execute('SELECT id, line_user_id FROM users WHERE email = %s', (normalized_email,))
                     user = c.fetchone()
                     if user:
                         if user[1] is None:
-                            c.execute('UPDATE users SET line_user_id = ? WHERE id = ?', (user_id, user[0]))
+                            c.execute('UPDATE users SET line_user_id = %s WHERE id = %s', (user_id, user[0]))
                             conn.commit()
                             send_line_message(event['replyToken'], [{"type": "text", "text": 'LINE連携が完了しました。メニューや追加コマンドが利用できます。'}])
                         else:
@@ -119,7 +119,7 @@ def line_webhook():
                         c.execute('SELECT id FROM users WHERE line_user_id IS NULL ORDER BY created_at DESC LIMIT 1')
                         fallback_user = c.fetchone()
                         if fallback_user:
-                            c.execute('UPDATE users SET line_user_id = ? WHERE id = ?', (user_id, fallback_user[0]))
+                            c.execute('UPDATE users SET line_user_id = %s WHERE id = %s', (user_id, fallback_user[0]))
                             conn.commit()
                             send_line_message(event['replyToken'], [{"type": "text", "text": 'メールアドレスが見つかりませんでしたが、直近の登録ユーザーにLINE連携しました。メニューや追加コマンドが利用できます。'}])
                         else:
@@ -133,7 +133,7 @@ def line_webhook():
                 postback_data = event['postback']['data']
                 conn = get_db_connection()
                 c = conn.cursor()
-                c.execute('SELECT id, stripe_subscription_id, line_user_id FROM users WHERE line_user_id = ?', (user_id,))
+                c.execute('SELECT id, stripe_subscription_id, line_user_id FROM users WHERE line_user_id = %s', (user_id,))
                 user = c.fetchone()
                 if not user:
                     send_line_message(event['replyToken'], [{"type": "text", "text": get_not_registered_message()}])
