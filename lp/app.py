@@ -249,7 +249,7 @@ def subscribe():
                 },
                 {
                     'price': USAGE_PRICE_ID,
-                    'quantity': 0,
+                    'quantity': 1,
                 },
             ],
             success_url=url_for('thanks', _external=True) + f"?email={email}",
