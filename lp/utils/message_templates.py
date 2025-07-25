@@ -7,7 +7,7 @@ def get_default_message():
         "template": {
             "type": "buttons",
             "title": "AIコレクションズ",
-            "text": "何かお手伝いできることはありますか？\n\n下のボタンからお選びください。",
+            "text": "何かお手伝いできることはありますか？",
             "actions": [
                 {
                     "type": "message",
