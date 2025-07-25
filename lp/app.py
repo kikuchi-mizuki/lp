@@ -115,8 +115,8 @@ def check_registration():
     email = request.args.get('email')
     if not email:
         return jsonify({'registered': False, 'error': 'Email parameter is required'})
+    email = normalize_email(email)
     
-    normalized_email = normalize_email(email)
     conn = get_db_connection()
     c = conn.cursor()
     c.execute('SELECT id, line_user_id FROM users WHERE email = %s', (normalized_email,))
@@ -140,8 +140,9 @@ def thanks():
     
     email = request.args.get('email')
     if email:
-    email = normalize_email(email)
-    return render_template('thanks.html', email=email)
+        email = normalize_email(email)
+        return render_template('thanks.html', email=email)
+    return render_template('thanks.html', email=None)
 
 @app.route('/static/<path:filename>')
 def static_files(filename):
@@ -203,8 +204,8 @@ def update_subscription_id(new_subscription_id):
         conn = get_db_connection()
         c = conn.cursor()
         c.execute('UPDATE users SET stripe_subscription_id = %s WHERE id = 1', (new_subscription_id,))
-            conn.commit()
-            conn.close()
+        conn.commit()
+        conn.close()
         return jsonify({'success': True, 'message': f'Updated subscription ID to {new_subscription_id}'})
     except Exception as e:
         return jsonify({'error': str(e)})
