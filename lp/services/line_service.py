@@ -63,7 +63,7 @@ def send_welcome_with_buttons(reply_token):
         'messages': [
             {
                 "type": "text",
-                "text": "ようこそ！AIコレクションズへ\n\nAIコレクションズサービスをご利用いただき、ありがとうございます。\n\n📋 サービス内容：\n• AI予定秘書：スケジュール管理\n• AI経理秘書：請求書作成\n• AIタスクコンシェルジュ：タスク管理\n\n💰 料金体系：\n• 月額基本料金：3,900円\n• 追加コンテンツ：1個目無料、2個目以降1,500円/件\n\n下のボタンからお選びください。"
+                "text": "ようこそ！AIコレクションズへ\n\nコンテンツを追加するには「追加」を押してください。"
             },
             {
                 "type": "template",
@@ -937,7 +937,9 @@ def handle_status_check(reply_token, user_id_db):
                 created_at = log[2]
                 if not is_free:
                     total_cost += 1500
-                content_list.append(f"• {content_type} ({'無料' if is_free else '1,500円'}) - {created_at}")
+                # 日付を簡潔に表示（YYYY-MM-DD形式）
+                date_str = created_at.strftime('%Y-%m-%d')
+                content_list.append(f"• {content_type} ({'無料' if is_free else '1,500円'}) - {date_str}")
             
             status_lines.append(f"📈 今月の追加回数：{len(usage_logs)}回")
             status_lines.append(f"💰 追加料金：{total_cost:,}円")
