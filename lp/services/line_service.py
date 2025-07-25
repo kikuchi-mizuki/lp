@@ -592,22 +592,22 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                 "altText": "コンテンツ追加完了",
                 "template": {
                     "type": "buttons",
-                    "title": "🎉 コンテンツ追加完了！",
-                    "text": f"📚 追加内容：\n• {content['name']} 1件追加\n\n💰 料金：\n• 🎉 **無料で追加されました！**\n\n📖 使用方法：\n{content['usage']}\n\n🔗 アクセスURL：\n{content['url']}",
+                    "title": "コンテンツ追加完了！",
+                    "text": f"追加内容：{content['name']}\n料金：無料\n\nアクセスURL：\n{content['url']}",
                     "actions": [
                         {
                             "type": "message",
-                            "label": "📚 他のコンテンツを追加",
+                            "label": "他のコンテンツを追加",
                             "text": "追加"
                         },
                         {
                             "type": "message",
-                            "label": "📊 利用状況確認",
+                            "label": "利用状況確認",
                             "text": "状態"
                         },
                         {
                             "type": "message",
-                            "label": "❓ ヘルプ",
+                            "label": "ヘルプ",
                             "text": "ヘルプ"
                         }
                     ]
@@ -619,22 +619,22 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                 "altText": "コンテンツ追加完了",
                 "template": {
                     "type": "buttons",
-                    "title": "✅ コンテンツ追加完了！",
-                    "text": f"📚 追加内容：\n• {content['name']} 1件追加\n\n💰 料金：\n• 追加料金：{content['price']:,}円（次回請求時に反映）\n\n📖 使用方法：\n{content['usage']}\n\n🔗 アクセスURL：\n{content['url']}",
+                    "title": "コンテンツ追加完了！",
+                    "text": f"追加内容：{content['name']}\n料金：{content['price']:,}円（次回請求時）\n\nアクセスURL：\n{content['url']}",
                     "actions": [
                         {
                             "type": "message",
-                            "label": "📚 他のコンテンツを追加",
+                            "label": "他のコンテンツを追加",
                             "text": "追加"
                         },
                         {
                             "type": "message",
-                            "label": "📊 利用状況確認",
+                            "label": "利用状況確認",
                             "text": "状態"
                         },
                         {
                             "type": "message",
-                            "label": "❓ ヘルプ",
+                            "label": "ヘルプ",
                             "text": "ヘルプ"
                         }
                     ]
