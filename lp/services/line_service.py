@@ -448,17 +448,17 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                         "altText": "サブスクリプション更新が必要です",
                         "template": {
                             "type": "buttons",
-                            "title": "⚠️ サブスクリプション更新が必要です",
-                            "text": "現在のサブスクリプションがキャンセルされているため、コンテンツを追加できません。\n\n新しいサブスクリプションを作成するか、既存のサブスクリプションを復活させてください。",
+                            "title": "サブスクリプション更新が必要です",
+                            "text": "現在のサブスクリプションがキャンセルされています。新しいサブスクリプションを作成するか、既存のものを復活させてください。",
                             "actions": [
                                 {
                                     "type": "message",
-                                    "label": "📊 利用状況確認",
+                                    "label": "利用状況確認",
                                     "text": "状態"
                                 },
                                 {
                                     "type": "message",
-                                    "label": "❓ ヘルプ",
+                                    "label": "ヘルプ",
                                     "text": "ヘルプ"
                                 }
                             ]
@@ -486,17 +486,17 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                         "altText": "サブスクリプション更新が必要です",
                         "template": {
                             "type": "buttons",
-                            "title": "⚠️ サブスクリプション更新が必要です",
-                            "text": "現在のサブスクリプションがキャンセルされているか、存在しません。\n\n新しいサブスクリプションを作成してください。",
+                            "title": "サブスクリプション更新が必要です",
+                            "text": "現在のサブスクリプションがキャンセルされています。新しいサブスクリプションを作成してください。",
                             "actions": [
                                 {
                                     "type": "message",
-                                    "label": "📊 利用状況確認",
+                                    "label": "利用状況確認",
                                     "text": "状態"
                                 },
                                 {
                                     "type": "message",
-                                    "label": "❓ ヘルプ",
+                                    "label": "ヘルプ",
                                     "text": "ヘルプ"
                                 }
                             ]
@@ -543,17 +543,17 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                             "altText": "サブスクリプション更新が必要です",
                             "template": {
                                 "type": "buttons",
-                                "title": "⚠️ サブスクリプション更新が必要です",
-                                "text": "現在のサブスクリプションがキャンセルされているため、コンテンツを追加できません。\n\n新しいサブスクリプションを作成するか、既存のサブスクリプションを復活させてください。",
+                                "title": "サブスクリプション更新が必要です",
+                                "text": "現在のサブスクリプションがキャンセルされています。新しいサブスクリプションを作成するか、既存のものを復活させてください。",
                                 "actions": [
                                     {
                                         "type": "message",
-                                        "label": "📊 利用状況確認",
+                                        "label": "利用状況確認",
                                         "text": "状態"
                                     },
                                     {
                                         "type": "message",
-                                        "label": "❓ ヘルプ",
+                                        "label": "ヘルプ",
                                         "text": "ヘルプ"
                                     }
                                 ]
@@ -576,17 +576,17 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                         "altText": "サブスクリプション更新が必要です",
                         "template": {
                             "type": "buttons",
-                            "title": "⚠️ サブスクリプション更新が必要です",
-                            "text": "現在のサブスクリプションがキャンセルされているため、コンテンツを追加できません。\n\n新しいサブスクリプションを作成するか、既存のサブスクリプションを復活させてください。",
+                            "title": "サブスクリプション更新が必要です",
+                            "text": "現在のサブスクリプションがキャンセルされています。新しいサブスクリプションを作成するか、既存のものを復活させてください。",
                             "actions": [
                                 {
                                     "type": "message",
-                                    "label": "📊 利用状況確認",
+                                    "label": "利用状況確認",
                                     "text": "状態"
                                 },
                                 {
                                     "type": "message",
-                                    "label": "❓ ヘルプ",
+                                    "label": "ヘルプ",
                                     "text": "ヘルプ"
                                 }
                             ]
