@@ -798,13 +798,57 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
             print(f'[DEBUG] usage_logs全件取得エラー: {e}')
         if is_free:
             success_message = {
-                "type": "text",
-                "text": f"コンテンツ追加完了！\n\n追加内容：{content['name']}\n料金：無料（1個目）\n\nアクセスURL：\n{content['url']}\n\n他のコンテンツも追加できます。"
+                "type": "template",
+                "altText": "コンテンツ追加完了",
+                "template": {
+                    "type": "buttons",
+                    "title": "コンテンツ追加完了！",
+                    "text": f"追加内容：{content['name']}\n料金：無料（1個目）\n\nアクセスURL：\n{content['url']}\n\n他のコンテンツも追加できます。",
+                    "actions": [
+                        {
+                            "type": "message",
+                            "label": "他のコンテンツ追加",
+                            "text": "追加"
+                        },
+                        {
+                            "type": "message",
+                            "label": "利用状況確認",
+                            "text": "状態"
+                        },
+                        {
+                            "type": "message",
+                            "label": "メニューに戻る",
+                            "text": "メニュー"
+                        }
+                    ]
+                }
             }
         else:
             success_message = {
-                "type": "text",
-                "text": f"コンテンツ追加完了！\n\n追加内容：{content['name']}\n料金：1,500円（{total_usage_count + 1}個目、次回請求時に反映）\n\nアクセスURL：\n{content['url']}\n\n他のコンテンツも追加できます。"
+                "type": "template",
+                "altText": "コンテンツ追加完了",
+                "template": {
+                    "type": "buttons",
+                    "title": "コンテンツ追加完了！",
+                    "text": f"追加内容：{content['name']}\n料金：1,500円（{total_usage_count + 1}個目、次回請求時に反映）\n\nアクセスURL：\n{content['url']}\n\n他のコンテンツも追加できます。",
+                    "actions": [
+                        {
+                            "type": "message",
+                            "label": "他のコンテンツ追加",
+                            "text": "追加"
+                        },
+                        {
+                            "type": "message",
+                            "label": "利用状況確認",
+                            "text": "状態"
+                        },
+                        {
+                            "type": "message",
+                            "label": "メニューに戻る",
+                            "text": "メニュー"
+                        }
+                    ]
+                }
             }
         send_line_message(reply_token, [success_message])
     except Exception as e:
@@ -968,7 +1012,33 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
         conn.close()
         
         if cancelled:
-            send_line_message(reply_token, [{"type": "text", "text": f"以下のコンテンツの解約を受け付けました（請求期間終了まで利用可能です）：\n" + "\n".join(cancelled)}])
+            cancel_success_message = {
+                "type": "template",
+                "altText": "コンテンツ解約完了",
+                "template": {
+                    "type": "buttons",
+                    "title": "コンテンツ解約完了",
+                    "text": f"以下のコンテンツの解約を受け付けました（請求期間終了まで利用可能です）：\n" + "\n".join(cancelled),
+                    "actions": [
+                        {
+                            "type": "message",
+                            "label": "他のコンテンツ追加",
+                            "text": "追加"
+                        },
+                        {
+                            "type": "message",
+                            "label": "利用状況確認",
+                            "text": "状態"
+                        },
+                        {
+                            "type": "message",
+                            "label": "メニューに戻る",
+                            "text": "メニュー"
+                        }
+                    ]
+                }
+            }
+            send_line_message(reply_token, [cancel_success_message])
         else:
             send_line_message(reply_token, [{"type": "text", "text": "有効な番号が選択されませんでした。もう一度お試しください。"}])
     except Exception as e:
