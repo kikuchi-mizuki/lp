@@ -83,15 +83,22 @@ def line_webhook():
                     user_states[user_id] = 'cancel_select'
                     handle_cancel_request(event['replyToken'], user_id_db, stripe_subscription_id)
                 elif state == 'add_select' and text in ['1', '2', '3', '4']:
+                    # 選択したコンテンツ番号を保存
+                    user_states[user_id] = f'confirm_{text}'
                     handle_content_selection(event['replyToken'], user_id_db, stripe_subscription_id, text)
-                    user_states[user_id] = None
                 elif state == 'cancel_select' and all(x.strip().isdigit() for x in text.split(',')):
                     handle_cancel_selection(event['replyToken'], user_id_db, stripe_subscription_id, text)
                     user_states[user_id] = None
-                elif text.lower() in ['はい', 'yes', 'y']:
-                    handle_content_confirmation(event['replyToken'], user_id_db, stripe_subscription_id, '1', True)
-                elif text.lower() in ['いいえ', 'no', 'n']:
-                    handle_content_confirmation(event['replyToken'], user_id_db, stripe_subscription_id, '1', False)
+                elif text.lower() in ['はい', 'yes', 'y'] and state and state.startswith('confirm_'):
+                    # 確認状態からコンテンツ番号を取得
+                    content_number = state.split('_')[1]
+                    handle_content_confirmation(event['replyToken'], user_id_db, stripe_subscription_id, content_number, True)
+                    user_states[user_id] = None
+                elif text.lower() in ['いいえ', 'no', 'n'] and state and state.startswith('confirm_'):
+                    # 確認状態からコンテンツ番号を取得
+                    content_number = state.split('_')[1]
+                    handle_content_confirmation(event['replyToken'], user_id_db, stripe_subscription_id, content_number, False)
+                    user_states[user_id] = None
                 elif '@' in text and '.' in text and len(text) < 100:
                     import unicodedata
                     def normalize_email(email):
