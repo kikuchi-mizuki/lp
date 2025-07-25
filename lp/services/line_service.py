@@ -321,7 +321,8 @@ def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, co
         send_line_message(reply_token, [{"type": "text", "text": "❌ エラーが発生しました。しばらく時間をおいて再度お試しください。"}])
 
 def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id, content_number, confirmed):
-    print(f'handle_content_confirmation called: user_id_db={user_id_db}, content_number={content_number}, confirmed={confirmed}')
+    print(f'[DEBUG] handle_content_confirmation called: user_id_db={user_id_db}, content_number={content_number}, confirmed={confirmed}')
+    print(f'[DEBUG] 環境変数: STRIPE_USAGE_PRICE_ID={os.getenv("STRIPE_USAGE_PRICE_ID")}, STRIPE_SECRET_KEY={os.getenv("STRIPE_SECRET_KEY")}, DATABASE_URL={os.getenv("DATABASE_URL")}, subscription_id={stripe_subscription_id}')
     try:
         if not confirmed:
             send_line_message(reply_token, [{"type": "text", "text": "❌ キャンセルしました。\n\n何か他にお手伝いできることはありますか？"}])
@@ -368,9 +369,11 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
         print(f"[DEBUG] DATABASE_URL: {os.getenv('DATABASE_URL')}")
         # INSERT用のコネクションは今まで通り
         if not is_free:
+            print('[DEBUG] Stripe課金API呼び出し開始')
             subscription = stripe.Subscription.retrieve(stripe_subscription_id)
             usage_item = None
             for item in subscription['items']['data']:
+                print(f'[DEBUG] Stripe item: {item}')
                 if item['price']['id'] == os.getenv('STRIPE_USAGE_PRICE_ID'):
                     usage_item = item
                     break
@@ -386,6 +389,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                 import time
                 
                 stripe_secret_key = os.getenv('STRIPE_SECRET_KEY')
+                print(f'[DEBUG] stripe_secret_key: {stripe_secret_key}')
                 headers = {
                     'Authorization': f'Bearer {stripe_secret_key}',
                     'Content-Type': 'application/x-www-form-urlencoded'
