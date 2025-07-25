@@ -66,7 +66,7 @@ def send_welcome_with_buttons(reply_token):
                 "template": {
                     "type": "buttons",
                     "title": "ようこそ！AIコレクションズへ",
-                    "text": "AI予定秘書、AI経理秘書、AIタスクコンシェルジュを提供しています。\n\n料金：\n• 月額基本料金：3,900円\n• コンテンツ追加：1個目無料、2個目以降1,500円/件\n\nまずは「コンテンツ追加」からお試しください！",
+                    "text": "AI予定秘書、AI経理秘書、AIタスクコンシェルジュを提供。\n\n月額3,900円、追加1個目無料、2個目以降1,500円/件",
                     "actions": [
                         {
                             "type": "message",
@@ -257,7 +257,7 @@ def handle_add_content(reply_token, user_id_db, stripe_subscription_id):
             "template": {
                 "type": "buttons",
                 "title": "コンテンツ選択メニュー",
-                "text": "利用したいコンテンツを選択してください。\n\n料金：\n• 1個目：無料\n• 2個目以降：1,500円/件\n\n各コンテンツの詳細は選択後に表示されます。",
+                "text": "利用したいコンテンツを選択してください。\n\n1個目無料、2個目以降1,500円/件",
                 "actions": [
                     {
                         "type": "message",
@@ -325,7 +325,7 @@ def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, co
             "template": {
                 "type": "buttons",
                 "title": "選択内容の確認",
-                "text": f"コンテンツ：{content['name']}\n内容：{content['description']}\n{price_message}\n\nこのコンテンツを追加しますか？",
+                "text": f"コンテンツ：{content['name']}\n{price_message}\n\nこのコンテンツを追加しますか？",
                 "actions": [
                     {
                         "type": "message",
