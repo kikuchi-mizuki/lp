@@ -414,7 +414,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
             usage_record_id = None
             
             if is_free:
-                c.execute('INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type) VALUES (?, ?, ?, ?, ?)',
+                c.execute('INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type) VALUES (%s, %s, %s, %s, %s)',
                           (user_id_db, 1, None, True, content['name']))
             else:
                 # usage_recordのidフィールドを安全に取得
@@ -423,7 +423,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                 elif usage_record and 'meter_event' in usage_record:
                     usage_record_id = usage_record['meter_event']['id']
                 
-                c.execute('INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type) VALUES (?, ?, ?, ?, ?)',
+                c.execute('INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type) VALUES (%s, %s, %s, %s, %s)',
                           (user_id_db, 1, usage_record_id, False, content['name']))
             conn.commit()
             conn.close()
