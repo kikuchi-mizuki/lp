@@ -42,3 +42,28 @@ def add_metered_price_to_subscription(subscription_id, metered_price_id):
     except Exception as e:
         print(f"Meter付き従量課金Price追加エラー: {e}")
         return False 
+
+def ensure_metered_price_in_subscription(subscription_id, metered_price_id):
+    """
+    サブスクリプションにMeter付き従量課金Priceが含まれていなければ自動で追加し、
+    必ずMeter付き従量課金Priceが含まれるサブスクリプションを返す。
+    """
+    stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+    try:
+        subscription = stripe.Subscription.retrieve(subscription_id)
+        for item in subscription['items']['data']:
+            if item['price']['id'] == metered_price_id:
+                print(f"Meter付き従量課金Priceは既に追加済み: {metered_price_id}")
+                return subscription
+        # なければ自動で追加
+        result = stripe.SubscriptionItem.create(
+            subscription=subscription_id,
+            price=metered_price_id
+        )
+        print(f"Meter付き従量課金Priceを自動追加: {result}")
+        # 追加後、最新のサブスクリプションを返す
+        subscription = stripe.Subscription.retrieve(subscription_id)
+        return subscription
+    except Exception as e:
+        print(f"Meter付き従量課金Price自動追加エラー: {e}")
+        return None 
