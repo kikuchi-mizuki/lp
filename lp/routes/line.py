@@ -125,7 +125,9 @@ def line_webhook():
                 stripe_subscription_id = user[1]
                 
                 # 既存ユーザーの初回メッセージ時に案内文を送信（初回のみ）
-                if user_id not in user_states or user_states.get(user_id) != 'welcome_sent':
+                if user_id not in user_states:
+                    user_states[user_id] = None
+                if user_states.get(user_id) != 'welcome_sent':
                     print(f'[DEBUG] 既存ユーザーの初回メッセージ処理: user_id={user_id}')
                     try:
                         from services.line_service import send_welcome_with_buttons
@@ -160,13 +162,14 @@ def line_webhook():
                 elif text == 'コンテンツ解約':
                     user_states[user_id] = 'cancel_select'
                     handle_cancel_request(event['replyToken'], user_id_db, stripe_subscription_id)
+                elif state == 'cancel_select' and all(x.strip().isdigit() for x in text.split(',')):
+                    print(f'[DEBUG] 解約選択処理: user_id={user_id}, state={state}, text={text}')
+                    handle_cancel_selection(event['replyToken'], user_id_db, stripe_subscription_id, text)
+                    user_states[user_id] = None
                 elif state == 'add_select' and text in ['1', '2', '3', '4']:
                     # 選択したコンテンツ番号を保存
                     user_states[user_id] = f'confirm_{text}'
                     handle_content_selection(event['replyToken'], user_id_db, stripe_subscription_id, text)
-                elif state == 'cancel_select' and all(x.strip().isdigit() for x in text.split(',')):
-                    handle_cancel_selection(event['replyToken'], user_id_db, stripe_subscription_id, text)
-                    user_states[user_id] = None
                 elif text.lower() in ['はい', 'yes', 'y'] and state and state.startswith('confirm_'):
                     # 確認状態からコンテンツ番号を取得
                     content_number = state.split('_')[1]
