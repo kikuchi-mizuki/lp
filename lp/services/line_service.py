@@ -266,7 +266,8 @@ def check_subscription_status(stripe_subscription_id):
         print(f'[DEBUG] サブスクリプション状態: status={status}, cancel_at_period_end={cancel_at_period_end}')
         
         # 有効な状態かチェック
-        is_active = status in ['active', 'trialing'] and not cancel_at_period_end
+        # trialing（試用期間）とactive（有効）の場合は有効とする
+        is_active = status in ['active', 'trialing']
         
         return {
             'is_active': is_active,
