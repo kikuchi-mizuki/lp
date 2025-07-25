@@ -62,12 +62,16 @@ def send_welcome_with_buttons(reply_token):
         'replyToken': reply_token,
         'messages': [
             {
+                "type": "text",
+                "text": "ようこそ！AIコレクションズへ\n\nAI秘書サービスをご利用いただき、ありがとうございます。\n\n📋 サービス内容：\n• AI予定秘書：スケジュール管理\n• AI経理秘書：請求書作成\n• AIタスクコンシェルジュ：タスク管理\n\n💰 料金体系：\n• 月額基本料金：3,900円\n• 追加コンテンツ：1個目無料、2個目以降1,500円/件\n\n下のボタンからお選びください。"
+            },
+            {
                 "type": "template",
-                "altText": "ようこそ！AIコレクションズへ",
+                "altText": "メニュー",
                 "template": {
                     "type": "buttons",
-                    "title": "ようこそ！AIコレクションズへ",
-                    "text": "AI秘書サービスを提供。\n\n月額3,900円、追加1個目無料、2個目以降1,500円/件",
+                    "title": "メニュー",
+                    "text": "ご希望の機能を選択してください。",
                     "actions": [
                         {
                             "type": "message",
