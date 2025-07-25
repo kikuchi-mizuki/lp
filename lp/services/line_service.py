@@ -29,6 +29,10 @@ def send_line_message(reply_token, message):
     except Exception as e:
         print(f'LINEメッセージ送信エラー: {e}')
         traceback.print_exc()
+        # エラー詳細をerror.logにも追記
+        with open('error.log', 'a', encoding='utf-8') as f:
+            f.write('LINEメッセージ送信エラー: ' + str(e) + '\n')
+            f.write(traceback.format_exc() + '\n')
 
 def create_rich_menu():
     rich_menu = {
