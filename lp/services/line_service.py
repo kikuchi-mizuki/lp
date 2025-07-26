@@ -658,20 +658,20 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
         
         # 無料の場合はデータベースにのみ記録
         if is_free:
-        conn = get_db_connection()
-        c = conn.cursor()
+            conn = get_db_connection()
+            c = conn.cursor()
             c.execute('''
                 INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type)
                 VALUES (%s, %s, %s, %s, %s)
             ''', (user_id_db, 1, None, is_free, content['name']))
             conn.commit()
-        conn.close()
+            conn.close()
             print(f'DB登録成功: user_id={user_id_db}, is_free={is_free}, usage_record_id=None')
         else:
             # 有料の場合はStripeの使用量記録も作成
             print('[DEBUG] Stripe課金API呼び出し開始')
             try:
-            subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+                subscription = stripe.Subscription.retrieve(stripe_subscription_id)
                 
                 # サブスクリプションの状態をチェック
                 if subscription['status'] == 'canceled':
@@ -699,16 +699,16 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                     send_line_message(reply_token, [cancel_message])
                     return
                 
-            usage_item = None
-            for item in subscription['items']['data']:
+                usage_item = None
+                for item in subscription['items']['data']:
                     print(f'[DEBUG] Stripe item: {item}')
-                if item['price']['id'] == os.getenv('STRIPE_USAGE_PRICE_ID'):
-                    usage_item = item
-                    break
-            if not usage_item:
+                    if item['price']['id'] == os.getenv('STRIPE_USAGE_PRICE_ID'):
+                        usage_item = item
+                        break
+                if not usage_item:
                     print('[DEBUG] usage_itemが見つからずreturn')
                     send_line_message(reply_token, [{"type": "text", "text": f"❌ 従量課金アイテムが見つかりません。\n\n設定されている価格ID: {os.getenv('STRIPE_USAGE_PRICE_ID')}\n\nサポートにお問い合わせください。"}])
-                return
+                    return
             except Exception as subscription_error:
                 print(f'[DEBUG] サブスクリプション取得エラー: {subscription_error}')
                 error_str = str(subscription_error)
@@ -752,14 +752,14 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                     print(f"使用量記録作成成功: {usage_record.id}")
                     
                     # usage_logsに記録
-            conn = get_db_connection()
-            c = conn.cursor()
+                    conn = get_db_connection()
+                    c = conn.cursor()
                     c.execute('''
                         INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type)
                         VALUES (%s, %s, %s, %s, %s)
                     ''', (user_id_db, 1, usage_record.id, is_free, content['name']))
-            conn.commit()
-            conn.close()
+                    conn.commit()
+                    conn.close()
                     print(f'DB登録成功: user_id={user_id_db}, is_free={is_free}, usage_record_id={usage_record.id}')
                 except stripe.error.StripeError as e:
                     print(f"使用量記録作成エラー: {e}")
@@ -775,8 +775,8 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                     print(f'DB登録成功（エラー時）: user_id={user_id_db}, is_free={is_free}, usage_record_id=None')
             except Exception as usage_error:
                 print(f'[DEBUG] 使用量記録作成例外: {usage_error}')
-            import traceback
-            print(traceback.format_exc())
+                import traceback
+                print(traceback.format_exc())
                 
                 # エラーが発生してもusage_logsには記録
                 conn = get_db_connection()
