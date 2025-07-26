@@ -63,7 +63,7 @@ def send_welcome_with_buttons(reply_token):
         'messages': [
             {
                 "type": "text",
-                "text": "ようこそ！AIコレクションズへ\n\nAIコレクションズサービスをご利用いただき、ありがとうございます。\n\n📋 サービス内容：\n• AI予定秘書：スケジュール管理\n• AI経理秘書：見積書・請求書作成\n• AIタスクコンシェルジュ：タスク管理\n\n💰 料金体系：\n• 月額基本料金：3,900円\n• 追加コンテンツ：1個目無料、2個目以降1,500円/件\n\n下のボタンからお選びください。"
+                "text": "ようこそ！AIコレクションズへ\n\nAIコレクションズサービスをご利用いただき、ありがとうございます。\n\n📋 サービス内容：\n• AI予定秘書：スケジュール管理\n• AI経理秘書：見積書・請求書作成\n• AIタスクコンシェルジュ：タスク管理\n\n💰 料金体系：\n• 月額基本料金：3,900円（1週間無料）\n• 追加コンテンツ：1個目無料、2個目以降1,500円/件（トライアル期間中は無料）\n\n下のボタンからお選びください。"
             },
             {
                 "type": "template",
@@ -450,8 +450,13 @@ def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, co
             send_line_message(reply_token, [already_added_message])
             return
         
-        is_free = total_usage_count == 0
-        price_message = "料金：無料（1個目）" if is_free else f"料金：1,500円（{total_usage_count + 1}個目）"
+        # サブスクリプションのトライアル期間をチェック
+        subscription_status = check_subscription_status(stripe_subscription_id)
+        is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
+        
+        # 1個目は常に無料、2個目以降はトライアル期間中は無料
+        is_free = total_usage_count == 0 or (is_trial_period and total_usage_count > 0)
+        price_message = "料金：無料（1個目）" if total_usage_count == 0 else f"料金：{'無料（トライアル期間中）' if is_trial_period else '1,500円'}（{total_usage_count + 1}個目）"
         confirm_message = {
             "type": "template",
             "altText": "選択内容の確認",
@@ -639,8 +644,13 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
             send_line_message(reply_token, [already_added_message])
             return
         
-        is_free = total_usage_count == 0
-        price_message = "料金：無料（1個目）" if is_free else f"料金：1,500円（{total_usage_count + 1}個目）"
+        # サブスクリプションのトライアル期間をチェック
+        subscription_status = check_subscription_status(stripe_subscription_id)
+        is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
+        
+        # 1個目は常に無料、2個目以降はトライアル期間中は無料
+        is_free = total_usage_count == 0 or (is_trial_period and total_usage_count > 0)
+        price_message = "料金：無料（1個目）" if total_usage_count == 0 else f"料金：{'無料（トライアル期間中）' if is_trial_period else '1,500円'}（{total_usage_count + 1}個目）"
         print(f"[DEBUG] content_type: {content['name']}")
         print(f"[DEBUG] DATABASE_URL: {os.getenv('DATABASE_URL')}")
         print(f"[DEBUG] total_usage_count: {total_usage_count}")
