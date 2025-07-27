@@ -560,30 +560,50 @@ def line_webhook():
                         # 数字が抽出できない場合は詳細なエラーメッセージ
                         error_message = "数字を入力してください。\n\n対応形式:\n• 1,2,3 (カンマ区切り)\n• 1.2.3 (ドット区切り)\n• 1 2 3 (スペース区切り)\n• 一二三 (日本語数字)\n• 1番目,2番目 (序数表現)\n• 最初,二番目 (日本語序数)"
                         send_line_message(event['replyToken'], [{"type": "text", "text": error_message}])
-                # その他のコマンド処理
-                elif text == '追加':
+                # その他のコマンド処理（cancel_select状態以外）
+                elif text == '追加' and state != 'cancel_select':
                     user_states[user_id] = 'add_select'
                     handle_add_content(event['replyToken'], user_id_db, stripe_subscription_id)
-                elif text == 'メニュー':
+                elif text == 'メニュー' and state != 'cancel_select':
                     send_line_message(event['replyToken'], [get_menu_message()])
-                elif text == 'ヘルプ':
+                elif text == 'ヘルプ' and state != 'cancel_select':
                     send_line_message(event['replyToken'], get_help_message())
-                elif text == '状態':
+                elif text == '状態' and state != 'cancel_select':
                     handle_status_check(event['replyToken'], user_id_db)
-                elif state == 'add_select' and text in ['1', '2', '3', '4']:
-                    # 選択したコンテンツ番号を保存
-                    user_states[user_id] = f'confirm_{text}'
-                    handle_content_selection(event['replyToken'], user_id_db, stripe_subscription_id, text)
-                elif text.lower() in ['はい', 'yes', 'y'] and state and state.startswith('confirm_'):
-                    # 確認状態からコンテンツ番号を取得
-                    content_number = state.split('_')[1]
-                    handle_content_confirmation(event['replyToken'], user_id_db, stripe_subscription_id, content_number, True)
-                    user_states[user_id] = 'welcome_sent'
-                elif text.lower() in ['いいえ', 'no', 'n'] and state and state.startswith('confirm_'):
-                    # 確認状態からコンテンツ番号を取得
-                    content_number = state.split('_')[1]
-                    handle_content_confirmation(event['replyToken'], user_id_db, stripe_subscription_id, content_number, False)
-                    user_states[user_id] = 'welcome_sent'
+                elif state == 'add_select':
+                    # 主要なコマンドの場合は通常の処理に切り替え
+                    if text in ['1', '2', '3', '4']:
+                        # 選択したコンテンツ番号を保存
+                        user_states[user_id] = f'confirm_{text}'
+                        handle_content_selection(event['replyToken'], user_id_db, stripe_subscription_id, text)
+                    elif text == 'メニュー':
+                        user_states[user_id] = 'welcome_sent'
+                        send_line_message(event['replyToken'], [get_menu_message()])
+                    elif text == 'ヘルプ':
+                        send_line_message(event['replyToken'], get_help_message())
+                    elif text == '状態':
+                        handle_status_check(event['replyToken'], user_id_db)
+                    else:
+                        # 無効な入力の場合はコンテンツ選択を促す
+                        send_line_message(event['replyToken'], [{"type": "text", "text": "1〜3の数字でコンテンツを選択してください。\n\nまたは「メニュー」でメインメニューに戻ります。"}])
+                elif state and state.startswith('confirm_'):
+                    # 確認状態での処理
+                    if text.lower() in ['はい', 'yes', 'y']:
+                        # 確認状態からコンテンツ番号を取得
+                        content_number = state.split('_')[1]
+                        handle_content_confirmation(event['replyToken'], user_id_db, stripe_subscription_id, content_number, True)
+                        user_states[user_id] = 'welcome_sent'
+                    elif text.lower() in ['いいえ', 'no', 'n']:
+                        # 確認状態からコンテンツ番号を取得
+                        content_number = state.split('_')[1]
+                        handle_content_confirmation(event['replyToken'], user_id_db, stripe_subscription_id, content_number, False)
+                        user_states[user_id] = 'welcome_sent'
+                    elif text == 'メニュー':
+                        user_states[user_id] = 'welcome_sent'
+                        send_line_message(event['replyToken'], [get_menu_message()])
+                    else:
+                        # 無効な入力の場合は確認を促す
+                        send_line_message(event['replyToken'], [{"type": "text", "text": "「はい」または「いいえ」で回答してください。\n\nまたは「メニュー」でメインメニューに戻ります。"}])
                 elif '@' in text and '.' in text and len(text) < 100:
                     import unicodedata
                     def normalize_email(email):
@@ -633,7 +653,12 @@ def line_webhook():
                         else:
                             send_line_message(event['replyToken'], [{"type": "text", "text": 'ご登録メールアドレスが見つかりません。LPでご登録済みかご確認ください。'}])
                 else:
-                    send_line_message(event['replyToken'], [get_default_message()])
+                    # どの条件にも当てはまらない場合のデフォルト処理
+                    if state in ['cancel_select', 'add_select'] or (state and state.startswith('confirm_')):
+                        # 特定の状態ではデフォルトメッセージを送信しない
+                        send_line_message(event['replyToken'], [{"type": "text", "text": "無効な入力です。メニューから選択してください。"}])
+                    else:
+                        send_line_message(event['replyToken'], [get_default_message()])
                 conn.close()
             # リッチメニューのpostbackイベントの処理
             elif event.get('type') == 'postback':
