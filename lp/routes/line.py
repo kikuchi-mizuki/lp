@@ -527,6 +527,18 @@ def line_webhook():
                         send_line_message(event['replyToken'], [get_menu_message()])
                         continue
                     
+                    # 主要なコマンドの場合は通常の処理に切り替え
+                    if text == '追加':
+                        user_states[user_id] = 'add_select'
+                        handle_add_content(event['replyToken'], user_id_db, stripe_subscription_id)
+                        continue
+                    elif text == '状態':
+                        handle_status_check(event['replyToken'], user_id_db)
+                        continue
+                    elif text == 'ヘルプ':
+                        send_line_message(event['replyToken'], get_help_message())
+                        continue
+                    
                     # AI技術を活用した高度な数字抽出関数を使用して処理
                     from services.line_service import smart_number_extraction, validate_selection_numbers
                     
