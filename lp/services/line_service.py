@@ -1223,7 +1223,7 @@ def handle_cancel_request(reply_token, user_id_db, stripe_subscription_id):
             return
         
         choice_message = "\n".join(content_choices)
-        send_line_message(reply_token, [{"type": "text", "text": f"解約したいコンテンツを選んでください（カンマ区切りで複数選択可）:\n{choice_message}\n\n例: 1,2"}])
+        send_line_message(reply_token, [{"type": "text", "text": f"解約したいコンテンツを選んでください（カンマまたはドット区切りで複数選択可）:\n{choice_message}\n\n例: 1,2 または 1.2"}])
     except Exception as e:
         send_line_message(reply_token, [{"type": "text", "text": "❌ 契約中コンテンツの取得に失敗しました。しばらく時間をおいて再度お試しください。"}])
 
@@ -1238,8 +1238,14 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
         c.execute('SELECT id, content_type, is_free FROM usage_logs WHERE user_id = %s ORDER BY created_at', (user_id_db,))
         added_contents = c.fetchall()
         
-        # 選択された番号を解析
-        selected_indices = [int(x.strip()) for x in selection_text.split(',') if x.strip().isdigit()]
+        # 選択された番号を解析（カンマ区切りとドット区切りの両方に対応）
+        # まず、ドットをカンマに変換してから解析
+        normalized_text = selection_text.replace('.', ',')
+        selected_indices = [int(x.strip()) for x in normalized_text.split(',') if x.strip().isdigit()]
+        
+        print(f'[DEBUG] 選択テキスト: {selection_text}')
+        print(f'[DEBUG] 正規化テキスト: {normalized_text}')
+        print(f'[DEBUG] 選択されたインデックス: {selected_indices}')
         
         cancelled = []
         choice_index = 1
@@ -1247,12 +1253,16 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
         # 実際に追加されたコンテンツの処理
         for usage_id, content_type, is_free in added_contents:
             if content_type in ['AI予定秘書', 'AI経理秘書', 'AIタスクコンシェルジュ']:
+                print(f'[DEBUG] 処理中: choice_index={choice_index}, content_type={content_type}, usage_id={usage_id}')
                 if choice_index in selected_indices:
                     # データベースからusage_logsを削除
                     c.execute('DELETE FROM usage_logs WHERE id = %s', (usage_id,))
                     cancelled.append(content_type)
                     print(f'[DEBUG] 解約処理: content_type={content_type}, usage_id={usage_id}')
                 choice_index += 1
+        
+        print(f'[DEBUG] 解約対象コンテンツ数: {len(cancelled)}')
+        print(f'[DEBUG] 解約対象: {cancelled}')
         
         # データベースの変更をコミット
         conn.commit()
