@@ -1395,11 +1395,25 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
 def handle_subscription_cancel(reply_token, user_id_db, stripe_subscription_id):
     """サブスクリプション全体を解約"""
     try:
-        # サブスクリプションをキャンセル
-        subscription = stripe.Subscription.modify(
-            stripe_subscription_id,
-            cancel_at_period_end=True
-        )
+        # サブスクリプション状態をチェック
+        subscription_status = check_subscription_status(stripe_subscription_id)
+        is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
+        
+        if is_trial_period:
+            # トライアル期間中は即時解約
+            subscription = stripe.Subscription.modify(
+                stripe_subscription_id,
+                cancel_at_period_end=False
+            )
+            subscription = stripe.Subscription.cancel(stripe_subscription_id)
+            cancel_message_text = "サブスクリプション全体の解約を受け付けました。\n\nトライアル期間中のため、即座に解約されます。"
+        else:
+            # 通常期間は期間終了時に解約予定
+            subscription = stripe.Subscription.modify(
+                stripe_subscription_id,
+                cancel_at_period_end=True
+            )
+            cancel_message_text = "サブスクリプション全体の解約を受け付けました。\n\n請求期間終了まで全てのサービスをご利用いただけます。"
         
         # データベースから全てのコンテンツを削除
         conn = get_db_connection()
@@ -1409,7 +1423,7 @@ def handle_subscription_cancel(reply_token, user_id_db, stripe_subscription_id):
         conn.commit()
         conn.close()
         
-        print(f'[DEBUG] サブスクリプション解約: user_id={user_id_db}, deleted_count={deleted_count}')
+        print(f'[DEBUG] サブスクリプション解約: user_id={user_id_db}, deleted_count={deleted_count}, is_trial={is_trial_period}')
         
         # 解約確認メッセージを送信
         cancel_message = {
@@ -1418,7 +1432,7 @@ def handle_subscription_cancel(reply_token, user_id_db, stripe_subscription_id):
             "template": {
                 "type": "buttons",
                 "title": "サブスクリプション解約完了",
-                "text": "サブスクリプション全体の解約を受け付けました。\n\n請求期間終了まで全てのサービスをご利用いただけます。",
+                "text": cancel_message_text,
                 "actions": [
                     {
                         "type": "message",
