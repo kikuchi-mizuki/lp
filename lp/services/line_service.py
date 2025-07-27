@@ -763,7 +763,8 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                 # Stripe Usage Recordを作成（無料でも記録）
                 import stripe
                 stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
-                usage_price_id = os.getenv('STRIPE_USAGE_PRICE_ID')
+                # 正しいUsage Price IDを直接設定（環境変数が間違っているため）
+                usage_price_id = 'price_1RokfbIxg6C5hAVd1v0J5ATb'
                 
                 if usage_price_id:
                     # サブスクリプションから従量課金アイテムを取得
@@ -851,7 +852,8 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                 # Stripe Usage Recordを作成（課金予定）
                 import stripe
                 stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
-                usage_price_id = os.getenv('STRIPE_USAGE_PRICE_ID')
+                # 正しいUsage Price IDを直接設定（環境変数が間違っているため）
+                usage_price_id = 'price_1RokfbIxg6C5hAVd1v0J5ATb'
                 
                 if usage_price_id:
                     # サブスクリプションから従量課金アイテムを取得
@@ -1782,7 +1784,7 @@ def process_pending_charges(user_id_db, stripe_subscription_id):
             # 従量課金アイテムを取得
             usage_item = None
             for item in subscription['items']['data']:
-                if item['price']['id'] == os.getenv('STRIPE_USAGE_PRICE_ID'):
+                if item['price']['id'] == 'price_1RokfbIxg6C5hAVd1v0J5ATb':  # 正しいUsage Price ID
                     usage_item = item
                     break
             

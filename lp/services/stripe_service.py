@@ -19,9 +19,13 @@ def grant_referral_free_content(user_id):
     """紹介特典の無料枠付与（今後拡張用）"""
     pass
 
-def add_metered_price_to_subscription(subscription_id, price_id):
+def add_metered_price_to_subscription(subscription_id, price_id=None):
     """サブスクリプションに従量課金Priceを追加"""
     try:
+        # デフォルトのPrice IDを使用
+        if price_id is None:
+            price_id = 'price_1RokfbIxg6C5hAVd1v0J5ATb'  # 正しいUsage Price ID
+        
         # サブスクリプションを取得
         subscription = stripe.Subscription.retrieve(subscription_id)
         
@@ -31,7 +35,7 @@ def add_metered_price_to_subscription(subscription_id, price_id):
                 print(f"Price {price_id} は既にサブスクリプション {subscription_id} に追加されています")
                 return subscription
         
-        # 従量課金Priceを追加
+        # 従量課金Priceを追加（quantityは設定しない）
         subscription_item = stripe.SubscriptionItem.create(
             subscription=subscription_id,
             price=price_id
@@ -44,9 +48,13 @@ def add_metered_price_to_subscription(subscription_id, price_id):
         print(f"従量課金Price追加エラー: {e}")
         raise e
 
-def ensure_metered_price_in_subscription(subscription_id, price_id):
+def ensure_metered_price_in_subscription(subscription_id, price_id=None):
     """サブスクリプションに従量課金Priceが含まれていることを確認し、なければ追加する"""
     try:
+        # デフォルトのPrice IDを使用
+        if price_id is None:
+            price_id = 'price_1RokfbIxg6C5hAVd1v0J5ATb'  # 正しいUsage Price ID
+        
         # サブスクリプションを取得
         subscription = stripe.Subscription.retrieve(subscription_id)
         
@@ -56,7 +64,7 @@ def ensure_metered_price_in_subscription(subscription_id, price_id):
                 print(f"Price {price_id} は既にサブスクリプション {subscription_id} に含まれています")
                 return subscription
         
-        # 従量課金Priceを追加
+        # 従量課金Priceを追加（quantityは設定しない）
         subscription_item = stripe.SubscriptionItem.create(
             subscription=subscription_id,
             price=price_id
