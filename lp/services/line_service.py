@@ -535,17 +535,14 @@ def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, co
         subscription_status = check_subscription_status(stripe_subscription_id)
         is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
         
-        # 1個目は常に無料、2個目以降はトライアル期間中は無料、それ以外は有料
+        # 1個目は常に無料、2個目以降は有料（1週間無料期間あり）
         current_count = total_usage_count + 1
-        is_free = current_count == 1 or (is_trial_period and current_count >= 2)
+        is_free = current_count == 1
         
-        if is_trial_period:
-            if current_count == 1:
-                price_message = f"料金：無料（{current_count}個目）"
-            else:
-                price_message = f"料金：無料（{current_count}個目）"
+        if current_count == 1:
+            price_message = f"料金：無料（{current_count}個目）"
         else:
-            price_message = f"料金：{'無料' if is_free else '1,500円'}（{current_count}個目）"
+            price_message = f"料金：1,500円（{current_count}個目、1週間無料）"
         confirm_message = {
             "type": "template",
             "altText": "選択内容の確認",
@@ -740,17 +737,14 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
         subscription_status = check_subscription_status(stripe_subscription_id)
         is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
         
-        # 1個目は常に無料、2個目以降はトライアル期間中は無料、それ以外は有料
+        # 1個目は常に無料、2個目以降は有料（1週間無料期間あり）
         current_count = total_usage_count + 1
-        is_free = current_count == 1 or (is_trial_period and current_count >= 2)
+        is_free = current_count == 1
         
-        if is_trial_period:
-            if current_count == 1:
-                price_message = f"料金：無料（{current_count}個目）"
-            else:
-                price_message = f"料金：無料（{current_count}個目）"
+        if current_count == 1:
+            price_message = f"料金：無料（{current_count}個目）"
         else:
-            price_message = f"料金：{'無料' if is_free else '1,500円'}（{current_count}個目）"
+            price_message = f"料金：1,500円（{current_count}個目、1週間無料）"
         print(f"[DEBUG] content_type: {content['name']}")
         print(f"[DEBUG] DATABASE_URL: {os.getenv('DATABASE_URL')}")
         print(f"[DEBUG] total_usage_count: {total_usage_count}")
@@ -1165,12 +1159,11 @@ def handle_status_check(reply_token, user_id_db):
         if is_trial_period:
             status_lines.append("💰 料金体系（トライアル期間中）:")
             status_lines.append("• 1個目: 無料")
-            status_lines.append("• 2個目以降: 無料（トライアル期間中のみ）")
-            status_lines.append("• トライアル終了後: 2個目以降1,500円/件（次回請求時）")
+            status_lines.append("• 2個目以降: 1,500円/件（1週間無料）")
         else:
             status_lines.append("💰 料金体系:")
             status_lines.append("• 1個目: 無料")
-            status_lines.append("• 2個目以降: 1,500円/件（次回請求時）")
+            status_lines.append("• 2個目以降: 1,500円/件")
         
         status_lines.append("")  # 空行
         
@@ -1203,14 +1196,10 @@ def handle_status_check(reply_token, user_id_db):
             
             # 次回追加時の料金予告
             next_count = actual_count + 1
-            if is_trial_period:
-                if next_count == 1:
-                    next_price = "無料"
-                else:
-                    next_price = "無料（トライアル期間中）"
-                next_price += f"\n※トライアル終了後は1,500円"
+            if next_count == 1:
+                next_price = "無料"
             else:
-                next_price = "1,500円" if next_count > 1 else "無料"
+                next_price = "1,500円（1週間無料）"
             status_lines.append(f"📝 次回追加時（{next_count}個目）: {next_price}")
             
             status_lines.append("")
@@ -1252,13 +1241,10 @@ def handle_cancel_request(reply_token, user_id_db, stripe_subscription_id):
         # 実際に追加されたコンテンツのみを表示
         for content_type, is_free in added_contents:
             if content_type in ['AI予定秘書', 'AI経理秘書', 'AIタスクコンシェルジュ']:
-                if is_trial_period:
-                    if is_free:
-                        display_price = '無料（トライアル期間中）'
-                    else:
-                        display_price = '1,500円（既に課金済み）'
+                if is_free:
+                    display_price = '無料'
                 else:
-                    display_price = '0円' if is_free else '1,500円'
+                    display_price = '1,500円'
                 content_choices.append(f"{choice_index}. {content_type}（{display_price}）")
                 print(f'[DEBUG] 解約選択肢: {choice_index}. {content_type}（{display_price}）')
                 choice_index += 1
