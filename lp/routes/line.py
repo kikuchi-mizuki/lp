@@ -507,7 +507,12 @@ def line_webhook():
                     # データベースからコンテンツ数を取得
                     conn = get_db_connection()
                     c = conn.cursor()
-                    c.execute('SELECT COUNT(*) FROM usage_logs WHERE user_id = %s AND content_type IN (%s, %s, %s)', 
+                    # データベースタイプに応じてプレースホルダーを選択
+                    from utils.db import get_db_type
+                    db_type = get_db_type()
+                    placeholder = '%s' if db_type == 'postgresql' else '?'
+                    
+                    c.execute(f'SELECT COUNT(*) FROM usage_logs WHERE user_id = {placeholder} AND content_type IN ({placeholder}, {placeholder}, {placeholder})', 
                              (user_id_db, 'AI予定秘書', 'AI経理秘書', 'AIタスクコンシェルジュ'))
                     content_count = c.fetchone()[0]
                     conn.close()

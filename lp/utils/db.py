@@ -31,6 +31,28 @@ def get_db_connection():
             # PostgreSQL接続に失敗した場合はSQLiteを使用
             return sqlite3.connect('database.db')
 
+def get_db_type():
+    """データベースタイプを取得（postgresql または sqlite）"""
+    database_url = os.getenv('DATABASE_URL')
+    if database_url and database_url.startswith('postgresql://'):
+        return 'postgresql'
+    elif database_url and database_url.startswith('sqlite://'):
+        return 'sqlite'
+    elif database_url and not database_url.startswith(('postgresql://', 'sqlite://')):
+        return 'sqlite'
+    else:
+        # ローカル開発用（PostgreSQL）
+        try:
+            psycopg2.connect(
+                host="localhost",
+                database="ai_collections",
+                user="postgres",
+                password="password"
+            )
+            return 'postgresql'
+        except:
+            return 'sqlite'
+
 def migrate_add_pending_charge():
     """pending_chargeカラムを追加するマイグレーション"""
     try:

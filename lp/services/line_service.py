@@ -485,11 +485,16 @@ def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, co
         if content_number not in content_info:
             send_line_message(reply_token, [{"type": "text", "text": "無効な選択です。1-3の数字で選択してください。"}])
             return
-        content = content_info[content_number]
+        content = content_info[str(content_number)]
         # 全コンテンツの合計数を取得
         conn_count = get_db_connection()
         c_count = conn_count.cursor()
-        c_count.execute('SELECT COUNT(*) FROM usage_logs WHERE user_id = %s', (user_id_db,))
+        # データベースタイプに応じてプレースホルダーを選択
+        from utils.db import get_db_type
+        db_type = get_db_type()
+        placeholder = '%s' if db_type == 'postgresql' else '?'
+        
+        c_count.execute(f'SELECT COUNT(*) FROM usage_logs WHERE user_id = {placeholder}', (user_id_db,))
         total_usage_count = c_count.fetchone()[0]
         
         # デバッグ用：実際のusage_logsを確認
@@ -498,7 +503,7 @@ def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, co
         print(f'[DEBUG] 全usage_logs: {all_logs}')
         
         # 同じコンテンツの追加回数を確認
-        c_count.execute('SELECT COUNT(*) FROM usage_logs WHERE user_id = %s AND content_type = %s', (user_id_db, content['name']))
+        c_count.execute(f'SELECT COUNT(*) FROM usage_logs WHERE user_id = {placeholder} AND content_type = {placeholder}', (user_id_db, content['name']))
         same_content_count = c_count.fetchone()[0]
         conn_count.close()
         
