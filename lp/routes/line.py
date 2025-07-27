@@ -41,6 +41,9 @@ def payment_completed_webhook_by_user_id(user_id):
                 from services.line_service import send_welcome_with_buttons_push
                 success = send_welcome_with_buttons_push(line_user_id)
                 if success:
+                    # 自動案内文送信後にユーザー状態を設定（重複防止）
+                    user_states[line_user_id] = 'welcome_sent'
+                    print(f'[DEBUG] 自動案内文送信完了、ユーザー状態を設定: line_user_id={line_user_id}')
                     return jsonify({
                         'success': True, 
                         'message': f'案内文を自動送信しました: {email}',
@@ -483,19 +486,39 @@ def line_webhook():
                 
                 if state is None:
                     print(f'[DEBUG] 既存ユーザーの初回メッセージ処理: user_id={user_id}')
-                    try:
-                        from services.line_service import send_welcome_with_buttons
-                        send_welcome_with_buttons(event['replyToken'])
-                        print(f'[DEBUG] 既存ユーザーへの案内文送信完了: user_id={user_id}')
-                        # 案内文送信済みフラグを設定
-                        user_states[user_id] = 'welcome_sent'
-                        # 案内文を送信した後は処理を終了（replyTokenは1回しか使用できない）
-                        conn.close()
-                        continue
-                    except Exception as e:
-                        print(f'[DEBUG] 既存ユーザーへの案内文送信エラー: {e}')
-                        import traceback
-                        traceback.print_exc()
+                    # 自動案内文が既に送信されている可能性があるため、状態を設定して処理をスキップ
+                    user_states[user_id] = 'welcome_sent'
+                    print(f'[DEBUG] 自動案内文送信済みのため、重複送信をスキップ: user_id={user_id}')
+                    # メニューボタンのみ送信
+                    menu_message = {
+                        "type": "template",
+                        "altText": "メニュー",
+                        "template": {
+                            "type": "buttons",
+                            "title": "メニュー",
+                            "text": "ご希望の機能を選択してください。",
+                            "actions": [
+                                {
+                                    "type": "message",
+                                    "label": "コンテンツ追加",
+                                    "text": "追加"
+                                },
+                                {
+                                    "type": "message",
+                                    "label": "利用状況確認",
+                                    "text": "状態"
+                                },
+                                {
+                                    "type": "message",
+                                    "label": "使い方を見る",
+                                    "text": "ヘルプ"
+                                }
+                            ]
+                        }
+                    }
+                    send_line_message(event['replyToken'], [menu_message])
+                    conn.close()
+                    continue
                 elif state == 'welcome_sent':
                     print(f'[DEBUG] 既存ユーザーの案内文は既に送信済み: user_id={user_id}')
                 else:
