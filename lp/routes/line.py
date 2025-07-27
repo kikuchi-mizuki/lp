@@ -14,6 +14,33 @@ line_bp = Blueprint('line', __name__)
 
 user_states = {}
 
+@line_bp.route('/line/debug/users')
+def debug_line_users():
+    """デバッグ用：LINE連携ユーザー状況確認"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute('SELECT id, email, line_user_id, stripe_subscription_id, created_at FROM users ORDER BY created_at DESC LIMIT 10')
+        users = c.fetchall()
+        conn.close()
+        
+        user_list = []
+        for user in users:
+            user_list.append({
+                'id': user[0],
+                'email': user[1],
+                'line_user_id': user[2],
+                'stripe_subscription_id': user[3],
+                'created_at': str(user[4]) if user[4] else None
+            })
+        
+        return jsonify({
+            'users': user_list,
+            'user_states': user_states
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
 @line_bp.route('/line/webhook', methods=['POST'])
 def line_webhook():
     signature = request.headers.get('X-Line-Signature', '')
@@ -48,6 +75,7 @@ def line_webhook():
                     print(f'[DEBUG] ユーザー紐付け完了: user_id={user_id}, db_user_id={user[0]}')
                     
                     # ボタン付きのウェルカムメッセージを送信（必ず送信）
+                    print(f'[DEBUG] 案内文送信開始: user_id={user_id}, replyToken={event["replyToken"]}')
                     try:
                         from services.line_service import send_welcome_with_buttons
                         send_welcome_with_buttons(event['replyToken'])
@@ -59,8 +87,10 @@ def line_webhook():
                         import traceback
                         traceback.print_exc()
                         # エラーが発生した場合は簡単なテキストメッセージを送信
+                        print(f'[DEBUG] 代替メッセージ送信開始: user_id={user_id}')
                         send_line_message(event['replyToken'], [{"type": "text", "text": "ようこそ！AIコレクションズへ\n\n「追加」と入力してコンテンツを追加してください。"}])
                         user_states[user_id] = 'welcome_sent'
+                        print(f'[DEBUG] 代替メッセージ送信完了: user_id={user_id}')
                 else:
                     # 未登録ユーザーの場合
                     print(f'[DEBUG] 未登録ユーザー: user_id={user_id}')
