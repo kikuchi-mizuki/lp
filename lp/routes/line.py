@@ -317,6 +317,11 @@ def line_webhook():
                 user_id = event['source']['userId']
                 print(f'[DEBUG] 友達追加イベント: user_id={user_id}')
                 
+                # 既に案内文が送信されているかチェック
+                if user_states.get(user_id) == 'welcome_sent':
+                    print(f'[DEBUG] 既に案内文送信済み、スキップ: user_id={user_id}')
+                    continue
+                
                 # 直近のline_user_id未設定ユーザーを自動で紐付け
                 conn = get_db_connection()
                 c = conn.cursor()
@@ -370,6 +375,10 @@ def line_webhook():
                 c.execute('UPDATE users SET line_user_id = NULL WHERE line_user_id = %s', (user_id,))
                 conn.commit()
                 conn.close()
+                
+                # ユーザー状態もクリア
+                if user_id in user_states:
+                    del user_states[user_id]
                 print(f'[DEBUG] ユーザー紐付け解除: user_id={user_id}')
                 continue
             
@@ -393,6 +402,12 @@ def line_webhook():
                     
                     if user:
                         print(f'[DEBUG] 未紐付けユーザー発見、紐付け処理開始: user_id={user_id}, db_user_id={user[0]}')
+                        
+                        # 既に案内文が送信されているかチェック
+                        if user_states.get(user_id) == 'welcome_sent':
+                            print(f'[DEBUG] 既に案内文送信済み、スキップ: user_id={user_id}')
+                            conn.close()
+                            continue
                         
                         # 既存のLINEユーザーID紐付けを解除（重複回避）
                         c.execute('UPDATE users SET line_user_id = NULL WHERE line_user_id = %s', (user_id,))
@@ -425,42 +440,31 @@ def line_webhook():
                 else:
                     user_id_db = user[0]
                     stripe_subscription_id = user[1]
-                    state = user_states.get(user_id, 'welcome_sent')
                     
-                    # 新しいサブスクリプションが作成された場合の処理（初回のみ、特定のメッセージ以外）
-                    if (stripe_subscription_id and stripe_subscription_id.startswith('sub_') and 
-                        state == 'welcome_sent' and 
-                        text not in ['追加', 'メニュー', 'ヘルプ', '状態', '解約', 'サブスクリプション解約', 'コンテンツ解約', '1', '2', '3', 'はい', 'いいえ', 'yes', 'no', 'y', 'n']):
-                        # サブスクリプションの状態をチェック
-                        from services.line_service import check_subscription_status
-                        subscription_status = check_subscription_status(stripe_subscription_id)
-                        
-                        # 有効なサブスクリプションの場合のみ案内メッセージを送信
-                        if subscription_status['is_active']:
-                            print(f'[DEBUG] 有効なサブスクリプション発見、案内メッセージ送信: user_id={user_id}, subscription_id={stripe_subscription_id}')
-                            try:
-                                from services.line_service import send_welcome_with_buttons
-                                send_welcome_with_buttons(event['replyToken'])
-                                print(f'[DEBUG] 新サブスクリプション時の案内文送信完了: user_id={user_id}')
-                                # 初回案内文送信後はユーザー状態を設定して処理を終了
-                                user_states[user_id] = 'welcome_sent'
-                                conn.close()
-                                continue
-                            except Exception as e:
-                                print(f'[DEBUG] 新サブスクリプション時の案内文送信エラー: {e}')
-                                import traceback
-                                traceback.print_exc()
-                                # エラーが発生した場合は簡単なテキストメッセージを送信
-                                send_line_message(event['replyToken'], [{"type": "text", "text": "ようこそ！AIコレクションズへ\n\n「追加」と入力してコンテンツを追加してください。"}])
-                                user_states[user_id] = 'welcome_sent'
-                                conn.close()
-                                continue
+                    # 既に案内文が送信されているかチェック
+                    if user_states.get(user_id) == 'welcome_sent':
+                        print(f'[DEBUG] 既に案内文送信済み、通常メッセージ処理に進む: user_id={user_id}')
+                        pass
+                    else:
+                        # 初回案内文が未送信の場合のみ送信
+                        print(f'[DEBUG] 初回案内文未送信、案内文送信: user_id={user_id}')
+                        try:
+                            from services.line_service import send_welcome_with_buttons
+                            send_welcome_with_buttons(event['replyToken'])
+                            print(f'[DEBUG] 初回案内文送信完了: user_id={user_id}')
+                            user_states[user_id] = 'welcome_sent'
+                            conn.close()
+                            continue
+                        except Exception as e:
+                            print(f'[DEBUG] 初回案内文送信エラー: {e}')
+                            # エラーが発生した場合は通常のメッセージ処理に進む
+                            user_states[user_id] = 'welcome_sent'
                 
                 # 既存ユーザーの初回メッセージ時に案内文を送信（初回のみ）
                 if user_id not in user_states:
-                    user_states[user_id] = None
+                    user_states[user_id] = 'welcome_sent'
                 
-                state = user_states.get(user_id, None)
+                state = user_states.get(user_id, 'welcome_sent')
                 print(f'[DEBUG] ユーザー状態: user_id={user_id}, state={state}')
                 
                 # 初回案内文が既に送信されている場合は、通常のメッセージ処理に進む
