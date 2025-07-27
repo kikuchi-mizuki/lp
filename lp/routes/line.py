@@ -200,6 +200,10 @@ def line_webhook():
                 print(f'[DEBUG] 友達追加時の未紐付けユーザー検索結果: {user}')
                 
                 if user:
+                    # 既存のLINEユーザーID紐付けを解除（重複回避）
+                    c.execute('UPDATE users SET line_user_id = NULL WHERE line_user_id = %s', (user_id,))
+                    
+                    # 新しい紐付けを作成
                     c.execute('UPDATE users SET line_user_id = %s WHERE id = %s', (user_id, user[0]))
                     conn.commit()
                     print(f'[DEBUG] ユーザー紐付け完了: user_id={user_id}, db_user_id={user[0]}')
@@ -264,9 +268,15 @@ def line_webhook():
                     
                     if user:
                         print(f'[DEBUG] 未紐付けユーザー発見、紐付け処理開始: user_id={user_id}, db_user_id={user[0]}')
+                        
+                        # 既存のLINEユーザーID紐付けを解除（重複回避）
+                        c.execute('UPDATE users SET line_user_id = NULL WHERE line_user_id = %s', (user_id,))
+                        
+                        # 新しい紐付けを作成
                         c.execute('UPDATE users SET line_user_id = %s WHERE id = %s', (user_id, user[0]))
                         conn.commit()
                         print(f'[DEBUG] 初回メッセージ時のユーザー紐付け完了: user_id={user_id}, db_user_id={user[0]}')
+                        
                         # 決済画面からLINEに移動した時の初回案内文（必ず送信）
                         print(f'[DEBUG] 案内文送信開始: user_id={user_id}, replyToken={event["replyToken"]}')
                         try:
