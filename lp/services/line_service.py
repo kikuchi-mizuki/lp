@@ -592,6 +592,15 @@ def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, co
 
 def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id, content_number, confirmed):
     import os
+    import stripe
+    from dotenv import load_dotenv
+    
+    # 環境変数を読み込み
+    load_dotenv()
+    
+    # Stripe APIキーを設定
+    stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+    
     print(f'[DEBUG] handle_content_confirmation called: user_id_db={user_id_db}, content_number={content_number}, confirmed={confirmed}')
     print(f'[DEBUG] 環境変数: STRIPE_USAGE_PRICE_ID={os.getenv("STRIPE_USAGE_PRICE_ID")}, STRIPE_SECRET_KEY={os.getenv("STRIPE_SECRET_KEY")}, DATABASE_URL={os.getenv("DATABASE_URL")}, subscription_id={stripe_subscription_id}')
     try:
@@ -712,7 +721,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                 'url': 'https://lp-production-9e2c.up.railway.app/task'
             }
         }
-        content = content_info[content_number]
+        content = content_info[str(content_number)]
         # usage_logsから再度カウントしてis_freeを決定
         conn_count = get_db_connection()
         c_count = conn_count.cursor()
