@@ -60,6 +60,25 @@ def init_db():
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
         ''')
+        
+        # 既存テーブルにpending_chargeカラムを追加（マイグレーション）
+        try:
+            c.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'usage_logs' AND column_name = 'pending_charge'
+            """)
+            
+            if not c.fetchone():
+                c.execute("""
+                    ALTER TABLE usage_logs 
+                    ADD COLUMN pending_charge BOOLEAN DEFAULT FALSE
+                """)
+                print("✅ pending_chargeカラムを追加しました")
+            else:
+                print("ℹ️ pending_chargeカラムは既に存在します")
+        except Exception as e:
+            print(f"❌ マイグレーションエラー: {e}")
     else:
         # SQLite用のテーブル作成
         c.execute('''
@@ -86,6 +105,22 @@ def init_db():
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
         ''')
+        
+        # SQLite用のマイグレーション
+        try:
+            c.execute("PRAGMA table_info(usage_logs)")
+            columns = [column[1] for column in c.fetchall()]
+            
+            if 'pending_charge' not in columns:
+                c.execute("""
+                    ALTER TABLE usage_logs 
+                    ADD COLUMN pending_charge BOOLEAN DEFAULT FALSE
+                """)
+                print("✅ pending_chargeカラムを追加しました")
+            else:
+                print("ℹ️ pending_chargeカラムは既に存在します")
+        except Exception as e:
+            print(f"❌ マイグレーションエラー: {e}")
     
     conn.commit()
     conn.close()
