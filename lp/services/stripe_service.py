@@ -34,8 +34,7 @@ def add_metered_price_to_subscription(subscription_id, price_id):
         # 従量課金Priceを追加
         subscription_item = stripe.SubscriptionItem.create(
             subscription=subscription_id,
-            price=price_id,
-            quantity=1  # 従来の従量課金システムではquantityを指定
+            price=price_id
         )
         
         print(f"従量課金Price {price_id} をサブスクリプション {subscription_id} に追加しました")
@@ -60,8 +59,7 @@ def ensure_metered_price_in_subscription(subscription_id, price_id):
         # 従量課金Priceを追加
         subscription_item = stripe.SubscriptionItem.create(
             subscription=subscription_id,
-            price=price_id,
-            quantity=1  # 従来の従量課金システムではquantityを指定
+            price=price_id
         )
         
         print(f"従量課金Price {price_id} をサブスクリプション {subscription_id} に追加しました")
