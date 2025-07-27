@@ -832,13 +832,15 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                                 print(f'[DEBUG] DB登録成功（1個目・無料・トライアル期間中）: user_id={user_id_db}')
                             else:
                                 # 通常期間中はUsageRecordを作成
+                                # 追加日から1週間後の期間で課金するため、1週間後のtimestampを設定
+                                one_week_later = datetime.datetime.now() + datetime.timedelta(days=7)
                                 usage_record = stripe.SubscriptionItem.create_usage_record(
                                     usage_item['id'],
                                     quantity=1,  # 1個目も使用量として記録
-                                    timestamp=int(datetime.datetime.now().timestamp()),
+                                    timestamp=int(one_week_later.timestamp()),
                                     action='increment'  # 既存の使用量に追加
                                 )
-                                print(f'[DEBUG] Stripe UsageRecord作成成功（無料）: {usage_record.id}')
+                                print(f'[DEBUG] Stripe UsageRecord作成成功（無料・1週間後課金）: {usage_record.id}, timestamp={one_week_later}')
                                 
                                 # データベースに記録
                                 conn = get_db_connection()
@@ -929,13 +931,15 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                             print(f'[DEBUG] DB登録成功（2個目以降・課金予定・トライアル期間中）: user_id={user_id_db}')
                         else:
                             # 通常期間中はUsageRecordを作成
+                            # 追加日から1週間後の期間で課金するため、1週間後のtimestampを設定
+                            one_week_later = datetime.datetime.now() + datetime.timedelta(days=7)
                             usage_record = stripe.SubscriptionItem.create_usage_record(
                                 usage_item['id'],
                                 quantity=1,  # 課金予定の場合は1
-                                timestamp=int(datetime.datetime.now().timestamp()),
+                                timestamp=int(one_week_later.timestamp()),
                                 action='increment'  # 既存の使用量に追加
                             )
-                            print(f'[DEBUG] Stripe UsageRecord作成成功（課金予定）: {usage_record.id}')
+                            print(f'[DEBUG] Stripe UsageRecord作成成功（課金予定・1週間後課金）: {usage_record.id}, timestamp={one_week_later}')
                             
                             # データベースに記録
                             conn = get_db_connection()
