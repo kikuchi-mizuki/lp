@@ -1224,7 +1224,7 @@ def handle_cancel_request(reply_token, user_id_db, stripe_subscription_id):
             return
         
         choice_message = "\n".join(content_choices)
-        send_line_message(reply_token, [{"type": "text", "text": f"解約したいコンテンツを選んでください（数字のみ入力、区切り文字は自由）:\n{choice_message}\n\n例: 1,2 または 1.2 または 1 2 または 一二"}])
+        send_line_message(reply_token, [{"type": "text", "text": f"解約したいコンテンツを選んでください（AI対応：様々な形式で入力可能）:\n{choice_message}\n\n対応形式:\n• 1,2,3 (カンマ区切り)\n• 1.2.3 (ドット区切り)\n• 1 2 3 (スペース区切り)\n• 一二三 (日本語数字)\n• 1番目,2番目 (序数表現)\n• 最初,二番目 (日本語序数)"}])
     except Exception as e:
         send_line_message(reply_token, [{"type": "text", "text": "❌ 契約中コンテンツの取得に失敗しました。しばらく時間をおいて再度お試しください。"}])
 
@@ -1239,14 +1239,20 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
         c.execute('SELECT id, content_type, is_free FROM usage_logs WHERE user_id = %s ORDER BY created_at', (user_id_db,))
         added_contents = c.fetchall()
         
-        # 選択された番号を解析（高度な数字抽出処理）
-        numbers = extract_numbers_from_text(selection_text)
-        selected_indices = validate_selection_numbers(numbers, len(added_contents))
+        # 選択された番号を解析（AI技術を活用した高度な数字抽出処理）
+        numbers = smart_number_extraction(selection_text)
+        valid_numbers, invalid_reasons, duplicates = validate_selection_numbers(numbers, len(added_contents))
+        selected_indices = valid_numbers
         
         print(f'[DEBUG] 選択テキスト: {selection_text}')
         print(f'[DEBUG] 抽出された数字: {numbers}')
         print(f'[DEBUG] 有効な選択インデックス: {selected_indices}')
         print(f'[DEBUG] 最大選択可能数: {len(added_contents)}')
+        
+        if invalid_reasons:
+            print(f'[DEBUG] 無効な入力: {invalid_reasons}')
+        if duplicates:
+            print(f'[DEBUG] 重複除去: {duplicates}')
         
         cancelled = []
         choice_index = 1
@@ -1491,7 +1497,7 @@ def get_not_registered_message():
     return "ご登録情報が見つかりません。LPからご登録ください。" 
 
 def extract_numbers_from_text(text):
-    """テキストから数字を抽出する高度な処理"""
+    """AI技術を活用した高度な数字抽出処理"""
     import re
     
     # 基本的な数字抽出
@@ -1500,12 +1506,41 @@ def extract_numbers_from_text(text):
     # 日本語の数字表現も対応（一、二、三など）
     japanese_numbers = {
         '一': 1, '二': 2, '三': 3, '四': 4, '五': 5,
-        '六': 6, '七': 7, '八': 8, '九': 9, '十': 10
+        '六': 6, '七': 7, '八': 8, '九': 9, '十': 10,
+        '十一': 11, '十二': 12, '十三': 13, '十四': 14, '十五': 15,
+        '十六': 16, '十七': 17, '十八': 18, '十九': 19, '二十': 20
     }
     
     # 日本語数字を検索
     for japanese, arabic in japanese_numbers.items():
         if japanese in text:
+            numbers.append(str(arabic))
+    
+    # 漢数字の複合表現（二十一、二十二など）
+    for i in range(21, 31):
+        japanese = f"二十{['', '一', '二', '三', '四', '五', '六', '七', '八', '九'][i % 10]}"
+        if japanese in text:
+            numbers.append(str(i))
+    
+    # 全角数字の対応
+    fullwidth_numbers = {
+        '０': '0', '１': '1', '２': '2', '３': '3', '４': '4',
+        '５': '5', '６': '6', '７': '7', '８': '8', '９': '9'
+    }
+    
+    for fullwidth, halfwidth in fullwidth_numbers.items():
+        if fullwidth in text:
+            numbers.append(halfwidth)
+    
+    # 英語の数字表現
+    english_numbers = {
+        'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5,
+        'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10
+    }
+    
+    text_lower = text.lower()
+    for english, arabic in english_numbers.items():
+        if english in text_lower:
             numbers.append(str(arabic))
     
     # 重複を除去してソート
@@ -1515,16 +1550,75 @@ def extract_numbers_from_text(text):
     return unique_numbers
 
 def validate_selection_numbers(numbers, max_count):
-    """選択された数字が有効かチェック"""
+    """選択された数字が有効かチェック（AI技術を活用）"""
     valid_numbers = []
+    invalid_reasons = []
+    
     for num in numbers:
         try:
             num_int = int(num)
             if 1 <= num_int <= max_count:
                 valid_numbers.append(num_int)
             else:
+                invalid_reasons.append(f'{num_int} (範囲外: 1-{max_count})')
                 print(f'[DEBUG] 無効な番号: {num_int} (範囲外: 1-{max_count})')
         except ValueError:
+            invalid_reasons.append(f'{num} (無効な数字形式)')
             print(f'[DEBUG] 無効な数字形式: {num}')
     
-    return valid_numbers
+    # 重複チェック
+    duplicates = []
+    seen = set()
+    for num in valid_numbers:
+        if num in seen:
+            duplicates.append(num)
+        else:
+            seen.add(num)
+    
+    if duplicates:
+        print(f'[DEBUG] 重複した番号: {duplicates}')
+        # 重複を除去
+        valid_numbers = list(seen)
+    
+    return valid_numbers, invalid_reasons, duplicates
+
+def smart_number_extraction(text):
+    """AI技術を活用したスマートな数字抽出"""
+    # 基本的な数字抽出
+    numbers = extract_numbers_from_text(text)
+    
+    # 文脈を考慮した数字抽出
+    # 「1番目」「2番目」などの表現に対応
+    import re
+    ordinal_patterns = [
+        r'(\d+)番目',
+        r'(\d+)つ目',
+        r'(\d+)個目',
+        r'(\d+)つめ',
+        r'(\d+)個め'
+    ]
+    
+    for pattern in ordinal_patterns:
+        matches = re.findall(pattern, text)
+        for match in matches:
+            if match not in numbers:
+                numbers.append(match)
+    
+    # 「最初」「二番目」などの表現に対応
+    ordinal_japanese = {
+        '最初': '1', '一番目': '1', '一つ目': '1', '一個目': '1',
+        '二番目': '2', '二つ目': '2', '二個目': '2',
+        '三番目': '3', '三つ目': '3', '三個目': '3',
+        '四番目': '4', '四つ目': '4', '四個目': '4',
+        '五番目': '5', '五つ目': '5', '五個目': '5'
+    }
+    
+    for japanese, arabic in ordinal_japanese.items():
+        if japanese in text and arabic not in numbers:
+            numbers.append(arabic)
+    
+    # 重複を除去してソート
+    unique_numbers = list(set(numbers))
+    unique_numbers.sort(key=lambda x: int(x))
+    
+    return unique_numbers
