@@ -460,44 +460,50 @@ def line_webhook():
                 
                 if state is None:
                     print(f'[DEBUG] 既存ユーザーの初回メッセージ処理: user_id={user_id}')
-                    # 自動案内文が既に送信されている可能性があるため、状態を設定して処理をスキップ
-                    user_states[user_id] = 'welcome_sent'
-                    print(f'[DEBUG] 自動案内文送信済みのため、重複送信をスキップ: user_id={user_id}')
-                    # メニューボタンのみ送信
-                    menu_message = {
-                        "type": "template",
-                        "altText": "メニュー",
-                        "template": {
-                            "type": "buttons",
-                            "title": "メニュー",
-                            "text": "ご希望の機能を選択してください。",
-                            "actions": [
-                                {
-                                    "type": "message",
-                                    "label": "コンテンツ追加",
-                                    "text": "追加"
-                                },
-                                {
-                                    "type": "message",
-                                    "label": "利用状況確認",
-                                    "text": "状態"
-                                },
-                                {
-                                    "type": "message",
-                                    "label": "解約",
-                                    "text": "解約"
-                                },
-                                {
-                                    "type": "message",
-                                    "label": "ヘルプ",
-                                    "text": "ヘルプ"
-                                }
-                            ]
+                    
+                    # 解約コマンドの場合は処理をスキップ
+                    if text == '解約':
+                        print(f'[DEBUG] 解約コマンドのため、初回メッセージ処理をスキップ: user_id={user_id}')
+                        user_states[user_id] = 'welcome_sent'
+                    else:
+                        # 自動案内文が既に送信されている可能性があるため、状態を設定して処理をスキップ
+                        user_states[user_id] = 'welcome_sent'
+                        print(f'[DEBUG] 自動案内文送信済みのため、重複送信をスキップ: user_id={user_id}')
+                        # メニューボタンのみ送信
+                        menu_message = {
+                            "type": "template",
+                            "altText": "メニュー",
+                            "template": {
+                                "type": "buttons",
+                                "title": "メニュー",
+                                "text": "ご希望の機能を選択してください。",
+                                "actions": [
+                                    {
+                                        "type": "message",
+                                        "label": "コンテンツ追加",
+                                        "text": "追加"
+                                    },
+                                    {
+                                        "type": "message",
+                                        "label": "利用状況確認",
+                                        "text": "状態"
+                                    },
+                                    {
+                                        "type": "message",
+                                        "label": "解約",
+                                        "text": "解約"
+                                    },
+                                    {
+                                        "type": "message",
+                                        "label": "ヘルプ",
+                                        "text": "ヘルプ"
+                                    }
+                                ]
+                            }
                         }
-                    }
-                    send_line_message(event['replyToken'], [menu_message])
-                    conn.close()
-                    continue
+                        send_line_message(event['replyToken'], [menu_message])
+                        conn.close()
+                        continue
                 elif state == 'welcome_sent':
                     print(f'[DEBUG] 既存ユーザーの案内文は既に送信済み: user_id={user_id}')
                 else:
