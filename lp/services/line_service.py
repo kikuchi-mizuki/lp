@@ -756,9 +756,12 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
         print(f"[DEBUG] is_trial_period: {is_trial_period}")
         print(f"[DEBUG] price_message: {price_message}")
         
-        # 1個目は無料、2個目以降は1週間後に課金
+        # トライアル期間中の処理を考慮
+        subscription_status = check_subscription_status(stripe_subscription_id)
+        is_trial = subscription_status['status'] == 'trialing'
+        
         if is_free:
-            # 1個目は無料で即座に追加（Stripe Usage Recordも作成）
+            # 1個目は無料で即座に追加（トライアル期間中は記録のみ）
             try:
                 # Stripe Usage Recordを作成（無料でも記録）
                 import stripe
@@ -776,27 +779,40 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                             break
                     
                     if usage_item:
-                        # Stripe UsageRecordを作成（即座に反映）
+                        # Stripe UsageRecordを作成（トライアル期間中は記録のみ）
                         try:
-                            # UsageRecordを作成（即座に反映）
-                            usage_record = stripe.SubscriptionItem.create_usage_record(
-                                usage_item['id'],
-                                quantity=1,  # 1個目も使用量として記録
-                                timestamp=int(datetime.datetime.now().timestamp()),
-                                action='increment'  # 既存の使用量に追加
-                            )
-                            print(f'[DEBUG] Stripe UsageRecord作成成功（無料）: {usage_record.id}')
-                            
-                            # データベースに記録
-                            conn = get_db_connection()
-                            c = conn.cursor()
-                            c.execute('''
-                                INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type, pending_charge)
-                                VALUES (%s, %s, %s, %s, %s, %s)
-                            ''', (user_id_db, 1, usage_record.id, is_free, content['name'], False))
-                            conn.commit()
-                            conn.close()
-                            print(f'[DEBUG] DB登録成功（1個目・無料）: user_id={user_id_db}, usage_record_id={usage_record.id}')
+                            if is_trial:
+                                print(f'[DEBUG] トライアル期間中のため、UsageRecordは作成せず記録のみ')
+                                # トライアル期間中はデータベースのみに記録
+                                conn = get_db_connection()
+                                c = conn.cursor()
+                                c.execute('''
+                                    INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type, pending_charge)
+                                    VALUES (%s, %s, %s, %s, %s, %s)
+                                ''', (user_id_db, 1, None, is_free, content['name'], False))
+                                conn.commit()
+                                conn.close()
+                                print(f'[DEBUG] DB登録成功（1個目・無料・トライアル期間中）: user_id={user_id_db}')
+                            else:
+                                # 通常期間中はUsageRecordを作成
+                                usage_record = stripe.SubscriptionItem.create_usage_record(
+                                    usage_item['id'],
+                                    quantity=1,  # 1個目も使用量として記録
+                                    timestamp=int(datetime.datetime.now().timestamp()),
+                                    action='increment'  # 既存の使用量に追加
+                                )
+                                print(f'[DEBUG] Stripe UsageRecord作成成功（無料）: {usage_record.id}')
+                                
+                                # データベースに記録
+                                conn = get_db_connection()
+                                c = conn.cursor()
+                                c.execute('''
+                                    INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type, pending_charge)
+                                    VALUES (%s, %s, %s, %s, %s, %s)
+                                ''', (user_id_db, 1, usage_record.id, is_free, content['name'], False))
+                                conn.commit()
+                                conn.close()
+                                print(f'[DEBUG] DB登録成功（1個目・無料）: user_id={user_id_db}, usage_record_id={usage_record.id}')
                         except Exception as e:
                             print(f'[DEBUG] Stripe UsageRecord作成エラー（無料）: {e}')
                             # エラーが発生した場合はデータベースのみに記録
@@ -865,25 +881,39 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                             break
                     
                     if usage_item:
-                        # UsageRecordを作成（課金予定）
-                        usage_record = stripe.SubscriptionItem.create_usage_record(
-                            usage_item['id'],
-                            quantity=1,  # 課金予定の場合は1
-                            timestamp=int(datetime.datetime.now().timestamp()),
-                            action='increment'  # 既存の使用量に追加
-                        )
-                        print(f'[DEBUG] Stripe UsageRecord作成成功（課金予定）: {usage_record.id}')
-                        
-                        # データベースに記録
-                        conn = get_db_connection()
-                        c = conn.cursor()
-                        c.execute('''
-                            INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type, pending_charge)
-                            VALUES (%s, %s, %s, %s, %s, %s)
-                        ''', (user_id_db, 1, usage_record.id, False, content['name'], True))
-                        conn.commit()
-                        conn.close()
-                        print(f'[DEBUG] DB登録成功（2個目以降・課金予定）: user_id={user_id_db}, usage_record_id={usage_record.id}')
+                        # UsageRecordを作成（トライアル期間中は記録のみ）
+                        if is_trial:
+                            print(f'[DEBUG] トライアル期間中のため、UsageRecordは作成せず記録のみ（課金予定）')
+                            # トライアル期間中はデータベースのみに記録
+                            conn = get_db_connection()
+                            c = conn.cursor()
+                            c.execute('''
+                                INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type, pending_charge)
+                                VALUES (%s, %s, %s, %s, %s, %s)
+                            ''', (user_id_db, 1, None, False, content['name'], True))
+                            conn.commit()
+                            conn.close()
+                            print(f'[DEBUG] DB登録成功（2個目以降・課金予定・トライアル期間中）: user_id={user_id_db}')
+                        else:
+                            # 通常期間中はUsageRecordを作成
+                            usage_record = stripe.SubscriptionItem.create_usage_record(
+                                usage_item['id'],
+                                quantity=1,  # 課金予定の場合は1
+                                timestamp=int(datetime.datetime.now().timestamp()),
+                                action='increment'  # 既存の使用量に追加
+                            )
+                            print(f'[DEBUG] Stripe UsageRecord作成成功（課金予定）: {usage_record.id}')
+                            
+                            # データベースに記録
+                            conn = get_db_connection()
+                            c = conn.cursor()
+                            c.execute('''
+                                INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type, pending_charge)
+                                VALUES (%s, %s, %s, %s, %s, %s)
+                            ''', (user_id_db, 1, usage_record.id, False, content['name'], True))
+                            conn.commit()
+                            conn.close()
+                            print(f'[DEBUG] DB登録成功（2個目以降・課金予定）: user_id={user_id_db}, usage_record_id={usage_record.id}')
                     else:
                         print(f'[DEBUG] 従量課金アイテムが見つかりません: usage_price_id={usage_price_id}')
                         # データベースのみに記録
