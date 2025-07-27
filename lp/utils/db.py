@@ -1,5 +1,6 @@
 import os
 import psycopg2
+import sqlite3
 from psycopg2.extras import RealDictCursor
 
 DATABASE_URL = os.getenv('DATABASE_URL', 'database.db')
@@ -7,16 +8,28 @@ DATABASE_URL = os.getenv('DATABASE_URL', 'database.db')
 def get_db_connection():
     """データベース接続を取得"""
     database_url = os.getenv('DATABASE_URL')
-    if database_url:
+    if database_url and database_url.startswith('postgresql://'):
+        # PostgreSQL接続
         return psycopg2.connect(database_url)
+    elif database_url and database_url.startswith('sqlite://'):
+        # SQLite接続（URL形式）
+        db_path = database_url.replace('sqlite://', '')
+        return sqlite3.connect(db_path)
+    elif database_url and not database_url.startswith(('postgresql://', 'sqlite://')):
+        # SQLite接続（ファイルパス形式）
+        return sqlite3.connect(database_url)
     else:
-        # ローカル開発用
-        return psycopg2.connect(
-            host="localhost",
-            database="ai_collections",
-            user="postgres",
-            password="password"
-        )
+        # ローカル開発用（PostgreSQL）
+        try:
+            return psycopg2.connect(
+                host="localhost",
+                database="ai_collections",
+                user="postgres",
+                password="password"
+            )
+        except:
+            # PostgreSQL接続に失敗した場合はSQLiteを使用
+            return sqlite3.connect('database.db')
 
 def migrate_add_pending_charge():
     """pending_chargeカラムを追加するマイグレーション"""
