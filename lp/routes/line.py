@@ -442,7 +442,8 @@ def line_webhook():
                                 from services.line_service import send_welcome_with_buttons
                                 send_welcome_with_buttons(event['replyToken'])
                                 print(f'[DEBUG] 新サブスクリプション時の案内文送信完了: user_id={user_id}')
-                                # 初回案内文送信後は処理を終了
+                                # 初回案内文送信後はユーザー状態を設定して処理を終了
+                                user_states[user_id] = 'welcome_sent'
                                 conn.close()
                                 continue
                             except Exception as e:
@@ -451,6 +452,7 @@ def line_webhook():
                                 traceback.print_exc()
                                 # エラーが発生した場合は簡単なテキストメッセージを送信
                                 send_line_message(event['replyToken'], [{"type": "text", "text": "ようこそ！AIコレクションズへ\n\n「追加」と入力してコンテンツを追加してください。"}])
+                                user_states[user_id] = 'welcome_sent'
                                 conn.close()
                                 continue
                 
@@ -511,8 +513,6 @@ def line_webhook():
                         send_line_message(event['replyToken'], [menu_message])
                         conn.close()
                         continue
-                elif state == 'welcome_sent':
-                    print(f'[DEBUG] 既存ユーザーの案内文は既に送信済み: user_id={user_id}')
                 else:
                     print(f'[DEBUG] ユーザーは特定の状態: user_id={user_id}, state={state}')
                 
