@@ -129,10 +129,24 @@ def stripe_webhook():
             if not subscription_id:
                 print('subscription_idが存在しません。スキップします。')
                 return jsonify({'status': 'skipped'})
+            
             conn = get_db_connection()
             c = conn.cursor()
             c.execute('SELECT id FROM users WHERE stripe_customer_id = %s', (customer_id,))
             existing_user = c.fetchone()
+            
+            if existing_user:
+                user_id = existing_user[0]
+                # 課金予定のコンテンツを実際に課金
+                try:
+                    from services.line_service import process_pending_charges
+                    charge_result = process_pending_charges(user_id, subscription_id)
+                    print(f'[DEBUG] 課金予定処理結果: {charge_result}')
+                except Exception as e:
+                    print(f'[DEBUG] 課金予定処理エラー: {e}')
+                    import traceback
+                    traceback.print_exc()
+            
             if not existing_user:
                 c.execute('SELECT id FROM users WHERE email = %s', (email,))
                 existing_user_by_email = c.fetchone()

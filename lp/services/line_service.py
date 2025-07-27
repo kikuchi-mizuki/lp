@@ -988,7 +988,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
         send_line_message(reply_token, [{"type": "text", "text": "❌ エラーが発生しました。しばらく時間をおいて再度お試しください。"}])
 
 def check_and_charge_trial_expired_content(user_id_db, stripe_subscription_id):
-    """トライアル期間終了時に、2個目以降のコンテンツを自動で有料に切り替える"""
+    """トライアル期間終了時に、2個目以降のコンテンツを課金予定状態に変更する"""
     try:
         # サブスクリプション状態をチェック
         subscription_status = check_subscription_status(stripe_subscription_id)
@@ -1002,7 +1002,7 @@ def check_and_charge_trial_expired_content(user_id_db, stripe_subscription_id):
         conn = get_db_connection()
         c = conn.cursor()
         c.execute('''
-            SELECT id, content_type, is_free, created_at 
+            SELECT id, content_type, is_free, created_at, pending_charge 
             FROM usage_logs 
             WHERE user_id = %s 
             ORDER BY created_at ASC
@@ -1013,88 +1013,60 @@ def check_and_charge_trial_expired_content(user_id_db, stripe_subscription_id):
         if not usage_logs:
             return {"status": "no_content", "message": "コンテンツがありません"}
         
-        # 2個目以降の無料コンテンツを有料に変更
-        content_to_charge = []
+        # 2個目以降の無料コンテンツを課金予定状態に変更
+        content_to_mark = []
         for i, log in enumerate(usage_logs):
-            log_id, content_type, is_free, created_at = log
-            if i >= 1 and is_free:  # 2個目以降で無料のもの
-                content_to_charge.append({
+            log_id, content_type, is_free, created_at, pending_charge = log
+            if i >= 1 and is_free and not pending_charge:  # 2個目以降で無料かつ課金予定でないもの
+                content_to_mark.append({
                     'id': log_id,
                     'content_type': content_type,
                     'created_at': created_at,
                     'position': i + 1  # 何個目かを記録
                 })
         
-        if not content_to_charge:
+        if not content_to_mark:
             return {"status": "no_charge_needed", "message": "課金対象のコンテンツがありません"}
         
-        print(f'[DEBUG] 自動課金対象: {len(content_to_charge)}個のコンテンツ')
-        for content in content_to_charge:
-            print(f'[DEBUG] 課金対象: {content["content_type"]} ({content["position"]}個目)')
+        print(f'[DEBUG] 課金予定対象: {len(content_to_mark)}個のコンテンツ')
+        for content in content_to_mark:
+            print(f'[DEBUG] 課金予定: {content["content_type"]} ({content["position"]}個目)')
         
-        # Stripeで課金処理
-        try:
-            import stripe
-            stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
-            
-            subscription = stripe.Subscription.retrieve(stripe_subscription_id)
-            
-            # 従量課金アイテムを取得
-            usage_item = None
-            for item in subscription['items']['data']:
-                if item['price']['id'] == os.getenv('STRIPE_USAGE_PRICE_ID'):
-                    usage_item = item
-                    break
-            
-            if not usage_item:
-                return {"status": "error", "message": "従量課金アイテムが見つかりません"}
-            
-            # 各コンテンツに対して課金
-            total_charged = 0
-            charged_details = []
-            for content in content_to_charge:
-                try:
-                    # Stripeの使用量記録を作成
-                    usage_record = stripe.UsageRecord.create(
-                        subscription_item=usage_item['id'],
-                        quantity=1,
-                        timestamp=int(content['created_at'].timestamp()),
-                        action='increment'
-                    )
-                    
-                    # データベースを更新
-                    conn = get_db_connection()
-                    c = conn.cursor()
-                    c.execute('''
-                        UPDATE usage_logs 
-                        SET is_free = FALSE, stripe_usage_record_id = %s 
-                        WHERE id = %s
-                    ''', (usage_record.id, content['id']))
-                    conn.commit()
-                    conn.close()
-                    
-                    total_charged += 1
-                    charged_details.append(f"{content['content_type']} ({content['position']}個目)")
-                    print(f'[DEBUG] 自動課金完了: {content["content_type"]} ({content["position"]}個目), usage_record_id={usage_record.id}')
-                    
-                except Exception as e:
-                    print(f'[DEBUG] 自動課金エラー: {content["content_type"]} ({content["position"]}個目), error={e}')
-                    continue
-            
-            return {
-                "status": "success", 
-                "message": f"{total_charged}個のコンテンツを自動課金しました",
-                "charged_count": total_charged,
-                "charged_details": charged_details
-            }
-            
-        except Exception as e:
-            print(f'[DEBUG] Stripe課金エラー: {e}')
-            return {"status": "stripe_error", "message": f"Stripe課金エラー: {str(e)}"}
-            
+        # データベースを更新（課金予定状態に変更）
+        conn = get_db_connection()
+        c = conn.cursor()
+        marked_count = 0
+        marked_details = []
+        
+        for content in content_to_mark:
+            try:
+                c.execute('''
+                    UPDATE usage_logs 
+                    SET pending_charge = TRUE 
+                    WHERE id = %s
+                ''', (content['id'],))
+                
+                marked_count += 1
+                marked_details.append(f"{content['content_type']} ({content['position']}個目)")
+                print(f'[DEBUG] 課金予定設定完了: {content["content_type"]} ({content["position"]}個目)')
+                
+            except Exception as e:
+                print(f'[DEBUG] 課金予定設定エラー: {content["content_type"]} ({content["position"]}個目), error={e}')
+                continue
+        
+        conn.commit()
+        conn.close()
+        
+        return {
+            "status": "pending_charge", 
+            "message": f"{marked_count}個のコンテンツが次回請求時に課金予定になりました",
+            "marked_count": marked_count,
+            "marked_details": marked_details
+        }
+        
     except Exception as e:
-        print(f'[DEBUG] 自動課金処理エラー: {e}')
-        return {"status": "error", "message": f"自動課金処理エラー: {str(e)}"}
+        print(f'[DEBUG] 課金予定処理エラー: {e}')
+        return {"status": "error", "message": f"課金予定処理でエラーが発生しました: {e}"}
 
 def handle_status_check(reply_token, user_id_db):
     try:
@@ -1155,7 +1127,17 @@ def handle_status_check(reply_token, user_id_db):
         
         # 自動課金の結果を表示
         if not is_trial_period and 'auto_charge_result' in locals():
-            if auto_charge_result.get('status') == 'success':
+            if auto_charge_result.get('status') == 'pending_charge':
+                marked_count = auto_charge_result.get('marked_count', 0)
+                marked_details = auto_charge_result.get('marked_details', [])
+                if marked_count > 0:
+                    status_lines.append(f"💰 課金予定設定: {marked_count}個のコンテンツが次回請求時に課金予定になりました")
+                    if marked_details:
+                        status_lines.append("対象コンテンツ:")
+                        for detail in marked_details:
+                            status_lines.append(f"  • {detail}")
+                    status_lines.append("")
+            elif auto_charge_result.get('status') == 'success':
                 charged_count = auto_charge_result.get('charged_count', 0)
                 charged_details = auto_charge_result.get('charged_details', [])
                 if charged_count > 0:
@@ -1184,11 +1166,11 @@ def handle_status_check(reply_token, user_id_db):
             status_lines.append("💰 料金体系（トライアル期間中）:")
             status_lines.append("• 1個目: 無料")
             status_lines.append("• 2個目以降: 無料（トライアル期間中のみ）")
-            status_lines.append("• トライアル終了後: 2個目以降1,500円/件")
+            status_lines.append("• トライアル終了後: 2個目以降1,500円/件（次回請求時）")
         else:
             status_lines.append("💰 料金体系:")
             status_lines.append("• 1個目: 無料")
-            status_lines.append("• 2個目以降: 1,500円/件")
+            status_lines.append("• 2個目以降: 1,500円/件（次回請求時）")
         
         status_lines.append("")  # 空行
         
@@ -1698,3 +1680,92 @@ def smart_number_extraction(text):
     unique_numbers.sort(key=lambda x: int(x))
     
     return unique_numbers
+
+def process_pending_charges(user_id_db, stripe_subscription_id):
+    """課金予定のコンテンツを実際に課金する"""
+    try:
+        # データベースから課金予定のコンテンツを取得
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute('''
+            SELECT id, content_type, created_at 
+            FROM usage_logs 
+            WHERE user_id = %s AND pending_charge = TRUE AND is_free = TRUE
+            ORDER BY created_at ASC
+        ''', (user_id_db,))
+        pending_charges = c.fetchall()
+        conn.close()
+        
+        if not pending_charges:
+            return {"status": "no_pending", "message": "課金予定のコンテンツがありません"}
+        
+        print(f'[DEBUG] 実際の課金対象: {len(pending_charges)}個のコンテンツ')
+        for charge in pending_charges:
+            print(f'[DEBUG] 課金実行: {charge[1]}')
+        
+        # Stripeで課金処理
+        try:
+            import stripe
+            stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+            
+            subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+            
+            # 従量課金アイテムを取得
+            usage_item = None
+            for item in subscription['items']['data']:
+                if item['price']['id'] == os.getenv('STRIPE_USAGE_PRICE_ID'):
+                    usage_item = item
+                    break
+            
+            if not usage_item:
+                return {"status": "error", "message": "従量課金アイテムが見つかりません"}
+            
+            # 各コンテンツに対して課金
+            total_charged = 0
+            charged_details = []
+            conn = get_db_connection()
+            c = conn.cursor()
+            
+            for charge in pending_charges:
+                log_id, content_type, created_at = charge
+                try:
+                    # Stripeの使用量記録を作成
+                    usage_record = stripe.UsageRecord.create(
+                        subscription_item=usage_item['id'],
+                        quantity=1,
+                        timestamp=int(created_at.timestamp()),
+                        action='increment'
+                    )
+                    
+                    # データベースを更新
+                    c.execute('''
+                        UPDATE usage_logs 
+                        SET is_free = FALSE, pending_charge = FALSE, stripe_usage_record_id = %s 
+                        WHERE id = %s
+                    ''', (usage_record.id, log_id))
+                    
+                    total_charged += 1
+                    charged_details.append(content_type)
+                    print(f'[DEBUG] 課金完了: {content_type}, usage_record_id={usage_record.id}')
+                    
+                except Exception as e:
+                    print(f'[DEBUG] 課金エラー: {content_type}, error={e}')
+                    continue
+            
+            conn.commit()
+            conn.close()
+            
+            return {
+                "status": "success", 
+                "message": f"{total_charged}個のコンテンツを課金しました",
+                "charged_count": total_charged,
+                "charged_details": charged_details
+            }
+            
+        except Exception as e:
+            print(f'[DEBUG] Stripe課金エラー: {e}')
+            return {"status": "stripe_error", "message": f"Stripe課金エラー: {str(e)}"}
+            
+    except Exception as e:
+        print(f'[DEBUG] 課金処理エラー: {e}')
+        return {"status": "error", "message": f"課金処理でエラーが発生しました: {e}"}
