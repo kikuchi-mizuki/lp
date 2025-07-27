@@ -430,7 +430,7 @@ def line_webhook():
                     # 新しいサブスクリプションが作成された場合の処理（初回のみ、特定のメッセージ以外）
                     if (stripe_subscription_id and stripe_subscription_id.startswith('sub_') and 
                         state == 'welcome_sent' and 
-                        text not in ['追加', 'メニュー', 'ヘルプ', '状態', '解約', 'サブスクリプション解約', 'コンテンツ解約']):
+                        text not in ['追加', 'メニュー', 'ヘルプ', '状態', '解約', 'サブスクリプション解約', 'コンテンツ解約', '1', '2', '3', 'はい', 'いいえ', 'yes', 'no', 'y', 'n']):
                         # サブスクリプションの状態をチェック
                         from services.line_service import check_subscription_status
                         subscription_status = check_subscription_status(stripe_subscription_id)
@@ -551,30 +551,6 @@ def line_webhook():
                     send_line_message(event['replyToken'], get_help_message())
                 elif text == '状態':
                     handle_status_check(event['replyToken'], user_id_db)
-
-                elif state == 'cancel_select':
-                    print(f'[DEBUG] 解約選択処理: user_id={user_id}, state={state}, text={text}')
-                    # AI技術を活用した高度な数字抽出関数を使用して処理
-                    from services.line_service import smart_number_extraction, validate_selection_numbers
-                    
-                    # データベースからコンテンツ数を取得
-                    conn = get_db_connection()
-                    c = conn.cursor()
-                    c.execute('SELECT COUNT(*) FROM usage_logs WHERE user_id = %s AND content_type IN (%s, %s, %s)', 
-                             (user_id_db, 'AI予定秘書', 'AI経理秘書', 'AIタスクコンシェルジュ'))
-                    content_count = c.fetchone()[0]
-                    conn.close()
-                    
-                    numbers = smart_number_extraction(text)
-                    valid_numbers, invalid_reasons, duplicates = validate_selection_numbers(numbers, content_count)
-                    
-                    if valid_numbers:  # 有効な数字が抽出できた場合のみ処理
-                        handle_cancel_selection(event['replyToken'], user_id_db, stripe_subscription_id, text)
-                        user_states[user_id] = 'welcome_sent'
-                    else:
-                        # 数字が抽出できない場合は詳細なエラーメッセージ
-                        error_message = "数字を入力してください。\n\n対応形式:\n• 1,2,3 (カンマ区切り)\n• 1.2.3 (ドット区切り)\n• 1 2 3 (スペース区切り)\n• 一二三 (日本語数字)\n• 1番目,2番目 (序数表現)\n• 最初,二番目 (日本語序数)"
-                        send_line_message(event['replyToken'], [{"type": "text", "text": error_message}])
                 elif state == 'add_select' and text in ['1', '2', '3', '4']:
                     # 選択したコンテンツ番号を保存
                     user_states[user_id] = f'confirm_{text}'
