@@ -47,17 +47,20 @@ def line_webhook():
                     conn.commit()
                     print(f'[DEBUG] ユーザー紐付け完了: user_id={user_id}, db_user_id={user[0]}')
                     
-                    # ボタン付きのウェルカムメッセージを送信
+                    # ボタン付きのウェルカムメッセージを送信（必ず送信）
                     try:
                         from services.line_service import send_welcome_with_buttons
                         send_welcome_with_buttons(event['replyToken'])
                         print(f'[DEBUG] ウェルカムメッセージ送信完了: user_id={user_id}')
+                        # ユーザー状態を設定して重複送信を防ぐ
+                        user_states[user_id] = 'welcome_sent'
                     except Exception as e:
                         print(f'[DEBUG] ウェルカムメッセージ送信エラー: {e}')
                         import traceback
                         traceback.print_exc()
                         # エラーが発生した場合は簡単なテキストメッセージを送信
                         send_line_message(event['replyToken'], [{"type": "text", "text": "ようこそ！AIコレクションズへ\n\n「追加」と入力してコンテンツを追加してください。"}])
+                        user_states[user_id] = 'welcome_sent'
                 else:
                     # 未登録ユーザーの場合
                     print(f'[DEBUG] 未登録ユーザー: user_id={user_id}')
@@ -104,18 +107,21 @@ def line_webhook():
                         c.execute('UPDATE users SET line_user_id = %s WHERE id = %s', (user_id, user[0]))
                         conn.commit()
                         print(f'[DEBUG] 初回メッセージ時のユーザー紐付け完了: user_id={user_id}, db_user_id={user[0]}')
-                        # 決済画面からLINEに移動した時の初回案内文
+                        # 決済画面からLINEに移動した時の初回案内文（必ず送信）
                         print(f'[DEBUG] 案内文送信開始: user_id={user_id}, replyToken={event["replyToken"]}')
                         try:
                             from services.line_service import send_welcome_with_buttons
                             send_welcome_with_buttons(event['replyToken'])
                             print(f'[DEBUG] 初回メッセージ時の案内文送信完了: user_id={user_id}')
+                            # ユーザー状態を設定して重複送信を防ぐ
+                            user_states[user_id] = 'welcome_sent'
                         except Exception as e:
                             print(f'[DEBUG] 初回メッセージ時の案内文送信エラー: {e}')
                             import traceback
                             traceback.print_exc()
                             # エラーが発生した場合は簡単なテキストメッセージを送信
                             send_line_message(event['replyToken'], [{"type": "text", "text": "ようこそ！AIコレクションズへ\n\n「追加」と入力してコンテンツを追加してください。"}])
+                            user_states[user_id] = 'welcome_sent'
                     else:
                         print(f'[DEBUG] 未紐付けユーザーも見つからない')
                         send_line_message(event['replyToken'], [{"type": "text", "text": get_not_registered_message()}])
