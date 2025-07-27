@@ -14,6 +14,48 @@ line_bp = Blueprint('line', __name__)
 
 user_states = {}
 
+@line_bp.route('/line/debug/send_welcome/<user_id>')
+def debug_send_welcome(user_id):
+    """デバッグ用：指定ユーザーに手動で案内文を送信"""
+    try:
+        # テスト用のメッセージを送信
+        test_message = {
+            "type": "text",
+            "text": "テスト：案内文が送信されました！\n\nようこそ！AIコレクションズへ\n\nAIコレクションズサービスをご利用いただき、ありがとうございます。\n\n📋 サービス内容：\n• AI予定秘書：スケジュール管理\n• AI経理秘書：見積書・請求書作成\n• AIタスクコンシェルジュ：タスク管理\n\n💰 料金体系：\n• 月額基本料金：3,900円（1週間無料）\n• 追加コンテンツ：1個目無料、2個目以降1,500円/件（トライアル期間中は無料）\n\n下のボタンからお選びください。"
+        }
+        
+        # LINE APIを使用してメッセージを送信（テスト用）
+        import requests
+        LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
+        
+        headers = {
+            'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}',
+            'Content-Type': 'application/json'
+        }
+        
+        data = {
+            'to': user_id,
+            'messages': [test_message]
+        }
+        
+        response = requests.post('https://api.line.me/v2/bot/message/push', headers=headers, json=data)
+        
+        if response.status_code == 200:
+            return jsonify({
+                'success': True,
+                'message': f'案内文を送信しました: {user_id}',
+                'response': response.json()
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': f'送信失敗: {response.status_code}',
+                'response': response.text
+            })
+            
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
 @line_bp.route('/line/debug/users')
 def debug_line_users():
     """デバッグ用：LINE連携ユーザー状況確認"""
