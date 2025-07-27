@@ -470,7 +470,7 @@ def line_webhook():
                 # 初回案内文が既に送信されている場合は、通常のメッセージ処理に進む
                 if state == 'welcome_sent':
                     print(f'[DEBUG] 初回案内文送信済み、通常メッセージ処理に進む: user_id={user_id}')
-                    pass
+                    # 通常のメッセージ処理に進む（何もしない）
                 elif state is None:
                     print(f'[DEBUG] 既存ユーザーの初回メッセージ処理: user_id={user_id}')
                     
@@ -597,6 +597,7 @@ def line_webhook():
                 elif text == '追加' and state != 'cancel_select':
                     print(f'[DEBUG] 追加コマンド受信: user_id={user_id}, state={state}')
                     user_states[user_id] = 'add_select'
+                    print(f'[DEBUG] ユーザー状態をadd_selectに設定: user_id={user_id}')
                     handle_add_content(event['replyToken'], user_id_db, stripe_subscription_id)
                 elif text == 'メニュー' and state != 'cancel_select':
                     print(f'[DEBUG] メニューコマンド受信: user_id={user_id}, state={state}')
@@ -682,7 +683,18 @@ def line_webhook():
                         send_line_message(event['replyToken'], [{"type": "text", "text": "無効な入力です。メニューから選択してください。"}])
                     else:
                         print(f'[DEBUG] 一般的なデフォルト処理: state={state}')
-                        send_line_message(event['replyToken'], [get_default_message()])
+                        # 初回案内文が未送信の場合のみ送信
+                        if user_id not in user_states or user_states[user_id] is None:
+                            print(f'[DEBUG] 初回案内文送信: user_id={user_id}')
+                            try:
+                                from services.line_service import send_welcome_with_buttons
+                                send_welcome_with_buttons(event['replyToken'])
+                                user_states[user_id] = 'welcome_sent'
+                            except Exception as e:
+                                print(f'[DEBUG] 初回案内文送信エラー: {e}')
+                                send_line_message(event['replyToken'], [get_default_message()])
+                        else:
+                            send_line_message(event['replyToken'], [get_default_message()])
                 conn.close()
             # リッチメニューのpostbackイベントの処理
             elif event.get('type') == 'postback':
