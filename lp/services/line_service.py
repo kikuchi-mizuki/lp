@@ -516,7 +516,8 @@ def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, co
         
         # 1個目は常に無料、2個目以降はトライアル期間中は無料、それ以外は有料
         is_free = total_usage_count == 0 or (is_trial_period and total_usage_count > 0)
-        price_message = "料金：無料（1個目）" if total_usage_count == 0 else f"料金：{'無料（トライアル期間中）' if is_trial_period else '1,500円'}（{total_usage_count + 1}個目）"
+        current_count = total_usage_count + 1
+        price_message = f"料金：無料（{current_count}個目）" if is_free else f"料金：1,500円（{current_count}個目）"
         confirm_message = {
             "type": "template",
             "altText": "選択内容の確認",
@@ -713,7 +714,8 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
         
         # 1個目は常に無料、2個目以降はトライアル期間中は無料、それ以外は有料
         is_free = total_usage_count == 0 or (is_trial_period and total_usage_count > 0)
-        price_message = "料金：無料（1個目）" if total_usage_count == 0 else f"料金：{'無料（トライアル期間中）' if is_trial_period else '1,500円'}（{total_usage_count + 1}個目）"
+        current_count = total_usage_count + 1
+        price_message = f"料金：無料（{current_count}個目）" if is_free else f"料金：1,500円（{current_count}個目）"
         print(f"[DEBUG] content_type: {content['name']}")
         print(f"[DEBUG] DATABASE_URL: {os.getenv('DATABASE_URL')}")
         print(f"[DEBUG] total_usage_count: {total_usage_count}")
