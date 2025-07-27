@@ -21,11 +21,11 @@ def test_usage_api():
     print(f"使用量記録APIをテスト中...")
     print(f"Subscription Item ID: {subscription_item_id}")
     
-    # テスト1: stripe.UsageRecord.create
-    print("\n=== テスト1: stripe.UsageRecord.create ===")
+    # テスト1: stripe.SubscriptionItem.create_usage_record（推奨）
+    print("\n=== テスト1: stripe.SubscriptionItem.create_usage_record（推奨） ===")
     try:
-        usage_record = stripe.UsageRecord.create(
-            subscription_item=subscription_item_id,
+        usage_record = stripe.SubscriptionItem.create_usage_record(
+            subscription_item_id,
             quantity=1,
             timestamp=int(time.time()),
             action='increment'
@@ -34,10 +34,10 @@ def test_usage_api():
     except Exception as e:
         print(f"❌ エラー: {e}")
     
-    # テスト2: stripe.SubscriptionItem.createUsageRecord
-    print("\n=== テスト2: stripe.SubscriptionItem.createUsageRecord ===")
+    # テスト2: stripe.SubscriptionItem.create_usage_record（別の方法）
+    print("\n=== テスト2: stripe.SubscriptionItem.create_usage_record（別の方法） ===")
     try:
-        usage_record = stripe.SubscriptionItem.createUsageRecord(
+        usage_record = stripe.SubscriptionItem.create_usage_record(
             subscription_item_id,
             quantity=1,
             timestamp=int(time.time()),

@@ -31,8 +31,8 @@ def test_new_subscription():
         
         # 使用量記録を作成
         print(f"\n=== 使用量記録を作成中 ===")
-        usage_record = stripe.UsageRecord.create(
-            subscription_item=subscription_item_id,
+        usage_record = stripe.SubscriptionItem.create_usage_record(
+            subscription_item_id,
             quantity=1,
             timestamp=int(time.time()),
             action='increment'
