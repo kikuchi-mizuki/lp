@@ -55,6 +55,7 @@ def init_db():
                 stripe_usage_record_id VARCHAR(255),
                 is_free BOOLEAN DEFAULT FALSE,
                 content_type VARCHAR(255),
+                pending_charge BOOLEAN DEFAULT FALSE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
@@ -80,6 +81,7 @@ def init_db():
                 stripe_usage_record_id VARCHAR(255),
                 is_free BOOLEAN DEFAULT FALSE,
                 content_type VARCHAR(255),
+                pending_charge BOOLEAN DEFAULT FALSE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
