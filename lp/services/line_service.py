@@ -968,10 +968,17 @@ def handle_status_check(reply_token, user_id_db):
         # サブスクリプション状態をチェック
         subscription_status = check_subscription_status(stripe_subscription_id)
         
-        # データベースから利用状況を取得
+        # データベースから利用状況を取得（最新のデータのみ）
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute('SELECT content_type, is_free, created_at FROM usage_logs WHERE user_id = %s ORDER BY created_at DESC', (user_id_db,))
+        # 最新のサブスクリプションIDに関連するデータのみを取得
+        c.execute('''
+            SELECT content_type, is_free, created_at 
+            FROM usage_logs 
+            WHERE user_id = %s 
+            ORDER BY created_at DESC 
+            LIMIT 10
+        ''', (user_id_db,))
         usage_logs = c.fetchall()
         conn.close()
         
@@ -1002,7 +1009,17 @@ def handle_status_check(reply_token, user_id_db):
         else:
             total_cost = 0
             content_list = []
+            # 重複を除外して最新のコンテンツのみを表示
+            seen_content = set()
+            unique_logs = []
+            
             for log in usage_logs:
+                content_type = log[0] or "不明"
+                if content_type not in seen_content:
+                    seen_content.add(content_type)
+                    unique_logs.append(log)
+            
+            for log in unique_logs:
                 content_type = log[0] or "不明"
                 is_free = log[1]
                 created_at = log[2]
@@ -1012,7 +1029,7 @@ def handle_status_check(reply_token, user_id_db):
                 date_str = created_at.strftime('%Y-%m-%d')
                 content_list.append(f"• {content_type} ({'無料' if is_free else '1,500円'}) - {date_str}")
             
-            status_lines.append(f"📈 今月の追加回数：{len(usage_logs)}回")
+            status_lines.append(f"📈 今月の追加回数：{len(unique_logs)}回")
             status_lines.append(f"💰 追加料金：{total_cost:,}円")
             status_lines.append("")
             status_lines.append("📚 追加済みコンテンツ：")

@@ -248,6 +248,27 @@ def debug_send_welcome(user_id):
     except Exception as e:
         return jsonify({'error': str(e)})
 
+@line_bp.route('/line/debug/clear_old_usage_logs')
+def debug_clear_old_usage_logs():
+    """デバッグ用：古いusage_logsデータをクリア"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 古いデータを削除（7月25日以前のデータ）
+        c.execute('DELETE FROM usage_logs WHERE created_at < %s', ('2025-07-26',))
+        deleted_count = c.rowcount
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': f'{deleted_count}件の古いデータを削除しました'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
 @line_bp.route('/line/debug/users')
 def debug_line_users():
     """デバッグ用：LINE連携ユーザー状況確認"""
