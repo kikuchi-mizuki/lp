@@ -799,16 +799,12 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                 import stripe
                 stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
                 # 実際のサブスクリプションに含まれているUsage Price IDを使用
+                usage_subscription_item_id = 'si_Sl1XdKM6w8gq79'  # ¥1,500の従量課金
                 usage_price_id = 'price_1Rog1nIxg6C5hAVdnqB5MJiT'
                 
-                if usage_price_id:
+                if usage_subscription_item_id:
                     # サブスクリプションから従量課金アイテムを取得
-                    subscription = stripe.Subscription.retrieve(stripe_subscription_id)
-                    usage_item = None
-                    for item in subscription['items']['data']:
-                        if item['price']['id'] == usage_price_id:
-                            usage_item = item
-                            break
+                    usage_item = {'id': usage_subscription_item_id}
                     
                     if usage_item:
                         # Stripe UsageRecordを作成（トライアル期間中は記録のみ）
@@ -901,16 +897,12 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                 import stripe
                 stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
                 # 実際のサブスクリプションに含まれているUsage Price IDを使用
+                usage_subscription_item_id = 'si_Sl1XdKM6w8gq79'  # ¥1,500の従量課金
                 usage_price_id = 'price_1Rog1nIxg6C5hAVdnqB5MJiT'
                 
-                if usage_price_id:
+                if usage_subscription_item_id:
                     # サブスクリプションから従量課金アイテムを取得
-                    subscription = stripe.Subscription.retrieve(stripe_subscription_id)
-                    usage_item = None
-                    for item in subscription['items']['data']:
-                        if item['price']['id'] == usage_price_id:
-                            usage_item = item
-                            break
+                    usage_item = {'id': usage_subscription_item_id}
                     
                     if usage_item:
                         # UsageRecordを作成（トライアル期間中は記録のみ）
@@ -1843,12 +1835,24 @@ def process_pending_charges(user_id_db, stripe_subscription_id):
             
             subscription = stripe.Subscription.retrieve(stripe_subscription_id)
             
-            # 従量課金アイテムを取得
+            # 従量課金アイテムを取得（¥1,500の従量課金）
             usage_item = None
             for item in subscription['items']['data']:
-                if item['price']['id'] == 'price_1Rog1nIxg6C5hAVdnqB5MJiT':  # 実際のサブスクリプションに含まれているPrice ID
+                if item['price']['id'] == 'price_1Rog1nIxg6C5hAVdnqB5MJiT':  # ¥1,500の従量課金Price ID
                     usage_item = item
                     break
+            
+            # 従量課金アイテムが見つからない場合は、使用量が記録されているアイテムを使用
+            if not usage_item:
+                for item in subscription['items']['data']:
+                    usage_records = stripe.SubscriptionItem.list_usage_record_summaries(
+                        item['id'],
+                        limit=1
+                    )
+                    if usage_records.data and usage_records.data[0].total_usage > 0:
+                        usage_item = item
+                        print(f'[WARN] 従量課金アイテムが見つからないため、使用量が記録されているアイテムを使用: {item["id"]}')
+                        break
             
             if not usage_item:
                 return {"status": "error", "message": "従量課金アイテムが見つかりません"}
