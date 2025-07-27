@@ -573,28 +573,38 @@ def line_webhook():
                         send_line_message(event['replyToken'], [{"type": "text", "text": error_message}])
                 # その他のコマンド処理（cancel_select状態以外）
                 elif text == '追加' and state != 'cancel_select':
+                    print(f'[DEBUG] 追加コマンド受信: user_id={user_id}, state={state}')
                     user_states[user_id] = 'add_select'
                     handle_add_content(event['replyToken'], user_id_db, stripe_subscription_id)
                 elif text == 'メニュー' and state != 'cancel_select':
+                    print(f'[DEBUG] メニューコマンド受信: user_id={user_id}, state={state}')
                     send_line_message(event['replyToken'], [get_menu_message()])
                 elif text == 'ヘルプ' and state != 'cancel_select':
+                    print(f'[DEBUG] ヘルプコマンド受信: user_id={user_id}, state={state}')
                     send_line_message(event['replyToken'], get_help_message())
                 elif text == '状態' and state != 'cancel_select':
+                    print(f'[DEBUG] 状態コマンド受信: user_id={user_id}, state={state}')
                     handle_status_check(event['replyToken'], user_id_db)
                 elif state == 'add_select':
+                    print(f'[DEBUG] add_select状態での処理: user_id={user_id}, text={text}')
                     # 主要なコマンドの場合は通常の処理に切り替え
                     if text in ['1', '2', '3', '4']:
+                        print(f'[DEBUG] コンテンツ選択: text={text}')
                         # 選択したコンテンツ番号を保存
                         user_states[user_id] = f'confirm_{text}'
                         handle_content_selection(event['replyToken'], user_id_db, stripe_subscription_id, text)
                     elif text == 'メニュー':
+                        print(f'[DEBUG] メニューコマンド: text={text}')
                         user_states[user_id] = 'welcome_sent'
                         send_line_message(event['replyToken'], [get_menu_message()])
                     elif text == 'ヘルプ':
+                        print(f'[DEBUG] ヘルプコマンド: text={text}')
                         send_line_message(event['replyToken'], get_help_message())
                     elif text == '状態':
+                        print(f'[DEBUG] 状態コマンド: text={text}')
                         handle_status_check(event['replyToken'], user_id_db)
                     else:
+                        print(f'[DEBUG] 無効な入力: text={text}')
                         # 無効な入力の場合はコンテンツ選択を促す
                         send_line_message(event['replyToken'], [{"type": "text", "text": "1〜3の数字でコンテンツを選択してください。\n\nまたは「メニュー」でメインメニューに戻ります。"}])
                 elif state and state.startswith('confirm_'):
@@ -664,11 +674,14 @@ def line_webhook():
                         else:
                             send_line_message(event['replyToken'], [{"type": "text", "text": 'ご登録メールアドレスが見つかりません。LPでご登録済みかご確認ください。'}])
                 else:
+                    print(f'[DEBUG] デフォルト処理: user_id={user_id}, state={state}, text={text}')
                     # どの条件にも当てはまらない場合のデフォルト処理
                     if state in ['cancel_select', 'add_select'] or (state and state.startswith('confirm_')):
                         # 特定の状態ではデフォルトメッセージを送信しない
+                        print(f'[DEBUG] 特定状態でのデフォルト処理: state={state}')
                         send_line_message(event['replyToken'], [{"type": "text", "text": "無効な入力です。メニューから選択してください。"}])
                     else:
+                        print(f'[DEBUG] 一般的なデフォルト処理: state={state}')
                         send_line_message(event['replyToken'], [get_default_message()])
                 conn.close()
             # リッチメニューのpostbackイベントの処理
