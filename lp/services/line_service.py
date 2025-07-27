@@ -775,25 +775,48 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                             break
                     
                     if usage_item:
-                        # Usage Recordを作成（1個目は無料だが使用量として記録）
-                        usage_record = stripe.SubscriptionItem.create_usage_record(
-                            usage_item['id'],
-                            quantity=1,  # 1個目も使用量として記録
-                            description=f"{content['name']} (無料)",
-                            timestamp=int(datetime.datetime.now().timestamp())
-                        )
-                        print(f'[DEBUG] Stripe Usage Record作成成功（無料）: {usage_record.id}')
-                        
-                        # データベースに記録
-                        conn = get_db_connection()
-                        c = conn.cursor()
-                        c.execute('''
-                            INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type, pending_charge)
-                            VALUES (%s, %s, %s, %s, %s, %s)
-                        ''', (user_id_db, 1, usage_record.id, is_free, content['name'], False))
-                        conn.commit()
-                        conn.close()
-                        print(f'[DEBUG] DB登録成功（1個目・無料）: user_id={user_id_db}, usage_record_id={usage_record.id}')
+                        # Stripe InvoiceItemを作成（即座に請求に反映）
+                        try:
+                            # 顧客情報を取得
+                            customer = stripe.Customer.retrieve(subscription['customer'])
+                            
+                            # InvoiceItemを作成（即座に請求に反映）
+                            invoice_item = stripe.InvoiceItem.create(
+                                customer=subscription['customer'],
+                                subscription=stripe_subscription_id,
+                                price=usage_price_id,
+                                quantity=1,  # 1個目も使用量として記録
+                                description=f"{content['name']} (無料期間)",
+                                metadata={
+                                    'content_type': content['name'],
+                                    'is_free': 'true',
+                                    'user_id': str(user_id_db)
+                                }
+                            )
+                            print(f'[DEBUG] Stripe InvoiceItem作成成功（無料）: {invoice_item.id}')
+                            
+                            # データベースに記録
+                            conn = get_db_connection()
+                            c = conn.cursor()
+                            c.execute('''
+                                INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type, pending_charge)
+                                VALUES (%s, %s, %s, %s, %s, %s)
+                            ''', (user_id_db, 1, invoice_item.id, is_free, content['name'], False))
+                            conn.commit()
+                            conn.close()
+                            print(f'[DEBUG] DB登録成功（1個目・無料）: user_id={user_id_db}, invoice_item_id={invoice_item.id}')
+                        except Exception as e:
+                            print(f'[DEBUG] Stripe InvoiceItem作成エラー（無料）: {e}')
+                            # エラーが発生した場合はデータベースのみに記録
+                            conn = get_db_connection()
+                            c = conn.cursor()
+                            c.execute('''
+                                INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type, pending_charge)
+                                VALUES (%s, %s, %s, %s, %s, %s)
+                            ''', (user_id_db, 1, None, is_free, content['name'], False))
+                            conn.commit()
+                            conn.close()
+                            print(f'[DEBUG] DB登録成功（1個目・無料・エラー時）: user_id={user_id_db}')
                     else:
                         print(f'[DEBUG] 従量課金アイテムが見つかりません: usage_price_id={usage_price_id}')
                         # データベースのみに記録
@@ -849,25 +872,49 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                             break
                     
                     if usage_item:
-                        # Usage Recordを作成（課金予定の場合はquantity=1）
-                        usage_record = stripe.SubscriptionItem.create_usage_record(
-                            usage_item['id'],
-                            quantity=1,  # 課金予定の場合は1
-                            description=f"{content['name']} (課金予定)",
-                            timestamp=int(datetime.datetime.now().timestamp())
-                        )
-                        print(f'[DEBUG] Stripe Usage Record作成成功（課金予定）: {usage_record.id}')
-                        
-                        # データベースに記録
-                        conn = get_db_connection()
-                        c = conn.cursor()
-                        c.execute('''
-                            INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type, pending_charge)
-                            VALUES (%s, %s, %s, %s, %s, %s)
-                        ''', (user_id_db, 1, usage_record.id, False, content['name'], True))
-                        conn.commit()
-                        conn.close()
-                        print(f'[DEBUG] DB登録成功（2個目以降・課金予定）: user_id={user_id_db}, usage_record_id={usage_record.id}')
+                        # Stripe InvoiceItemを作成（課金予定）
+                        try:
+                            # 顧客情報を取得
+                            customer = stripe.Customer.retrieve(subscription['customer'])
+                            
+                            # InvoiceItemを作成（課金予定）
+                            invoice_item = stripe.InvoiceItem.create(
+                                customer=subscription['customer'],
+                                subscription=stripe_subscription_id,
+                                price=usage_price_id,
+                                quantity=1,  # 課金予定の場合は1
+                                description=f"{content['name']} (課金予定)",
+                                metadata={
+                                    'content_type': content['name'],
+                                    'is_free': 'false',
+                                    'user_id': str(user_id_db),
+                                    'pending_charge': 'true'
+                                }
+                            )
+                            print(f'[DEBUG] Stripe InvoiceItem作成成功（課金予定）: {invoice_item.id}')
+                            
+                            # データベースに記録
+                            conn = get_db_connection()
+                            c = conn.cursor()
+                            c.execute('''
+                                INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type, pending_charge)
+                                VALUES (%s, %s, %s, %s, %s, %s)
+                            ''', (user_id_db, 1, invoice_item.id, False, content['name'], True))
+                            conn.commit()
+                            conn.close()
+                            print(f'[DEBUG] DB登録成功（2個目以降・課金予定）: user_id={user_id_db}, invoice_item_id={invoice_item.id}')
+                        except Exception as e:
+                            print(f'[DEBUG] Stripe InvoiceItem作成エラー（課金予定）: {e}')
+                            # エラーが発生した場合はデータベースのみに記録
+                            conn = get_db_connection()
+                            c = conn.cursor()
+                            c.execute('''
+                                INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type, pending_charge)
+                                VALUES (%s, %s, %s, %s, %s, %s)
+                            ''', (user_id_db, 1, None, False, content['name'], True))
+                            conn.commit()
+                            conn.close()
+                            print(f'[DEBUG] DB登録成功（2個目以降・課金予定・エラー時）: user_id={user_id_db}')
                     else:
                         print(f'[DEBUG] 従量課金アイテムが見つかりません: usage_price_id={usage_price_id}')
                         # データベースのみに記録
