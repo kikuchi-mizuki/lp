@@ -1191,6 +1191,11 @@ def handle_cancel_request(reply_token, user_id_db, stripe_subscription_id):
     try:
         subscription = stripe.Subscription.retrieve(stripe_subscription_id)
         items = subscription['items']['data']
+        
+        # サブスクリプション状態をチェック
+        subscription_status = check_subscription_status(stripe_subscription_id)
+        is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
+        
         conn = get_db_connection()
         c = conn.cursor()
         
@@ -1205,9 +1210,12 @@ def handle_cancel_request(reply_token, user_id_db, stripe_subscription_id):
         # 実際に追加されたコンテンツのみを表示
         for content_type, is_free in added_contents:
             if content_type in ['AI予定秘書', 'AI経理秘書', 'AIタスクコンシェルジュ']:
-                display_price = '0円' if is_free else '1,500円'
-                content_choices.append(f"{choice_index}. {content_type}（{display_price}/件）")
-                print(f'[DEBUG] 解約選択肢: {choice_index}. {content_type}（{display_price}/件）')
+                if is_trial_period:
+                    display_price = '無料（トライアル期間中）'
+                else:
+                    display_price = '0円' if is_free else '1,500円'
+                content_choices.append(f"{choice_index}. {content_type}（{display_price}）")
+                print(f'[DEBUG] 解約選択肢: {choice_index}. {content_type}（{display_price}）')
                 choice_index += 1
         
         if not content_choices:
@@ -1251,6 +1259,10 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
         conn.close()
         
         if cancelled:
+            # サブスクリプション状態をチェック
+            subscription_status = check_subscription_status(stripe_subscription_id)
+            is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
+            
             cancel_success_message = {
                 "type": "template",
                 "altText": "コンテンツ解約完了",
@@ -1280,11 +1292,32 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
             send_line_message(reply_token, [cancel_success_message])
             
             # 請求期間についての説明を別メッセージで送信
-            period_message = {
-                "type": "text",
-                "text": "請求期間終了まで利用可能です。"
-            }
+            if is_trial_period:
+                period_message = {
+                    "type": "text",
+                    "text": "トライアル期間中は料金が発生しません。"
+                }
+            else:
+                period_message = {
+                    "type": "text",
+                    "text": "請求期間終了まで利用可能です。"
+                }
             send_line_message(reply_token, [period_message])
+            
+            # ユーザー状態をリセット
+            from routes.line import user_states
+            line_user_id = None
+            # LINEユーザーIDを取得
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute('SELECT line_user_id FROM users WHERE id = %s', (user_id_db,))
+            result = c.fetchone()
+            conn.close()
+            if result and result[0]:
+                line_user_id = result[0]
+                if line_user_id in user_states:
+                    del user_states[line_user_id]
+                    print(f'[DEBUG] ユーザー状態リセット: {line_user_id}')
         else:
             send_line_message(reply_token, [{"type": "text", "text": "有効な番号が選択されませんでした。もう一度お試しください。"}])
     except Exception as e:
