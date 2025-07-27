@@ -744,9 +744,9 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
         
         if current_count == 1:
             price_message = f"料金：無料（{current_count}個目）"
-                else:
+        else:
             price_message = f"料金：1,500円（{current_count}個目、1週間後に課金）"
-            print(f'[DEBUG] 2個目以降のコンテンツ追加確認: is_free={is_free}, current_count={current_count}')
+            print(f'[DEBUG] 2個目以降のコンテンツ追加: is_free={is_free}, current_count={current_count}')
         print(f"[DEBUG] content_type: {content['name']}")
         print(f"[DEBUG] DATABASE_URL: {os.getenv('DATABASE_URL')}")
         print(f"[DEBUG] total_usage_count: {total_usage_count}")
@@ -756,7 +756,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
         print(f"[DEBUG] price_message: {price_message}")
         
         # 1個目は無料、2個目以降は1週間後に課金
-            if is_free:
+        if is_free:
             # 1個目は無料で即座に追加
             conn = get_db_connection()
             c = conn.cursor()
@@ -767,7 +767,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
             conn.commit()
             conn.close()
             print(f'[DEBUG] DB登録成功（1個目）: user_id={user_id_db}, is_free={is_free}, usage_record_id=None')
-            else:
+        else:
             # 2個目以降は1週間後に課金するため、pending_chargeフラグを設定
             print(f'[DEBUG] 2個目以降のコンテンツ追加: 1週間後に課金予定, is_free={is_free}, current_count={current_count}')
             conn = get_db_connection()
@@ -931,7 +931,7 @@ def check_and_charge_trial_expired_content(user_id_db, stripe_subscription_id):
                 marked_details.append(f"{content['content_type']} ({content['position']}個目)")
                 print(f'[DEBUG] 課金予定設定完了: {content["content_type"]} ({content["position"]}個目)')
                 
-    except Exception as e:
+            except Exception as e:
                 print(f'[DEBUG] 課金予定設定エラー: {content["content_type"]} ({content["position"]}個目), error={e}')
                 continue
         
@@ -1134,7 +1134,7 @@ def handle_cancel_request(reply_token, user_id_db, stripe_subscription_id):
             if content_type in ['AI予定秘書', 'AI経理秘書', 'AIタスクコンシェルジュ']:
                 if is_free:
                     display_price = '無料'
-            else:
+                else:
                     display_price = '1,500円'
                 content_choices.append(f"{choice_index}. {content_type}（{display_price}）")
                 print(f'[DEBUG] 解約選択肢: {choice_index}. {content_type}（{display_price}）')
@@ -1257,7 +1257,7 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
                     "type": "text",
                     "text": "トライアル期間中は料金が発生しません。"
                 }
-        else:
+            else:
                 period_message = {
                     "type": "text",
                     "text": "請求期間終了まで利用可能です。"
