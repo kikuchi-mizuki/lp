@@ -543,6 +543,7 @@ def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, co
             price_message = f"料金：無料（{current_count}個目）"
         else:
             price_message = f"料金：1,500円（{current_count}個目、1週間無料）"
+            print(f'[DEBUG] 2個目以降のコンテンツ追加: is_free={is_free}, current_count={current_count}')
         confirm_message = {
             "type": "template",
             "altText": "選択内容の確認",
@@ -745,6 +746,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
             price_message = f"料金：無料（{current_count}個目）"
         else:
             price_message = f"料金：1,500円（{current_count}個目、1週間無料）"
+            print(f'[DEBUG] 2個目以降のコンテンツ追加確認: is_free={is_free}, current_count={current_count}')
         print(f"[DEBUG] content_type: {content['name']}")
         print(f"[DEBUG] DATABASE_URL: {os.getenv('DATABASE_URL')}")
         print(f"[DEBUG] total_usage_count: {total_usage_count}")
@@ -763,10 +765,10 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
             ''', (user_id_db, 1, None, is_free, content['name']))
             conn.commit()
             conn.close()
-            print(f'DB登録成功: user_id={user_id_db}, is_free={is_free}, usage_record_id=None')
+            print(f'[DEBUG] DB登録成功: user_id={user_id_db}, is_free={is_free}, usage_record_id=None')
         else:
             # 有料の場合はStripeの使用量記録も作成
-            print('[DEBUG] Stripe課金API呼び出し開始')
+            print(f'[DEBUG] Stripe課金API呼び出し開始: is_free={is_free}, current_count={current_count}')
             try:
                 subscription = stripe.Subscription.retrieve(stripe_subscription_id)
                 
@@ -857,7 +859,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                             timestamp=int(time.time()),
                             action='increment'
                         )
-                        print(f"使用量記録作成成功: {usage_record.id}")
+                        print(f"[DEBUG] 使用量記録作成成功: {usage_record.id}, quantity=1, subscription_item={subscription_item_id}")
                         
                         # usage_logsに記録
                         conn = get_db_connection()
@@ -868,7 +870,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                         ''', (user_id_db, 1, usage_record.id, is_free, content['name']))
                         conn.commit()
                         conn.close()
-                        print(f'DB登録成功: user_id={user_id_db}, is_free={is_free}, usage_record_id={usage_record.id}')
+                        print(f'[DEBUG] DB登録成功: user_id={user_id_db}, is_free={is_free}, usage_record_id={usage_record.id}')
                     except stripe.error.StripeError as e:
                         print(f"使用量記録作成エラー: {e}")
                         # エラーが発生してもusage_logsには記録
@@ -880,7 +882,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                         ''', (user_id_db, 1, None, is_free, content['name']))
                         conn.commit()
                         conn.close()
-                        print(f'DB登録成功（エラー時）: user_id={user_id_db}, is_free={is_free}, usage_record_id=None')
+                        print(f'[DEBUG] DB登録成功（エラー時）: user_id={user_id_db}, is_free={is_free}, usage_record_id=None')
                 except Exception as usage_error:
                     print(f'[DEBUG] 使用量記録作成例外: {usage_error}')
                     import traceback
@@ -895,7 +897,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                     ''', (user_id_db, 1, None, is_free, content['name']))
                     conn.commit()
                     conn.close()
-                    print(f'DB登録成功（例外時）: user_id={user_id_db}, is_free={is_free}, usage_record_id=None')
+                    print(f'[DEBUG] DB登録成功（例外時）: user_id={user_id_db}, is_free={is_free}, usage_record_id=None')
         # usage_logsの全件を出力
         try:
             conn_debug = get_db_connection()
@@ -948,7 +950,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                 "template": {
                     "type": "buttons",
                     "title": "コンテンツ追加完了！",
-                    "text": f"追加内容：{content['name']}\n料金：1,500円（{total_usage_count + 1}個目）",
+                    "text": f"追加内容：{content['name']}\n料金：1,500円（{total_usage_count + 1}個目、1週間無料）",
                     "actions": [
                         {
                             "type": "message",
