@@ -1815,8 +1815,8 @@ def process_pending_charges(user_id_db, stripe_subscription_id):
                 log_id, content_type, created_at = charge
                 try:
                     # Stripeの使用量記録を作成
-                    usage_record = stripe.UsageRecord.create(
-                        subscription_item=usage_item['id'],
+                    usage_record = stripe.SubscriptionItem.create_usage_record(
+                        usage_item['id'],
                         quantity=1,
                         timestamp=int(created_at.timestamp()),
                         action='increment'
