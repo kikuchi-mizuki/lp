@@ -106,6 +106,66 @@ def send_welcome_with_buttons(reply_token):
             f.write('LINEテンプレートメッセージ送信エラー: ' + str(e) + '\n')
             f.write(traceback.format_exc() + '\n')
 
+def send_welcome_with_buttons_push(user_id):
+    """LINEユーザーIDに直接案内文を送信（pushメッセージ）"""
+    print(f'[DEBUG] send_welcome_with_buttons_push開始: user_id={user_id}')
+    import requests
+    import os
+    LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
+    headers = {
+        'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}',
+        'Content-Type': 'application/json'
+    }
+    data = {
+        'to': user_id,
+        'messages': [
+            {
+                "type": "text",
+                "text": "ようこそ！AIコレクションズへ\n\nAIコレクションズサービスをご利用いただき、ありがとうございます。\n\n📋 サービス内容：\n• AI予定秘書：スケジュール管理\n• AI経理秘書：見積書・請求書作成\n• AIタスクコンシェルジュ：タスク管理\n\n💰 料金体系：\n• 月額基本料金：3,900円（1週間無料）\n• 追加コンテンツ：1個目無料、2個目以降1,500円/件（トライアル期間中は無料）\n\n下のボタンからお選びください。"
+            },
+            {
+                "type": "template",
+                "altText": "メニュー",
+                "template": {
+                    "type": "buttons",
+                    "title": "メニュー",
+                    "text": "ご希望の機能を選択してください。",
+                    "actions": [
+                        {
+                            "type": "message",
+                            "label": "コンテンツ追加",
+                            "text": "追加"
+                        },
+                        {
+                            "type": "message",
+                            "label": "利用状況確認",
+                            "text": "状態"
+                        },
+                        {
+                            "type": "message",
+                            "label": "使い方を見る",
+                            "text": "ヘルプ"
+                        }
+                    ]
+                }
+            }
+        ]
+    }
+    try:
+        print(f'[DEBUG] LINE Push API送信開始: data={data}')
+        response = requests.post('https://api.line.me/v2/bot/message/push', headers=headers, json=data)
+        response.raise_for_status()
+        print(f'[DEBUG] LINE Push API送信成功: status_code={response.status_code}')
+        return True
+    except Exception as e:
+        print(f'LINE Push テンプレートメッセージ送信エラー: {e}')
+        import traceback
+        traceback.print_exc()
+        with open('error.log', 'a', encoding='utf-8') as f:
+            f.write('LINE Push テンプレートメッセージ送信エラー: ' + str(e) + '\n')
+            f.write(traceback.format_exc() + '\n')
+        return False
+
 def create_rich_menu():
     rich_menu = {
         "size": {"width": 2500, "height": 843},

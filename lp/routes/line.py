@@ -18,13 +18,52 @@ pending_welcome_users = set()
 
 @line_bp.route('/line/payment_completed/user/<int:user_id>')
 def payment_completed_webhook_by_user_id(user_id):
-    """決済完了後の案内文送信準備（ユーザーIDベース）"""
+    """決済完了後の案内文自動送信（ユーザーIDベース）"""
     try:
-        # ユーザーIDを文字列として保存（LINEユーザーIDの代わりに使用）
-        user_id_str = f"user_{user_id}"
-        pending_welcome_users.add(user_id_str)
-        print(f'[DEBUG] 決済完了後の案内文送信準備: user_id={user_id}, user_id_str={user_id_str}')
-        return jsonify({'success': True, 'message': f'案内文送信準備完了: {user_id}'})
+        # データベースからユーザー情報を取得
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute('SELECT line_user_id, email FROM users WHERE id = %s', (user_id,))
+        user = c.fetchone()
+        conn.close()
+        
+        if not user:
+            return jsonify({'error': 'ユーザーが見つかりません'})
+        
+        line_user_id = user[0]
+        email = user[1]
+        
+        if line_user_id:
+            # 既にLINE連携済みの場合、直接案内文を送信
+            print(f'[DEBUG] 既存LINE連携ユーザーへの自動案内文送信: line_user_id={line_user_id}')
+            try:
+                from services.line_service import send_welcome_with_buttons_push
+                success = send_welcome_with_buttons_push(line_user_id)
+                if success:
+                    return jsonify({
+                        'success': True, 
+                        'message': f'案内文を自動送信しました: {email}',
+                        'line_user_id': line_user_id
+                    })
+                else:
+                    return jsonify({
+                        'success': False,
+                        'error': '案内文送信に失敗しました'
+                    })
+            except Exception as e:
+                print(f'[DEBUG] 自動案内文送信エラー: {e}')
+                return jsonify({'error': f'案内文送信エラー: {str(e)}'})
+        else:
+            # LINE連携未完了の場合、送信待ちリストに追加
+            user_id_str = f"user_{user_id}"
+            pending_welcome_users.add(user_id_str)
+            print(f'[DEBUG] LINE連携未完了ユーザーの案内文送信準備: user_id={user_id}, email={email}')
+            return jsonify({
+                'success': True, 
+                'message': f'LINE連携後に案内文を送信します: {email}',
+                'status': 'pending_line_connection'
+            })
+            
     except Exception as e:
         return jsonify({'error': str(e)})
 
