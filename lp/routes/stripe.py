@@ -147,6 +147,9 @@ def stripe_webhook():
                     import traceback
                     traceback.print_exc()
             
+            conn = get_db_connection()
+            c = conn.cursor()
+            
             if not existing_user:
                 c.execute('SELECT id FROM users WHERE email = %s', (email,))
                 existing_user_by_email = c.fetchone()

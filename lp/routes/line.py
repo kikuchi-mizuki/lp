@@ -154,7 +154,7 @@ def debug_diagnose_user(user_id):
         if user[3]:
             try:
                 import stripe
-                stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+                # stripe.api_keyはapp.pyで既に設定済み
                 subscription = stripe.Subscription.retrieve(user[3])
                 diagnosis['stripe_subscription'] = {
                     'status': subscription.status,

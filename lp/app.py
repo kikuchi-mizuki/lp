@@ -121,7 +121,7 @@ def check_registration():
     
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute('SELECT id, line_user_id FROM users WHERE email = ?', (email,))
+    c.execute('SELECT id, line_user_id FROM users WHERE email = %s', (email,))
     user = c.fetchone()
     conn.close()
     

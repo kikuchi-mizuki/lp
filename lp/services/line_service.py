@@ -1637,8 +1637,7 @@ def process_pending_charges(user_id_db, stripe_subscription_id):
         
         # Stripeで課金処理
         try:
-            import stripe
-            stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+            # stripe.api_keyはapp.pyで既に設定済み
             
             subscription = stripe.Subscription.retrieve(stripe_subscription_id)
             
