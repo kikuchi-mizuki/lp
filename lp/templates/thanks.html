@@ -125,13 +125,32 @@
             </p>
             
             {% if email %}
-                <a href="https://line.me/R/oaMessage/@077rkaxn/" target="_blank" class="line-btn">
+                <a href="https://line.me/R/oaMessage/@077rkaxn/" target="_blank" class="line-btn" onclick="prepareWelcomeMessage()">
                     LINE連携を開始
                 </a>
                 
                 <p class="note">
                     ※ボタンが反応しない場合は、しばらく待ってから再度お試しください。
                 </p>
+                
+                <script>
+                    function prepareWelcomeMessage() {
+                        // 決済完了後の案内文送信準備
+                        var userId = '{{ user_id }}';
+                        if (userId && userId !== 'None') {
+                            fetch('/line/payment_completed/user/' + userId)
+                                .then(function(response) {
+                                    return response.json();
+                                })
+                                .then(function(data) {
+                                    console.log('案内文送信準備完了:', data);
+                                })
+                                .catch(function(error) {
+                                    console.error('案内文送信準備エラー:', error);
+                                });
+                        }
+                    }
+                </script>
             {% else %}
                 <div class="error-message">
                     登録処理が完了していません。<br>

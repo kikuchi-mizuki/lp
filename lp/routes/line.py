@@ -13,6 +13,30 @@ from utils.db import get_db_connection
 line_bp = Blueprint('line', __name__)
 
 user_states = {}
+# 決済完了後の案内文送信待ちユーザーを管理
+pending_welcome_users = set()
+
+@line_bp.route('/line/payment_completed/user/<int:user_id>')
+def payment_completed_webhook_by_user_id(user_id):
+    """決済完了後の案内文送信準備（ユーザーIDベース）"""
+    try:
+        # ユーザーIDを文字列として保存（LINEユーザーIDの代わりに使用）
+        user_id_str = f"user_{user_id}"
+        pending_welcome_users.add(user_id_str)
+        print(f'[DEBUG] 決済完了後の案内文送信準備: user_id={user_id}, user_id_str={user_id_str}')
+        return jsonify({'success': True, 'message': f'案内文送信準備完了: {user_id}'})
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
+@line_bp.route('/line/payment_completed/<user_id>')
+def payment_completed_webhook(user_id):
+    """決済完了後の案内文送信準備（LINEユーザーIDベース）"""
+    try:
+        pending_welcome_users.add(user_id)
+        print(f'[DEBUG] 決済完了後の案内文送信準備: user_id={user_id}')
+        return jsonify({'success': True, 'message': f'案内文送信準備完了: {user_id}'})
+    except Exception as e:
+        return jsonify({'error': str(e)})
 
 @line_bp.route('/line/debug/send_welcome/<user_id>')
 def debug_send_welcome(user_id):
@@ -223,6 +247,57 @@ def line_webhook():
                     send_line_message(event['replyToken'], [payment_message])
                     conn.close()
                     continue
+                
+                # 決済完了後の案内文送信待ちユーザーかチェック
+                if user_id in pending_welcome_users:
+                    print(f'[DEBUG] 決済完了後の案内文送信: user_id={user_id}')
+                    try:
+                        from services.line_service import send_welcome_with_buttons
+                        send_welcome_with_buttons(event['replyToken'])
+                        print(f'[DEBUG] 決済完了後の案内文送信完了: user_id={user_id}')
+                        # 案内文送信済みフラグを設定
+                        user_states[user_id] = 'welcome_sent'
+                        # 送信待ちリストから削除
+                        pending_welcome_users.discard(user_id)
+                        # 案内文を送信した後は処理を終了（replyTokenは1回しか使用できない）
+                        conn.close()
+                        continue
+                    except Exception as e:
+                        print(f'[DEBUG] 決済完了後の案内文送信エラー: {e}')
+                        import traceback
+                        traceback.print_exc()
+                        # エラーが発生した場合は簡単なテキストメッセージを送信
+                        send_line_message(event['replyToken'], [{"type": "text", "text": "ようこそ！AIコレクションズへ\n\n「追加」と入力してコンテンツを追加してください。"}])
+                        user_states[user_id] = 'welcome_sent'
+                        pending_welcome_users.discard(user_id)
+                        conn.close()
+                        continue
+                
+                # ユーザーIDベースの案内文送信待ちユーザーかチェック
+                user_id_str = f"user_{user_id_db}"
+                if user_id_str in pending_welcome_users:
+                    print(f'[DEBUG] ユーザーIDベースの決済完了後の案内文送信: user_id={user_id}, user_id_str={user_id_str}')
+                    try:
+                        from services.line_service import send_welcome_with_buttons
+                        send_welcome_with_buttons(event['replyToken'])
+                        print(f'[DEBUG] ユーザーIDベースの決済完了後の案内文送信完了: user_id={user_id}')
+                        # 案内文送信済みフラグを設定
+                        user_states[user_id] = 'welcome_sent'
+                        # 送信待ちリストから削除
+                        pending_welcome_users.discard(user_id_str)
+                        # 案内文を送信した後は処理を終了（replyTokenは1回しか使用できない）
+                        conn.close()
+                        continue
+                    except Exception as e:
+                        print(f'[DEBUG] ユーザーIDベースの決済完了後の案内文送信エラー: {e}')
+                        import traceback
+                        traceback.print_exc()
+                        # エラーが発生した場合は簡単なテキストメッセージを送信
+                        send_line_message(event['replyToken'], [{"type": "text", "text": "ようこそ！AIコレクションズへ\n\n「追加」と入力してコンテンツを追加してください。"}])
+                        user_states[user_id] = 'welcome_sent'
+                        pending_welcome_users.discard(user_id_str)
+                        conn.close()
+                        continue
                 
                 # 既存ユーザーの初回メッセージ時に案内文を送信（初回のみ）
                 if user_id not in user_states:

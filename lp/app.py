@@ -139,11 +139,23 @@ def thanks():
         return email
     
     email = request.args.get('email')
+    user_id = None
+    
     if email:
         email = normalize_email(email)
-        return render_template('thanks.html', email=email)
-    else:
-        return render_template('thanks.html', email=None)
+        # ユーザーIDを取得
+        try:
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute('SELECT id FROM users WHERE email = %s ORDER BY created_at DESC LIMIT 1', (email,))
+            user = c.fetchone()
+            conn.close()
+            if user:
+                user_id = user[0]
+        except Exception as e:
+            print(f'[DEBUG] ユーザーID取得エラー: {e}')
+    
+    return render_template('thanks.html', email=email, user_id=user_id)
 
 @app.route('/static/<path:filename>')
 def static_files(filename):
