@@ -801,8 +801,9 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                 subscription = stripe.Subscription.retrieve(stripe_subscription_id)
                 customer_id = subscription.customer
                 
-                # 次の請求期間の開始日を取得
-                next_period_start = subscription.current_period_end
+                # 現在の請求期間の開始日を取得（通常期間として設定）
+                current_period_start = subscription.current_period_start
+                current_period_end = subscription.current_period_end
                 
                 # Invoice Itemを作成（月額料金と同じ期間で課金）
                 invoice_item = stripe.InvoiceItem.create(
@@ -812,11 +813,11 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                     description=f"コンテンツ追加: {content['name']} ({current_count}個目)",
                     subscription=stripe_subscription_id,
                     period={
-                        'start': next_period_start,
-                        'end': next_period_start + (30 * 24 * 60 * 60)  # 30日後
+                        'start': current_period_start,
+                        'end': current_period_end
                     }
                 )
-                print(f'[DEBUG] Stripe InvoiceItem作成成功: {invoice_item.id}, amount=1500, period_start={next_period_start}')
+                print(f'[DEBUG] Stripe InvoiceItem作成成功: {invoice_item.id}, amount=1500, period_start={current_period_start}, period_end={current_period_end}')
                 
                 # データベースのStripe Usage Record IDを更新
                 conn = get_db_connection()
