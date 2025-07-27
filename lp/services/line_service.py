@@ -536,9 +536,27 @@ def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, co
         subscription_status = check_subscription_status(stripe_subscription_id)
         is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
         
-        # 1個目は常に無料、2個目以降は有料（1週間後に課金）
-        current_count = total_usage_count + 1
-        is_free = current_count == 1
+        # トライアル期間終了後のコンテンツ追加回数を正しく計算
+        if is_trial_period:
+            # トライアル期間中は常に無料
+            current_count = total_usage_count + 1
+            is_free = True
+        else:
+            # トライアル期間終了後は、トライアル期間中の追加分を除いて計算
+            # トライアル期間中の追加分を取得
+            conn_trial = get_db_connection()
+            c_trial = conn_trial.cursor()
+            c_trial.execute('''
+                SELECT COUNT(*) FROM usage_logs 
+                WHERE user_id = %s AND pending_charge = FALSE
+            ''', (user_id_db,))
+            trial_additions = c_trial.fetchone()[0]
+            conn_trial.close()
+            
+            # トライアル期間終了後の追加回数
+            post_trial_count = total_usage_count - trial_additions + 1
+            current_count = post_trial_count
+            is_free = current_count == 1
         
         if current_count == 1:
             price_message = f"料金：無料（{current_count}個目）"
@@ -738,10 +756,28 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
         # サブスクリプションのトライアル期間をチェック
         subscription_status = check_subscription_status(stripe_subscription_id)
         is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
+        is_trial = subscription_status['status'] == 'trialing'
         
-        # 1個目は常に無料、2個目以降は有料（1週間後に課金）
-        current_count = total_usage_count + 1
-        is_free = current_count == 1
+        # トライアル期間終了後のコンテンツ追加回数を正しく計算
+        if is_trial_period:
+            # トライアル期間中は常に無料
+            current_count = total_usage_count + 1
+            is_free = True
+        else:
+            # トライアル期間終了後は、新しく追加するコンテンツを1個目として扱う
+            # トライアル期間終了後の追加分のみをカウント
+            conn_post_trial = get_db_connection()
+            c_post_trial = conn_post_trial.cursor()
+            c_post_trial.execute('''
+                SELECT COUNT(*) FROM usage_logs 
+                WHERE user_id = %s AND pending_charge = TRUE
+            ''', (user_id_db,))
+            post_trial_additions = c_post_trial.fetchone()[0]
+            conn_post_trial.close()
+            
+            # トライアル期間終了後の追加回数
+            current_count = post_trial_additions + 1
+            is_free = current_count == 1
         
         if current_count == 1:
             price_message = f"料金：無料（{current_count}個目）"
@@ -755,10 +791,6 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
         print(f"[DEBUG] current_count: {current_count}")
         print(f"[DEBUG] is_trial_period: {is_trial_period}")
         print(f"[DEBUG] price_message: {price_message}")
-        
-        # トライアル期間中の処理を考慮
-        subscription_status = check_subscription_status(stripe_subscription_id)
-        is_trial = subscription_status['status'] == 'trialing'
         
         if is_free:
             # 1個目は無料で即座に追加（トライアル期間中は記録のみ）
