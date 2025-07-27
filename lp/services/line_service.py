@@ -535,14 +535,14 @@ def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, co
         subscription_status = check_subscription_status(stripe_subscription_id)
         is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
         
-        # 1個目は常に無料、2個目以降は有料（1週間無料期間あり）
+        # 1個目は常に無料、2個目以降は有料（1週間後に課金）
         current_count = total_usage_count + 1
         is_free = current_count == 1
         
         if current_count == 1:
             price_message = f"料金：無料（{current_count}個目）"
         else:
-            price_message = f"料金：1,500円（{current_count}個目、1週間無料）"
+            price_message = f"料金：1,500円（{current_count}個目、1週間後に課金）"
             print(f'[DEBUG] 2個目以降のコンテンツ追加: is_free={is_free}, current_count={current_count}')
         confirm_message = {
             "type": "template",
@@ -738,14 +738,14 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
         subscription_status = check_subscription_status(stripe_subscription_id)
         is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
         
-        # 1個目は常に無料、2個目以降は有料（1週間無料期間あり）
+        # 1個目は常に無料、2個目以降は有料（1週間後に課金）
         current_count = total_usage_count + 1
         is_free = current_count == 1
         
         if current_count == 1:
             price_message = f"料金：無料（{current_count}個目）"
         else:
-            price_message = f"料金：1,500円（{current_count}個目、1週間無料）"
+            price_message = f"料金：1,500円（{current_count}個目、1週間後に課金）"
             print(f'[DEBUG] 2個目以降のコンテンツ追加確認: is_free={is_free}, current_count={current_count}')
         print(f"[DEBUG] content_type: {content['name']}")
         print(f"[DEBUG] DATABASE_URL: {os.getenv('DATABASE_URL')}")
@@ -755,149 +755,31 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
         print(f"[DEBUG] is_trial_period: {is_trial_period}")
         print(f"[DEBUG] price_message: {price_message}")
         
-        # 無料の場合はデータベースにのみ記録
+        # 1個目は無料、2個目以降は1週間後に課金
         if is_free:
+            # 1個目は無料で即座に追加
             conn = get_db_connection()
             c = conn.cursor()
             c.execute('''
-                INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type)
-                VALUES (%s, %s, %s, %s, %s)
-            ''', (user_id_db, 1, None, is_free, content['name']))
+                INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type, pending_charge)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            ''', (user_id_db, 1, None, is_free, content['name'], False))
             conn.commit()
             conn.close()
-            print(f'[DEBUG] DB登録成功: user_id={user_id_db}, is_free={is_free}, usage_record_id=None')
+            print(f'[DEBUG] DB登録成功（1個目）: user_id={user_id_db}, is_free={is_free}, usage_record_id=None')
         else:
-            # 有料の場合はStripeの使用量記録も作成
-            print(f'[DEBUG] Stripe課金API呼び出し開始: is_free={is_free}, current_count={current_count}')
-            try:
-                subscription = stripe.Subscription.retrieve(stripe_subscription_id)
-                
-                # サブスクリプションの状態をチェック
-                if subscription['status'] == 'canceled':
-                    cancel_message = {
-                        "type": "template",
-                        "altText": "サブスクリプション更新が必要です",
-                        "template": {
-                            "type": "buttons",
-                            "title": "サブスクリプション更新が必要です",
-                            "text": "現在のサブスクリプションがキャンセルされています。新しいサブスクリプションを作成するか、既存のものを復活させてください。",
-                            "actions": [
-                                {
-                                    "type": "message",
-                                    "label": "利用状況確認",
-                                    "text": "状態"
-                                },
-                                {
-                                    "type": "message",
-                                    "label": "解約",
-                                    "text": "解約"
-                                },
-                                {
-                                    "type": "message",
-                                    "label": "ヘルプ",
-                                    "text": "ヘルプ"
-                                }
-                            ]
-                        }
-                    }
-                    send_line_message(reply_token, [cancel_message])
-                    return
-                
-                usage_item = None
-                for item in subscription['items']['data']:
-                    print(f'[DEBUG] Stripe item: {item}')
-                    if item['price']['id'] == os.getenv('STRIPE_USAGE_PRICE_ID'):
-                        usage_item = item
-                        break
-                if not usage_item:
-                    print('[DEBUG] usage_itemが見つからずreturn')
-                    send_line_message(reply_token, [{"type": "text", "text": f"❌ 従量課金アイテムが見つかりません。\n\n設定されている価格ID: {os.getenv('STRIPE_USAGE_PRICE_ID')}\n\nサポートにお問い合わせください。"}])
-                    return
-                    
-            except Exception as subscription_error:
-                print(f'[DEBUG] サブスクリプション取得エラー: {subscription_error}')
-                error_str = str(subscription_error)
-                if "subscription has been canceled" in error_str or "No such subscription" in error_str:
-                    cancel_message = {
-                        "type": "template",
-                        "altText": "サブスクリプション更新が必要です",
-                        "template": {
-                            "type": "buttons",
-                            "title": "サブスクリプション更新が必要です",
-                            "text": "現在のサブスクリプションがキャンセルされています。新しいサブスクリプションを作成してください。",
-                            "actions": [
-                                {
-                                    "type": "message",
-                                    "label": "利用状況確認",
-                                    "text": "状態"
-                                },
-                                {
-                                    "type": "message",
-                                    "label": "解約",
-                                    "text": "解約"
-                                },
-                                {
-                                    "type": "message",
-                                    "label": "ヘルプ",
-                                    "text": "ヘルプ"
-                                }
-                            ]
-                        }
-                    }
-                    send_line_message(reply_token, [cancel_message])
-                else:
-                    send_line_message(reply_token, [{"type": "text", "text": f"❌ サブスクリプションの取得に失敗しました。\n\nエラー: {error_str}"}])
-                    return
-                subscription_item_id = usage_item['id']
-                try:
-                    # 従量課金の使用量を記録
-                    try:
-                        # 既存のSubscription Itemを使用して使用量を記録
-                        usage_record = stripe.UsageRecord.create(
-                            subscription_item=subscription_item_id,
-                            quantity=1,
-                            timestamp=int(time.time()),
-                            action='increment'
-                        )
-                        print(f"[DEBUG] 使用量記録作成成功: {usage_record.id}, quantity=1, subscription_item={subscription_item_id}")
-                        
-                        # usage_logsに記録
-                        conn = get_db_connection()
-                        c = conn.cursor()
-                        c.execute('''
-                            INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type)
-                            VALUES (%s, %s, %s, %s, %s)
-                        ''', (user_id_db, 1, usage_record.id, is_free, content['name']))
-                        conn.commit()
-                        conn.close()
-                        print(f'[DEBUG] DB登録成功: user_id={user_id_db}, is_free={is_free}, usage_record_id={usage_record.id}')
-                    except stripe.error.StripeError as e:
-                        print(f"使用量記録作成エラー: {e}")
-                        # エラーが発生してもusage_logsには記録
-                        conn = get_db_connection()
-                        c = conn.cursor()
-                        c.execute('''
-                            INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type)
-                            VALUES (%s, %s, %s, %s, %s)
-                        ''', (user_id_db, 1, None, is_free, content['name']))
-                        conn.commit()
-                        conn.close()
-                        print(f'[DEBUG] DB登録成功（エラー時）: user_id={user_id_db}, is_free={is_free}, usage_record_id=None')
-                except Exception as usage_error:
-                    print(f'[DEBUG] 使用量記録作成例外: {usage_error}')
-                    import traceback
-                    print(traceback.format_exc())
-                    
-                    # エラーが発生してもusage_logsには記録
-                    conn = get_db_connection()
-                    c = conn.cursor()
-                    c.execute('''
-                        INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type)
-                        VALUES (%s, %s, %s, %s, %s)
-                    ''', (user_id_db, 1, None, is_free, content['name']))
-                    conn.commit()
-                    conn.close()
-                    print(f'[DEBUG] DB登録成功（例外時）: user_id={user_id_db}, is_free={is_free}, usage_record_id=None')
+            # 2個目以降は1週間後に課金するため、pending_chargeフラグを設定
+            print(f'[DEBUG] 2個目以降のコンテンツ追加: 1週間後に課金予定, is_free={is_free}, current_count={current_count}')
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute('''
+                INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type, pending_charge)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            ''', (user_id_db, 1, None, False, content['name'], True))
+            conn.commit()
+            conn.close()
+            print(f'[DEBUG] DB登録成功（2個目以降）: user_id={user_id_db}, is_free=False, pending_charge=True')
+            # 2個目以降は1週間後に課金するため、ここではStripe課金処理を行わない
         # usage_logsの全件を出力
         try:
             conn_debug = get_db_connection()
@@ -950,7 +832,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                 "template": {
                     "type": "buttons",
                     "title": "コンテンツ追加完了！",
-                    "text": f"追加内容：{content['name']}\n料金：1,500円（{total_usage_count + 1}個目、1週間無料）",
+                    "text": f"追加内容：{content['name']}\n料金：1,500円（{total_usage_count + 1}個目、1週間後に課金）",
                     "actions": [
                         {
                             "type": "message",
@@ -1161,11 +1043,11 @@ def handle_status_check(reply_token, user_id_db):
         if is_trial_period:
             status_lines.append("💰 料金体系（トライアル期間中）:")
             status_lines.append("• 1個目: 無料")
-            status_lines.append("• 2個目以降: 1,500円/件（1週間無料）")
+            status_lines.append("• 2個目以降: 1,500円/件（1週間後に課金）")
         else:
             status_lines.append("💰 料金体系:")
             status_lines.append("• 1個目: 無料")
-            status_lines.append("• 2個目以降: 1,500円/件")
+            status_lines.append("• 2個目以降: 1,500円/件（1週間後に課金）")
         
         status_lines.append("")  # 空行
         
@@ -1201,7 +1083,7 @@ def handle_status_check(reply_token, user_id_db):
             if next_count == 1:
                 next_price = "無料"
             else:
-                next_price = "1,500円（1週間無料）"
+                next_price = "1,500円（1週間後に課金）"
             status_lines.append(f"📝 次回追加時（{next_count}個目）: {next_price}")
             
             status_lines.append("")
@@ -1378,6 +1260,8 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
 def handle_subscription_cancel(reply_token, user_id_db, stripe_subscription_id):
     """サブスクリプション全体を解約"""
     try:
+        import datetime
+        
         # サブスクリプション状態をチェック
         subscription_status = check_subscription_status(stripe_subscription_id)
         is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
@@ -1398,13 +1282,39 @@ def handle_subscription_cancel(reply_token, user_id_db, stripe_subscription_id):
             )
             cancel_message_text = "サブスクリプション全体の解約を受け付けました。\n\n請求期間終了まで全てのサービスをご利用いただけます。"
         
-        # データベースから全てのコンテンツを削除
+        # 1週間以内に追加された課金予定のコンテンツをキャンセル
+        one_week_ago = datetime.datetime.now() - datetime.timedelta(days=7)
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute('DELETE FROM usage_logs WHERE user_id = %s', (user_id_db,))
+        
+        # 1週間以内の課金予定コンテンツを取得
+        c.execute('''
+            SELECT id, content_type, created_at 
+            FROM usage_logs 
+            WHERE user_id = %s AND pending_charge = TRUE AND created_at > %s
+        ''', (user_id_db, one_week_ago))
+        recent_pending = c.fetchall()
+        
+        # 1週間以内の課金予定をキャンセル（pending_chargeをFalseに設定）
+        c.execute('''
+            UPDATE usage_logs 
+            SET pending_charge = FALSE 
+            WHERE user_id = %s AND pending_charge = TRUE AND created_at > %s
+        ''', (user_id_db, one_week_ago))
+        cancelled_count = c.rowcount
+        
+        # 1週間以上前のコンテンツは削除
+        c.execute('DELETE FROM usage_logs WHERE user_id = %s AND created_at <= %s', (user_id_db, one_week_ago))
         deleted_count = c.rowcount
+        
         conn.commit()
         conn.close()
+        
+        print(f'[DEBUG] 解約処理: user_id={user_id_db}, cancelled_count={cancelled_count}, deleted_count={deleted_count}, is_trial={is_trial_period}')
+        
+        # キャンセルされたコンテンツの情報をメッセージに追加
+        if cancelled_count > 0:
+            cancel_message_text += f"\n\n1週間以内に追加された{cancelled_count}個のコンテンツの課金がキャンセルされました。"
         
         print(f'[DEBUG] サブスクリプション解約: user_id={user_id_db}, deleted_count={deleted_count}, is_trial={is_trial_period}')
         
@@ -1670,17 +1580,22 @@ def smart_number_extraction(text):
     return unique_numbers
 
 def process_pending_charges(user_id_db, stripe_subscription_id):
-    """課金予定のコンテンツを実際に課金する"""
+    """1週間後に課金予定のコンテンツを実際に課金する"""
     try:
-        # データベースから課金予定のコンテンツを取得
+        import datetime
+        
+        # 1週間前の日時を計算
+        one_week_ago = datetime.datetime.now() - datetime.timedelta(days=7)
+        
+        # データベースから1週間前に追加された課金予定のコンテンツを取得
         conn = get_db_connection()
         c = conn.cursor()
         c.execute('''
             SELECT id, content_type, created_at 
             FROM usage_logs 
-            WHERE user_id = %s AND pending_charge = TRUE AND is_free = TRUE
+            WHERE user_id = %s AND pending_charge = TRUE AND created_at <= %s
             ORDER BY created_at ASC
-        ''', (user_id_db,))
+        ''', (user_id_db, one_week_ago))
         pending_charges = c.fetchall()
         conn.close()
         

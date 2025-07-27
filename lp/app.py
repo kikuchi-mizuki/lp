@@ -309,7 +309,7 @@ def subscribe():
                 }
             ],
             subscription_data={
-                'trial_period_days': 7,
+                'trial_period_days': 7,  # 1週間の無料期間
             },
             success_url=url_for('thanks', _external=True) + f"?email={email}",
             cancel_url=url_for('index', _external=True),
