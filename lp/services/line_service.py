@@ -480,10 +480,20 @@ def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, co
         c_count = conn_count.cursor()
         c_count.execute('SELECT COUNT(*) FROM usage_logs WHERE user_id = %s', (user_id_db,))
         total_usage_count = c_count.fetchone()[0]
+        
+        # デバッグ用：実際のusage_logsを確認
+        c_count.execute('SELECT id, content_type, created_at FROM usage_logs WHERE user_id = %s ORDER BY created_at', (user_id_db,))
+        all_logs = c_count.fetchall()
+        print(f'[DEBUG] 全usage_logs: {all_logs}')
+        
         # 同じコンテンツの追加回数を確認
         c_count.execute('SELECT COUNT(*) FROM usage_logs WHERE user_id = %s AND content_type = %s', (user_id_db, content['name']))
         same_content_count = c_count.fetchone()[0]
         conn_count.close()
+        
+        print(f'[DEBUG] total_usage_count: {total_usage_count}')
+        print(f'[DEBUG] same_content_count: {same_content_count}')
+        print(f'[DEBUG] content_type: {content["name"]}')
         
         # 同じコンテンツが既に追加されている場合
         if same_content_count > 0:
@@ -1141,17 +1151,11 @@ def handle_status_check(reply_token, user_id_db):
         else:
             total_cost = 0
             content_list = []
-            # 重複を除外して最新のコンテンツのみを表示
-            seen_content = set()
-            unique_logs = []
+            
+            # 実際の追加回数（重複を含む）を計算
+            actual_count = len(usage_logs)
             
             for log in usage_logs:
-                content_type = log[0] or "不明"
-                if content_type not in seen_content:
-                    seen_content.add(content_type)
-                    unique_logs.append(log)
-            
-            for log in unique_logs:
                 content_type = log[0] or "不明"
                 is_free = log[1]
                 created_at = log[2]
@@ -1161,11 +1165,11 @@ def handle_status_check(reply_token, user_id_db):
                 date_str = created_at.strftime('%Y-%m-%d')
                 content_list.append(f"• {content_type} ({'無料' if is_free else '1,500円'}) - {date_str}")
             
-            status_lines.append(f"📈 今月の追加回数：{len(unique_logs)}回")
+            status_lines.append(f"📈 今月の追加回数：{actual_count}回")
             status_lines.append(f"💰 追加料金：{total_cost:,}円")
             
             # 次回追加時の料金予告
-            next_count = len(unique_logs) + 1
+            next_count = actual_count + 1
             if is_trial_period:
                 next_price = "無料（トライアル期間中）"
             else:
