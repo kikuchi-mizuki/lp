@@ -86,7 +86,12 @@ def send_welcome_with_buttons(reply_token):
                         },
                         {
                             "type": "message",
-                            "label": "使い方を見る",
+                            "label": "解約",
+                            "text": "解約"
+                        },
+                        {
+                            "type": "message",
+                            "label": "ヘルプ",
                             "text": "ヘルプ"
                         }
                     ]
@@ -144,7 +149,12 @@ def send_welcome_with_buttons_push(user_id):
                         },
                         {
                             "type": "message",
-                            "label": "使い方を見る",
+                            "label": "解約",
+                            "text": "解約"
+                        },
+                        {
+                            "type": "message",
+                            "label": "ヘルプ",
                             "text": "ヘルプ"
                         }
                     ]
@@ -527,7 +537,7 @@ def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, co
         
         # 1個目は常に無料、2個目以降はトライアル期間中は無料、それ以外は有料
         current_count = total_usage_count + 1
-        is_free = current_count == 1 or (is_trial_period and current_count > 1)
+        is_free = current_count == 1 or (is_trial_period and current_count >= 2)
         
         if is_trial_period:
             if current_count == 1:
@@ -732,7 +742,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
         
         # 1個目は常に無料、2個目以降はトライアル期間中は無料、それ以外は有料
         current_count = total_usage_count + 1
-        is_free = current_count == 1 or (is_trial_period and current_count > 1)
+        is_free = current_count == 1 or (is_trial_period and current_count >= 2)
         
         if is_trial_period:
             if current_count == 1:
@@ -745,6 +755,9 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
         print(f"[DEBUG] DATABASE_URL: {os.getenv('DATABASE_URL')}")
         print(f"[DEBUG] total_usage_count: {total_usage_count}")
         print(f"[DEBUG] is_free: {is_free}")
+        print(f"[DEBUG] current_count: {current_count}")
+        print(f"[DEBUG] is_trial_period: {is_trial_period}")
+        print(f"[DEBUG] price_message: {price_message}")
         
         # 無料の場合はデータベースにのみ記録
         if is_free:

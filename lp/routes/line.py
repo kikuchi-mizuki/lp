@@ -427,15 +427,15 @@ def line_webhook():
                     stripe_subscription_id = user[1]
                     state = user_states.get(user_id, 'welcome_sent')
                     
-                    # 新しいサブスクリプションが作成された場合の処理
-                    if stripe_subscription_id and stripe_subscription_id.startswith('sub_'):
+                    # 新しいサブスクリプションが作成された場合の処理（初回のみ）
+                    if stripe_subscription_id and stripe_subscription_id.startswith('sub_') and state == 'welcome_sent':
                         # サブスクリプションの状態をチェック
                         from services.line_service import check_subscription_status
                         subscription_status = check_subscription_status(stripe_subscription_id)
                         
-                        # 有効なサブスクリプションで、ユーザーがwelcome_sent状態の場合、案内メッセージを再送信
-                        if subscription_status['is_active'] and state == 'welcome_sent':
-                            print(f'[DEBUG] 有効なサブスクリプション発見、案内メッセージ再送信: user_id={user_id}, subscription_id={stripe_subscription_id}')
+                        # 有効なサブスクリプションの場合のみ案内メッセージを送信
+                        if subscription_status['is_active']:
+                            print(f'[DEBUG] 有効なサブスクリプション発見、案内メッセージ送信: user_id={user_id}, subscription_id={stripe_subscription_id}')
                             try:
                                 from services.line_service import send_welcome_with_buttons
                                 send_welcome_with_buttons(event['replyToken'])
