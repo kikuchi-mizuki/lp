@@ -83,7 +83,13 @@ def debug_update_line_user(user_id, line_user_id):
     try:
         conn = get_db_connection()
         c = conn.cursor()
+        
+        # 既存の紐付けを解除
+        c.execute('UPDATE users SET line_user_id = NULL WHERE line_user_id = %s', (line_user_id,))
+        
+        # 新しい紐付けを作成
         c.execute('UPDATE users SET line_user_id = %s WHERE id = %s', (line_user_id, user_id))
+        
         conn.commit()
         conn.close()
         
