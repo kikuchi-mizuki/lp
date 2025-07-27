@@ -9,6 +9,7 @@ from services.line_service import (
 )
 from utils.message_templates import get_menu_message, get_help_message, get_default_message
 from utils.db import get_db_connection
+import datetime
 
 line_bp = Blueprint('line', __name__)
 
@@ -76,6 +77,106 @@ def payment_completed_webhook(user_id):
         return jsonify({'success': True, 'message': f'案内文送信準備完了: {user_id}'})
     except Exception as e:
         return jsonify({'error': str(e)})
+
+@line_bp.route('/line/debug/diagnose/<int:user_id>')
+def debug_diagnose_user(user_id):
+    """デバッグ用：ユーザーの自動診断"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # ユーザー情報を取得
+        c.execute('SELECT id, email, line_user_id, stripe_subscription_id, created_at FROM users WHERE id = %s', (user_id,))
+        user = c.fetchone()
+        
+        if not user:
+            return jsonify({
+                'error': 'ユーザーが見つかりません',
+                'user_id': user_id
+            })
+        
+        user_info = {
+            'id': user[0],
+            'email': user[1],
+            'line_user_id': user[2],
+            'stripe_subscription_id': user[3],
+            'created_at': str(user[4]) if user[4] else None
+        }
+        
+        # 診断結果
+        diagnosis = {
+            'user_exists': True,
+            'has_subscription': bool(user[3]),
+            'has_line_connection': bool(user[2]),
+            'issues': [],
+            'recommendations': []
+        }
+        
+        # 問題の特定
+        if not user[3]:
+            diagnosis['issues'].append('サブスクリプションが設定されていません')
+            diagnosis['recommendations'].append('決済を完了してください')
+        
+        if not user[2]:
+            diagnosis['issues'].append('LINE連携が完了していません')
+            diagnosis['recommendations'].append('LINEアプリで友達追加またはメッセージを送信してください')
+        
+        # LINE連携済みの場合、LINE APIでユーザー情報を確認
+        if user[2]:
+            try:
+                import requests
+                LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
+                headers = {
+                    'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}',
+                    'Content-Type': 'application/json'
+                }
+                response = requests.get(f'https://api.line.me/v2/bot/profile/{user[2]}', headers=headers)
+                
+                if response.status_code == 200:
+                    line_profile = response.json()
+                    diagnosis['line_profile'] = {
+                        'display_name': line_profile.get('displayName'),
+                        'picture_url': line_profile.get('pictureUrl'),
+                        'status_message': line_profile.get('statusMessage')
+                    }
+                    diagnosis['line_api_working'] = True
+                else:
+                    diagnosis['issues'].append('LINE APIでユーザー情報を取得できません')
+                    diagnosis['line_api_working'] = False
+            except Exception as e:
+                diagnosis['issues'].append(f'LINE API接続エラー: {str(e)}')
+                diagnosis['line_api_working'] = False
+        
+        # サブスクリプション情報を確認
+        if user[3]:
+            try:
+                import stripe
+                stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+                subscription = stripe.Subscription.retrieve(user[3])
+                diagnosis['stripe_subscription'] = {
+                    'status': subscription.status,
+                    'current_period_end': subscription.current_period_end,
+                    'cancel_at_period_end': subscription.cancel_at_period_end
+                }
+                diagnosis['stripe_api_working'] = True
+            except Exception as e:
+                diagnosis['issues'].append(f'Stripe API接続エラー: {str(e)}')
+                diagnosis['stripe_api_working'] = False
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'user_info': user_info,
+            'diagnosis': diagnosis,
+            'timestamp': str(datetime.datetime.now())
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'user_id': user_id
+        })
 
 @line_bp.route('/line/debug/update_line_user/<int:user_id>/<line_user_id>')
 def debug_update_line_user(user_id, line_user_id):
