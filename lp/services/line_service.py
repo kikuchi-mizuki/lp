@@ -780,6 +780,11 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                                 },
                                 {
                                     "type": "message",
+                                    "label": "解約",
+                                    "text": "解約"
+                                },
+                                {
+                                    "type": "message",
                                     "label": "ヘルプ",
                                     "text": "ヘルプ"
                                 }
@@ -816,6 +821,11 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                                     "type": "message",
                                     "label": "利用状況確認",
                                     "text": "状態"
+                                },
+                                {
+                                    "type": "message",
+                                    "label": "解約",
+                                    "text": "解約"
                                 },
                                 {
                                     "type": "message",

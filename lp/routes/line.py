@@ -422,81 +422,32 @@ def line_webhook():
                         send_line_message(event['replyToken'], [{"type": "text", "text": get_not_registered_message()}])
                     conn.close()
                     continue
-                user_id_db = user[0]
-                stripe_subscription_id = user[1]
-                
-                # サブスクリプションIDが存在しない場合
-                if not stripe_subscription_id:
-                    payment_message = {
-                        "type": "template",
-                        "altText": "決済が必要です",
-                        "template": {
-                            "type": "buttons",
-                            "title": "決済が必要です",
-                            "text": "サブスクリプションが設定されていません。\n\n決済画面から登録してください。",
-                            "actions": [
-                                {
-                                    "type": "uri",
-                                    "label": "決済画面へ",
-                                    "uri": "https://lp-production-9e2c.up.railway.app"
-                                }
-                            ]
-                        }
-                    }
-                    send_line_message(event['replyToken'], [payment_message])
-                    conn.close()
-                    continue
-                
-                # 決済完了後の案内文送信待ちユーザーかチェック
-                if user_id in pending_welcome_users:
-                    print(f'[DEBUG] 決済完了後の案内文送信: user_id={user_id}')
-                    try:
-                        from services.line_service import send_welcome_with_buttons
-                        send_welcome_with_buttons(event['replyToken'])
-                        print(f'[DEBUG] 決済完了後の案内文送信完了: user_id={user_id}')
-                        # 案内文送信済みフラグを設定
-                        user_states[user_id] = 'welcome_sent'
-                        # 送信待ちリストから削除
-                        pending_welcome_users.discard(user_id)
-                        # 案内文を送信した後は処理を終了（replyTokenは1回しか使用できない）
-                        conn.close()
-                        continue
-                    except Exception as e:
-                        print(f'[DEBUG] 決済完了後の案内文送信エラー: {e}')
-                        import traceback
-                        traceback.print_exc()
-                        # エラーが発生した場合は簡単なテキストメッセージを送信
-                        send_line_message(event['replyToken'], [{"type": "text", "text": "ようこそ！AIコレクションズへ\n\n「追加」と入力してコンテンツを追加してください。"}])
-                        user_states[user_id] = 'welcome_sent'
-                        pending_welcome_users.discard(user_id)
-                        conn.close()
-                        continue
-                
-                # ユーザーIDベースの案内文送信待ちユーザーかチェック
-                user_id_str = f"user_{user_id_db}"
-                if user_id_str in pending_welcome_users:
-                    print(f'[DEBUG] ユーザーIDベースの決済完了後の案内文送信: user_id={user_id}, user_id_str={user_id_str}')
-                    try:
-                        from services.line_service import send_welcome_with_buttons
-                        send_welcome_with_buttons(event['replyToken'])
-                        print(f'[DEBUG] ユーザーIDベースの決済完了後の案内文送信完了: user_id={user_id}')
-                        # 案内文送信済みフラグを設定
-                        user_states[user_id] = 'welcome_sent'
-                        # 送信待ちリストから削除
-                        pending_welcome_users.discard(user_id_str)
-                        # 案内文を送信した後は処理を終了（replyTokenは1回しか使用できない）
-                        conn.close()
-                        continue
-                    except Exception as e:
-                        print(f'[DEBUG] ユーザーIDベースの決済完了後の案内文送信エラー: {e}')
-                        import traceback
-                        traceback.print_exc()
-                        # エラーが発生した場合は簡単なテキストメッセージを送信
-                        send_line_message(event['replyToken'], [{"type": "text", "text": "ようこそ！AIコレクションズへ\n\n「追加」と入力してコンテンツを追加してください。"}])
-                        user_states[user_id] = 'welcome_sent'
-                        pending_welcome_users.discard(user_id_str)
-                        conn.close()
-                        continue
+                else:
+                    user_id_db = user[0]
+                    stripe_subscription_id = user[1]
+                    state = user_states.get(user_id, 'welcome_sent')
+                    
+                    # 新しいサブスクリプションが作成された場合の処理
+                    if stripe_subscription_id and stripe_subscription_id.startswith('sub_'):
+                        # サブスクリプションの状態をチェック
+                        from services.line_service import check_subscription_status
+                        subscription_status = check_subscription_status(stripe_subscription_id)
+                        
+                        # 有効なサブスクリプションで、ユーザーがwelcome_sent状態の場合、案内メッセージを再送信
+                        if subscription_status['is_active'] and state == 'welcome_sent':
+                            print(f'[DEBUG] 有効なサブスクリプション発見、案内メッセージ再送信: user_id={user_id}, subscription_id={stripe_subscription_id}')
+                            try:
+                                from services.line_service import send_welcome_with_buttons
+                                send_welcome_with_buttons(event['replyToken'])
+                                print(f'[DEBUG] 新サブスクリプション時の案内文送信完了: user_id={user_id}')
+                            except Exception as e:
+                                print(f'[DEBUG] 新サブスクリプション時の案内文送信エラー: {e}')
+                                import traceback
+                                traceback.print_exc()
+                                # エラーが発生した場合は簡単なテキストメッセージを送信
+                                send_line_message(event['replyToken'], [{"type": "text", "text": "ようこそ！AIコレクションズへ\n\n「追加」と入力してコンテンツを追加してください。"}])
+                            conn.close()
+                            continue
                 
                 # 既存ユーザーの初回メッセージ時に案内文を送信（初回のみ）
                 if user_id not in user_states:
@@ -531,7 +482,12 @@ def line_webhook():
                                 },
                                 {
                                     "type": "message",
-                                    "label": "使い方を見る",
+                                    "label": "解約",
+                                    "text": "解約"
+                                },
+                                {
+                                    "type": "message",
+                                    "label": "ヘルプ",
                                     "text": "ヘルプ"
                                 }
                             ]

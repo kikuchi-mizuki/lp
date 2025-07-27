@@ -87,12 +87,38 @@ def stripe_webhook():
                     c.execute('UPDATE users SET stripe_customer_id = %s, stripe_subscription_id = %s WHERE id = %s', (customer_id, subscription_id, existing_user_by_email[0]))
                     conn.commit()
                     print(f'既存ユーザーのsubscription_idをUPDATE: id={existing_user_by_email[0]}, subscription_id={subscription_id}')
+                    
+                    # LINE連携済みの場合、案内メッセージを送信
+                    c.execute('SELECT line_user_id FROM users WHERE id = %s', (existing_user_by_email[0],))
+                    line_user_result = c.fetchone()
+                    if line_user_result and line_user_result[0]:
+                        try:
+                            from services.line_service import send_welcome_with_buttons_push
+                            send_welcome_with_buttons_push(line_user_result[0])
+                            print(f'[DEBUG] 新サブスクリプション作成時の案内文送信完了: line_user_id={line_user_result[0]}')
+                        except Exception as e:
+                            print(f'[DEBUG] 新サブスクリプション作成時の案内文送信エラー: {e}')
+                            import traceback
+                            traceback.print_exc()
             else:
                 print(f'既存ユーザーが存在: {existing_user[0]}')
                 # 既存ユーザーにもsubscription_idをUPDATE
                 c.execute('UPDATE users SET stripe_customer_id = %s, stripe_subscription_id = %s WHERE id = %s', (customer_id, subscription_id, existing_user[0]))
                 conn.commit()
                 print(f'既存ユーザーのsubscription_idをUPDATE: id={existing_user[0]}, subscription_id={subscription_id}')
+                
+                # LINE連携済みの場合、案内メッセージを送信
+                c.execute('SELECT line_user_id FROM users WHERE id = %s', (existing_user[0],))
+                line_user_result = c.fetchone()
+                if line_user_result and line_user_result[0]:
+                    try:
+                        from services.line_service import send_welcome_with_buttons_push
+                        send_welcome_with_buttons_push(line_user_result[0])
+                        print(f'[DEBUG] 新サブスクリプション作成時の案内文送信完了: line_user_id={line_user_result[0]}')
+                    except Exception as e:
+                        print(f'[DEBUG] 新サブスクリプション作成時の案内文送信エラー: {e}')
+                        import traceback
+                        traceback.print_exc()
             conn.close()
         elif event_type == 'invoice.payment_succeeded':
             invoice = event['data']['object']
@@ -178,12 +204,38 @@ def stripe_webhook():
                     c.execute('UPDATE users SET stripe_customer_id = %s, stripe_subscription_id = %s WHERE id = %s', (customer_id, subscription_id, existing_user_by_email[0]))
                     conn.commit()
                     print(f'既存ユーザーのsubscription_idをUPDATE: id={existing_user_by_email[0]}, subscription_id={subscription_id}')
+                    
+                    # LINE連携済みの場合、案内メッセージを送信
+                    c.execute('SELECT line_user_id FROM users WHERE id = %s', (existing_user_by_email[0],))
+                    line_user_result = c.fetchone()
+                    if line_user_result and line_user_result[0]:
+                        try:
+                            from services.line_service import send_welcome_with_buttons_push
+                            send_welcome_with_buttons_push(line_user_result[0])
+                            print(f'[DEBUG] 新サブスクリプション作成時の案内文送信完了: line_user_id={line_user_result[0]}')
+                        except Exception as e:
+                            print(f'[DEBUG] 新サブスクリプション作成時の案内文送信エラー: {e}')
+                            import traceback
+                            traceback.print_exc()
             else:
                 print(f'既存ユーザーが存在: {existing_user[0]}')
                 # 既存ユーザーにもsubscription_idをUPDATE
                 c.execute('UPDATE users SET stripe_customer_id = %s, stripe_subscription_id = %s WHERE id = %s', (customer_id, subscription_id, existing_user[0]))
                 conn.commit()
                 print(f'既存ユーザーのsubscription_idをUPDATE: id={existing_user[0]}, subscription_id={subscription_id}')
+                
+                # LINE連携済みの場合、案内メッセージを送信
+                c.execute('SELECT line_user_id FROM users WHERE id = %s', (existing_user[0],))
+                line_user_result = c.fetchone()
+                if line_user_result and line_user_result[0]:
+                    try:
+                        from services.line_service import send_welcome_with_buttons_push
+                        send_welcome_with_buttons_push(line_user_result[0])
+                        print(f'[DEBUG] 新サブスクリプション作成時の案内文送信完了: line_user_id={line_user_result[0]}')
+                    except Exception as e:
+                        print(f'[DEBUG] 新サブスクリプション作成時の案内文送信エラー: {e}')
+                        import traceback
+                        traceback.print_exc()
             conn.close()
     except Exception as e:
         import traceback
