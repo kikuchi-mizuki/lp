@@ -972,6 +972,7 @@ def handle_status_check(reply_token, user_id_db):
         
         # サブスクリプション状態をチェック
         subscription_status = check_subscription_status(stripe_subscription_id)
+        is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
         
         # データベースから利用状況を取得（最新のデータのみ）
         conn = get_db_connection()
@@ -1001,6 +1002,17 @@ def handle_status_check(reply_token, user_id_db):
                 status_lines.append("🔴 サブスクリプション: 解約済み")
             else:
                 status_lines.append("🔴 サブスクリプション: 無効")
+        
+        # 料金体系の情報を追加
+        status_lines.append("")
+        if is_trial_period:
+            status_lines.append("💰 料金体系（トライアル期間中）:")
+            status_lines.append("• 1個目: 無料")
+            status_lines.append("• 2個目以降: 無料")
+        else:
+            status_lines.append("💰 料金体系:")
+            status_lines.append("• 1個目: 無料")
+            status_lines.append("• 2個目以降: 1,500円/件")
         
         status_lines.append("")  # 空行
         
@@ -1036,6 +1048,15 @@ def handle_status_check(reply_token, user_id_db):
             
             status_lines.append(f"📈 今月の追加回数：{len(unique_logs)}回")
             status_lines.append(f"💰 追加料金：{total_cost:,}円")
+            
+            # 次回追加時の料金予告
+            next_count = len(unique_logs) + 1
+            if is_trial_period:
+                next_price = "無料（トライアル期間中）"
+            else:
+                next_price = "1,500円" if next_count > 1 else "無料"
+            status_lines.append(f"📝 次回追加時（{next_count}個目）: {next_price}")
+            
             status_lines.append("")
             status_lines.append("📚 追加済みコンテンツ：")
             status_lines.extend(content_list[:5])  # 最新5件まで表示
