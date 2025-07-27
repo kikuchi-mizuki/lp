@@ -863,6 +863,9 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
         }
         send_line_message(reply_token, [url_message])
     except Exception as e:
+        print(f'[ERROR] handle_content_confirmation エラー: {e}')
+        import traceback
+        traceback.print_exc()
         send_line_message(reply_token, [{"type": "text", "text": "❌ エラーが発生しました。しばらく時間をおいて再度お試しください。"}])
 
 def check_and_charge_trial_expired_content(user_id_db, stripe_subscription_id):
