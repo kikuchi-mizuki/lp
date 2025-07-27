@@ -451,21 +451,21 @@ def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, co
             '1': {
                 'name': 'AI予定秘書',
                 'price': 1500,
-                'description': '日程調整のストレスから解放される、スケジュール管理の相棒',
+                "description": '日程調整のストレスから解放される、スケジュール管理の相棒',
                 'usage': 'Googleカレンダーと連携し、LINEで予定の追加・確認・空き時間の提案まで。調整のやりとりに追われる時間を、もっとクリエイティブに使えるように。',
                 'url': 'https://lp-production-9e2c.up.railway.app/schedule'
             },
             '2': {
                 'name': 'AI経理秘書',
                 'price': 1500,
-                'description': '打合せ後すぐ送れる、スマートな請求書作成アシスタント',
+                "description": '打合せ後すぐ送れる、スマートな請求書作成アシスタント',
                 'usage': 'LINEで項目を送るだけで、見積書や請求書を即作成。営業から事務処理までを一気通貫でスムーズに。',
                 'url': 'https://lp-production-9e2c.up.railway.app/accounting'
             },
             '3': {
                 'name': 'AIタスクコンシェルジュ',
                 'price': 1500,
-                'description': '今日やるべきことを、ベストなタイミングで',
+                "description": '今日やるべきことを、ベストなタイミングで',
                 'usage': '登録したタスクを空き時間に自動で配置し、理想的な1日をAIが提案。「やりたいのにできない」を、「自然にこなせる」毎日に。',
                 'url': 'https://lp-production-9e2c.up.railway.app/task'
             }
@@ -648,21 +648,21 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
             '1': {
                 'name': 'AI予定秘書',
                 'price': 1500,
-                'description': '日程調整のストレスから解放される、スケジュール管理の相棒',
+                "description": '日程調整のストレスから解放される、スケジュール管理の相棒',
                 'usage': 'Googleカレンダーと連携し、LINEで予定の追加・確認・空き時間の提案まで。調整のやりとりに追われる時間を、もっとクリエイティブに使えるように。',
                 'url': 'https://lp-production-9e2c.up.railway.app/schedule'
             },
             '2': {
                 'name': 'AI経理秘書',
                 'price': 1500,
-                'description': '打合せ後すぐ送れる、スマートな請求書作成アシスタント',
+                "description": '打合せ後すぐ送れる、スマートな請求書作成アシスタント',
                 'usage': 'LINEで項目を送るだけで、見積書や請求書を即作成。営業から事務処理までを一気通貫でスムーズに。',
                 'url': 'https://lp-production-9e2c.up.railway.app/accounting'
             },
             '3': {
                 'name': 'AIタスクコンシェルジュ',
                 'price': 1500,
-                'description': '今日やるべきことを、ベストなタイミングで',
+                "description": '今日やるべきことを、ベストなタイミングで',
                 'usage': '登録したタスクを空き時間に自動で配置し、理想的な1日をAIが提案。「やりたいのにできない」を、「自然にこなせる」毎日に。',
                 'url': 'https://lp-production-9e2c.up.railway.app/task'
             }
@@ -939,6 +939,107 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
     except Exception as e:
         send_line_message(reply_token, [{"type": "text", "text": "❌ エラーが発生しました。しばらく時間をおいて再度お試しください。"}])
 
+def check_and_charge_trial_expired_content(user_id_db, stripe_subscription_id):
+    """トライアル期間終了時に、2個目以降のコンテンツを自動で有料に切り替える"""
+    try:
+        # サブスクリプション状態をチェック
+        subscription_status = check_subscription_status(stripe_subscription_id)
+        is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
+        
+        # トライアル期間中の場合は何もしない
+        if is_trial_period:
+            return {"status": "trial_active", "message": "トライアル期間中です"}
+        
+        # データベースから利用状況を取得
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute('''
+            SELECT id, content_type, is_free, created_at 
+            FROM usage_logs 
+            WHERE user_id = %s 
+            ORDER BY created_at ASC
+        ''', (user_id_db,))
+        usage_logs = c.fetchall()
+        conn.close()
+        
+        if not usage_logs:
+            return {"status": "no_content", "message": "コンテンツがありません"}
+        
+        # 2個目以降の無料コンテンツを有料に変更
+        content_to_charge = []
+        for i, log in enumerate(usage_logs):
+            log_id, content_type, is_free, created_at = log
+            if i >= 1 and is_free:  # 2個目以降で無料のもの
+                content_to_charge.append({
+                    'id': log_id,
+                    'content_type': content_type,
+                    'created_at': created_at
+                })
+        
+        if not content_to_charge:
+            return {"status": "no_charge_needed", "message": "課金対象のコンテンツがありません"}
+        
+        # Stripeで課金処理
+        try:
+            import stripe
+            stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+            
+            subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+            
+            # 従量課金アイテムを取得
+            usage_item = None
+            for item in subscription['items']['data']:
+                if item['price']['id'] == os.getenv('STRIPE_USAGE_PRICE_ID'):
+                    usage_item = item
+                    break
+            
+            if not usage_item:
+                return {"status": "error", "message": "従量課金アイテムが見つかりません"}
+            
+            # 各コンテンツに対して課金
+            total_charged = 0
+            for content in content_to_charge:
+                try:
+                    # Stripeの使用量記録を作成
+                    usage_record = stripe.UsageRecord.create(
+                        subscription_item=usage_item['id'],
+                        quantity=1,
+                        timestamp=int(content['created_at'].timestamp()),
+                        action='increment'
+                    )
+                    
+                    # データベースを更新
+                    conn = get_db_connection()
+                    c = conn.cursor()
+                    c.execute('''
+                        UPDATE usage_logs 
+                        SET is_free = FALSE, stripe_usage_record_id = %s 
+                        WHERE id = %s
+                    ''', (usage_record.id, content['id']))
+                    conn.commit()
+                    conn.close()
+                    
+                    total_charged += 1
+                    print(f'[DEBUG] 自動課金完了: {content["content_type"]}, usage_record_id={usage_record.id}')
+                    
+                except Exception as e:
+                    print(f'[DEBUG] 自動課金エラー: {content["content_type"]}, error={e}')
+                    continue
+            
+            return {
+                "status": "success", 
+                "message": f"{total_charged}個のコンテンツを自動課金しました",
+                "charged_count": total_charged
+            }
+            
+        except Exception as e:
+            print(f'[DEBUG] Stripe課金エラー: {e}')
+            return {"status": "stripe_error", "message": f"Stripe課金エラー: {str(e)}"}
+            
+    except Exception as e:
+        print(f'[DEBUG] 自動課金処理エラー: {e}')
+        return {"status": "error", "message": f"自動課金処理エラー: {str(e)}"}
+
 def handle_status_check(reply_token, user_id_db):
     try:
         # ユーザーのサブスクリプション情報を取得
@@ -974,6 +1075,11 @@ def handle_status_check(reply_token, user_id_db):
         subscription_status = check_subscription_status(stripe_subscription_id)
         is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
         
+        # トライアル期間終了時の自動課金処理
+        if not is_trial_period:
+            auto_charge_result = check_and_charge_trial_expired_content(user_id_db, stripe_subscription_id)
+            print(f'[DEBUG] 自動課金処理結果: {auto_charge_result}')
+        
         # データベースから利用状況を取得（最新のデータのみ）
         conn = get_db_connection()
         c = conn.cursor()
@@ -990,6 +1096,14 @@ def handle_status_check(reply_token, user_id_db):
         
         # ステータスメッセージを構築
         status_lines = ["📊 利用状況"]
+        
+        # 自動課金の結果を表示
+        if not is_trial_period and 'auto_charge_result' in locals():
+            if auto_charge_result.get('status') == 'success':
+                charged_count = auto_charge_result.get('charged_count', 0)
+                if charged_count > 0:
+                    status_lines.append(f"💰 自動課金完了: {charged_count}個のコンテンツが有料に変更されました")
+                    status_lines.append("")
         
         # サブスクリプション状態を追加
         if subscription_status['is_active']:
