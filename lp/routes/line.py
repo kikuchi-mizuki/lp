@@ -444,7 +444,7 @@ def line_webhook():
                     # 既に案内文が送信されているかチェック
                     if user_states.get(user_id) == 'welcome_sent':
                         print(f'[DEBUG] 既に案内文送信済み、通常メッセージ処理に進む: user_id={user_id}')
-                        pass
+                        # 通常のメッセージ処理に進む
                     else:
                         # 初回案内文が未送信の場合のみ送信
                         print(f'[DEBUG] 初回案内文未送信、案内文送信: user_id={user_id}')
@@ -460,63 +460,14 @@ def line_webhook():
                             # エラーが発生した場合は通常のメッセージ処理に進む
                             user_states[user_id] = 'welcome_sent'
                 
-                # 既存ユーザーの初回メッセージ時に案内文を送信（初回のみ）
-                if user_id not in user_states:
-                    user_states[user_id] = 'welcome_sent'
-                
+                # ユーザー状態の確認
                 state = user_states.get(user_id, 'welcome_sent')
                 print(f'[DEBUG] ユーザー状態: user_id={user_id}, state={state}')
                 
                 # 初回案内文が既に送信されている場合は、通常のメッセージ処理に進む
                 if state == 'welcome_sent':
                     print(f'[DEBUG] 初回案内文送信済み、通常メッセージ処理に進む: user_id={user_id}')
-                    # 通常のメッセージ処理に進む（何もしない）
-                elif state is None:
-                    print(f'[DEBUG] 既存ユーザーの初回メッセージ処理: user_id={user_id}')
-                    
-                    # 解約コマンドの場合は処理をスキップ
-                    if text == '解約':
-                        print(f'[DEBUG] 解約コマンドのため、初回メッセージ処理をスキップ: user_id={user_id}')
-                        user_states[user_id] = 'welcome_sent'
-                    else:
-                        # 自動案内文が既に送信されている可能性があるため、状態を設定して処理をスキップ
-                        user_states[user_id] = 'welcome_sent'
-                        print(f'[DEBUG] 自動案内文送信済みのため、重複送信をスキップ: user_id={user_id}')
-                        # メニューボタンのみ送信
-                        menu_message = {
-                            "type": "template",
-                            "altText": "メニュー",
-                            "template": {
-                                "type": "buttons",
-                                "title": "メニュー",
-                                "text": "ご希望の機能を選択してください。",
-                                "actions": [
-                                    {
-                                        "type": "message",
-                                        "label": "コンテンツ追加",
-                                        "text": "追加"
-                                    },
-                                    {
-                                        "type": "message",
-                                        "label": "利用状況確認",
-                                        "text": "状態"
-                                    },
-                                    {
-                                        "type": "message",
-                                        "label": "解約",
-                                        "text": "解約"
-                                    },
-                                    {
-                                        "type": "message",
-                                        "label": "ヘルプ",
-                                        "text": "ヘルプ"
-                                    }
-                                ]
-                            }
-                        }
-                        send_line_message(event['replyToken'], [menu_message])
-                        conn.close()
-                        continue
+                    # 通常のメッセージ処理に進む
                 else:
                     print(f'[DEBUG] ユーザーは特定の状態: user_id={user_id}, state={state}')
                 
