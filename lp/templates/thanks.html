@@ -137,18 +137,81 @@
                     function prepareWelcomeMessage() {
                         // 決済完了後の案内文送信準備
                         var userId = '{{ user_id }}';
+                        console.log('準備開始: userId =', userId);
+                        
                         if (userId && userId !== 'None') {
-                            fetch('/line/payment_completed/user/' + userId)
-                                .then(function(response) {
-                                    return response.json();
-                                })
-                                .then(function(data) {
-                                    console.log('案内文送信準備完了:', data);
-                                })
-                                .catch(function(error) {
-                                    console.error('案内文送信準備エラー:', error);
-                                });
+                            var url = '/line/payment_completed/user/' + userId;
+                            console.log('リクエストURL:', url);
+                            
+                            fetch(url, {
+                                method: 'GET',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                            })
+                            .then(function(response) {
+                                console.log('レスポンス受信:', response.status, response.statusText);
+                                if (!response.ok) {
+                                    throw new Error('HTTP ' + response.status + ': ' + response.statusText);
+                                }
+                                return response.json();
+                            })
+                            .then(function(data) {
+                                console.log('案内文送信準備完了:', data);
+                                // 成功メッセージを表示
+                                showMessage('案内文送信準備が完了しました！', 'success');
+                            })
+                            .catch(function(error) {
+                                console.error('案内文送信準備エラー:', error);
+                                // エラーメッセージを表示
+                                showMessage('案内文送信準備でエラーが発生しました: ' + error.message, 'error');
+                            });
+                        } else {
+                            console.log('ユーザーIDが無効です:', userId);
+                            showMessage('ユーザーIDが無効です。', 'error');
                         }
+                    }
+                    
+                    function showMessage(message, type) {
+                        // 既存のメッセージを削除
+                        var existingMessage = document.querySelector('.status-message');
+                        if (existingMessage) {
+                            existingMessage.remove();
+                        }
+                        
+                        // 新しいメッセージを作成
+                        var messageDiv = document.createElement('div');
+                        messageDiv.className = 'status-message';
+                        messageDiv.style.cssText = `
+                            padding: 10px 15px;
+                            border-radius: 8px;
+                            margin: 10px 0;
+                            font-size: 14px;
+                            font-weight: 500;
+                        `;
+                        
+                        if (type === 'success') {
+                            messageDiv.style.backgroundColor = '#d1fae5';
+                            messageDiv.style.color = '#065f46';
+                            messageDiv.style.border = '1px solid #a7f3d0';
+                        } else {
+                            messageDiv.style.backgroundColor = '#fef2f2';
+                            messageDiv.style.color = '#dc2626';
+                            messageDiv.style.border = '1px solid #fecaca';
+                        }
+                        
+                        messageDiv.textContent = message;
+                        
+                        // メッセージを挿入
+                        var button = document.querySelector('.line-btn');
+                        button.parentNode.insertBefore(messageDiv, button.nextSibling);
+                        
+                        // 3秒後にメッセージを削除
+                        setTimeout(function() {
+                            if (messageDiv.parentNode) {
+                                messageDiv.remove();
+                            }
+                        }, 3000);
                     }
                 </script>
             {% else %}
