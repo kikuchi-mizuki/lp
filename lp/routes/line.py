@@ -77,6 +77,25 @@ def payment_completed_webhook(user_id):
     except Exception as e:
         return jsonify({'error': str(e)})
 
+@line_bp.route('/line/debug/update_line_user/<int:user_id>/<line_user_id>')
+def debug_update_line_user(user_id, line_user_id):
+    """デバッグ用：LINEユーザーIDを手動で更新"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute('UPDATE users SET line_user_id = %s WHERE id = %s', (line_user_id, user_id))
+        conn.commit()
+        conn.close()
+        
+        print(f'[DEBUG] LINEユーザーID更新: user_id={user_id}, line_user_id={line_user_id}')
+        
+        return jsonify({
+            'success': True,
+            'message': f'LINEユーザーIDを更新しました: user_id={user_id}, line_user_id={line_user_id}'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
 @line_bp.route('/line/debug/send_welcome/<user_id>')
 def debug_send_welcome(user_id):
     """デバッグ用：指定ユーザーに手動で案内文を送信"""
