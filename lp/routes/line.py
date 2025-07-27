@@ -560,10 +560,17 @@ def line_webhook():
                 elif text == 'コンテンツ解約':
                     user_states[user_id] = 'cancel_select'
                     handle_cancel_request(event['replyToken'], user_id_db, stripe_subscription_id)
-                elif state == 'cancel_select' and all(x.strip().isdigit() for x in text.split(',')):
+                elif state == 'cancel_select':
                     print(f'[DEBUG] 解約選択処理: user_id={user_id}, state={state}, text={text}')
-                    handle_cancel_selection(event['replyToken'], user_id_db, stripe_subscription_id, text)
-                    user_states[user_id] = 'welcome_sent'
+                    # 新しい数字抽出関数を使用して処理
+                    from services.line_service import extract_numbers_from_text
+                    numbers = extract_numbers_from_text(text)
+                    if numbers:  # 数字が抽出できた場合のみ処理
+                        handle_cancel_selection(event['replyToken'], user_id_db, stripe_subscription_id, text)
+                        user_states[user_id] = 'welcome_sent'
+                    else:
+                        # 数字が抽出できない場合はエラーメッセージ
+                        send_line_message(event['replyToken'], [{"type": "text", "text": "数字を入力してください。例: 1,2 または 1.2 または 1 2"}])
                 elif state == 'add_select' and text in ['1', '2', '3', '4']:
                     # 選択したコンテンツ番号を保存
                     user_states[user_id] = f'confirm_{text}'
