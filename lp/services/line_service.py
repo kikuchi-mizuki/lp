@@ -543,7 +543,7 @@ def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, co
             if current_count == 1:
                 price_message = f"料金：無料（{current_count}個目）"
             else:
-                price_message = f"料金：無料（{current_count}個目、トライアル期間中）\n※トライアル終了後は1,500円"
+                price_message = f"料金：無料（{current_count}個目）"
         else:
             price_message = f"料金：{'無料' if is_free else '1,500円'}（{current_count}個目）"
         confirm_message = {
@@ -552,7 +552,7 @@ def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, co
             "template": {
                 "type": "buttons",
                 "title": "選択内容の確認",
-                "text": f"コンテンツ：{content['name']}\n{price_message}\n\nこのコンテンツを追加しますか？",
+                "text": f"コンテンツ：{content['name']}\n{price_message}\n\n追加しますか？",
                 "actions": [
                     {
                         "type": "message",
@@ -748,7 +748,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
             if current_count == 1:
                 price_message = f"料金：無料（{current_count}個目）"
             else:
-                price_message = f"料金：無料（{current_count}個目、トライアル期間中）\n※トライアル終了後は1,500円"
+                price_message = f"料金：無料（{current_count}個目）"
         else:
             price_message = f"料金：{'無料' if is_free else '1,500円'}（{current_count}個目）"
         print(f"[DEBUG] content_type: {content['name']}")
