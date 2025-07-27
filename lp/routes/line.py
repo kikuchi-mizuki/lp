@@ -427,8 +427,10 @@ def line_webhook():
                     stripe_subscription_id = user[1]
                     state = user_states.get(user_id, 'welcome_sent')
                     
-                    # 新しいサブスクリプションが作成された場合の処理（初回のみ）
-                    if stripe_subscription_id and stripe_subscription_id.startswith('sub_') and state == 'welcome_sent':
+                    # 新しいサブスクリプションが作成された場合の処理（初回のみ、特定のメッセージ以外）
+                    if (stripe_subscription_id and stripe_subscription_id.startswith('sub_') and 
+                        state == 'welcome_sent' and 
+                        text not in ['追加', 'メニュー', 'ヘルプ', '状態', '解約']):
                         # サブスクリプションの状態をチェック
                         from services.line_service import check_subscription_status
                         subscription_status = check_subscription_status(stripe_subscription_id)
