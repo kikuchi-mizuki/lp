@@ -7,6 +7,7 @@ import traceback
 import time
 from utils.db import get_db_connection
 import re
+import datetime
 
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
 
@@ -774,13 +775,12 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                             break
                     
                     if usage_item:
-                        # Usage Recordを作成（無料の場合はquantity=0）
-                        usage_record = stripe.InvoiceItem.create(
-                            customer=subscription['customer'],
-                            subscription=stripe_subscription_id,
-                            price=usage_price_id,
-                            quantity=0,  # 無料の場合は0
-                            description=f"{content['name']} (無料)"
+                        # Usage Recordを作成（1個目は無料だが使用量として記録）
+                        usage_record = stripe.SubscriptionItem.create_usage_record(
+                            usage_item['id'],
+                            quantity=1,  # 1個目も使用量として記録
+                            description=f"{content['name']} (無料)",
+                            timestamp=int(datetime.datetime.now().timestamp())
                         )
                         print(f'[DEBUG] Stripe Usage Record作成成功（無料）: {usage_record.id}')
                         
@@ -790,7 +790,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                         c.execute('''
                             INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type, pending_charge)
                             VALUES (%s, %s, %s, %s, %s, %s)
-                        ''', (user_id_db, 0, usage_record.id, is_free, content['name'], False))
+                        ''', (user_id_db, 1, usage_record.id, is_free, content['name'], False))
                         conn.commit()
                         conn.close()
                         print(f'[DEBUG] DB登録成功（1個目・無料）: user_id={user_id_db}, usage_record_id={usage_record.id}')
@@ -802,7 +802,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                         c.execute('''
                             INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type, pending_charge)
                             VALUES (%s, %s, %s, %s, %s, %s)
-                        ''', (user_id_db, 0, None, is_free, content['name'], False))
+                        ''', (user_id_db, 1, None, is_free, content['name'], False))
                         conn.commit()
                         conn.close()
                         print(f'[DEBUG] DB登録成功（1個目・無料・Stripe未連携）: user_id={user_id_db}')
@@ -814,7 +814,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                     c.execute('''
                         INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type, pending_charge)
                         VALUES (%s, %s, %s, %s, %s, %s)
-                    ''', (user_id_db, 0, None, is_free, content['name'], False))
+                    ''', (user_id_db, 1, None, is_free, content['name'], False))
                     conn.commit()
                     conn.close()
                     print(f'[DEBUG] DB登録成功（1個目・無料・Stripe未設定）: user_id={user_id_db}')
@@ -826,7 +826,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                 c.execute('''
                     INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type, pending_charge)
                     VALUES (%s, %s, %s, %s, %s, %s)
-                ''', (user_id_db, 0, None, is_free, content['name'], False))
+                ''', (user_id_db, 1, None, is_free, content['name'], False))
                 conn.commit()
                 conn.close()
                 print(f'[DEBUG] DB登録成功（1個目・無料・エラー時）: user_id={user_id_db}')
@@ -850,12 +850,11 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                     
                     if usage_item:
                         # Usage Recordを作成（課金予定の場合はquantity=1）
-                        usage_record = stripe.InvoiceItem.create(
-                            customer=subscription['customer'],
-                            subscription=stripe_subscription_id,
-                            price=usage_price_id,
+                        usage_record = stripe.SubscriptionItem.create_usage_record(
+                            usage_item['id'],
                             quantity=1,  # 課金予定の場合は1
-                            description=f"{content['name']} (課金予定)"
+                            description=f"{content['name']} (課金予定)",
+                            timestamp=int(datetime.datetime.now().timestamp())
                         )
                         print(f'[DEBUG] Stripe Usage Record作成成功（課金予定）: {usage_record.id}')
                         
