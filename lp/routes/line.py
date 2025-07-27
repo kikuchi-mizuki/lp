@@ -520,6 +520,13 @@ def line_webhook():
                     handle_cancel_request(event['replyToken'], user_id_db, stripe_subscription_id)
                 elif state == 'cancel_select':
                     print(f'[DEBUG] 解約選択処理: user_id={user_id}, state={state}, text={text}')
+                    
+                    # 「メニュー」コマンドの場合は状態をリセットしてメニューを表示
+                    if text == 'メニュー':
+                        user_states[user_id] = 'welcome_sent'
+                        send_line_message(event['replyToken'], [get_menu_message()])
+                        continue
+                    
                     # AI技術を活用した高度な数字抽出関数を使用して処理
                     from services.line_service import smart_number_extraction, validate_selection_numbers
                     

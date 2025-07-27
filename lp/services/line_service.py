@@ -1122,6 +1122,10 @@ def handle_cancel_request(reply_token, user_id_db, stripe_subscription_id):
         added_contents = c.fetchall()
         conn.close()
         
+        print(f'[DEBUG] 解約対象コンテンツ取得: user_id={user_id_db}, count={len(added_contents)}')
+        for content in added_contents:
+            print(f'[DEBUG] コンテンツ: {content}')
+        
         content_choices = []
         choice_index = 1
         
@@ -1137,7 +1141,29 @@ def handle_cancel_request(reply_token, user_id_db, stripe_subscription_id):
                 choice_index += 1
         
         if not content_choices:
-            send_line_message(reply_token, [{"type": "text", "text": "現在契約中のコンテンツはありません。"}])
+            # コンテンツが存在しない場合のメッセージを改善
+            no_content_message = {
+                "type": "template",
+                "altText": "契約中コンテンツなし",
+                "template": {
+                    "type": "buttons",
+                    "title": "契約中コンテンツなし",
+                    "text": "現在契約中のコンテンツはありません。\n\nコンテンツを追加してから解約してください。",
+                    "actions": [
+                        {
+                            "type": "message",
+                            "label": "コンテンツ追加",
+                            "text": "追加"
+                        },
+                        {
+                            "type": "message",
+                            "label": "メニューに戻る",
+                            "text": "メニュー"
+                        }
+                    ]
+                }
+            }
+            send_line_message(reply_token, [no_content_message])
             return
         
         choice_message = "\n".join(content_choices)
