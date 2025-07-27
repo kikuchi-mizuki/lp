@@ -6,6 +6,7 @@ import stripe
 import traceback
 import time
 from utils.db import get_db_connection
+import re
 
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
 
@@ -1223,7 +1224,7 @@ def handle_cancel_request(reply_token, user_id_db, stripe_subscription_id):
             return
         
         choice_message = "\n".join(content_choices)
-        send_line_message(reply_token, [{"type": "text", "text": f"解約したいコンテンツを選んでください（カンマまたはドット区切りで複数選択可）:\n{choice_message}\n\n例: 1,2 または 1.2"}])
+        send_line_message(reply_token, [{"type": "text", "text": f"解約したいコンテンツを選んでください（数字のみ入力、区切り文字は自由）:\n{choice_message}\n\n例: 1,2 または 1.2 または 1 2 または 一二"}])
     except Exception as e:
         send_line_message(reply_token, [{"type": "text", "text": "❌ 契約中コンテンツの取得に失敗しました。しばらく時間をおいて再度お試しください。"}])
 
@@ -1238,14 +1239,14 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
         c.execute('SELECT id, content_type, is_free FROM usage_logs WHERE user_id = %s ORDER BY created_at', (user_id_db,))
         added_contents = c.fetchall()
         
-        # 選択された番号を解析（カンマ区切りとドット区切りの両方に対応）
-        # まず、ドットをカンマに変換してから解析
-        normalized_text = selection_text.replace('.', ',')
-        selected_indices = [int(x.strip()) for x in normalized_text.split(',') if x.strip().isdigit()]
+        # 選択された番号を解析（高度な数字抽出処理）
+        numbers = extract_numbers_from_text(selection_text)
+        selected_indices = validate_selection_numbers(numbers, len(added_contents))
         
         print(f'[DEBUG] 選択テキスト: {selection_text}')
-        print(f'[DEBUG] 正規化テキスト: {normalized_text}')
-        print(f'[DEBUG] 選択されたインデックス: {selected_indices}')
+        print(f'[DEBUG] 抽出された数字: {numbers}')
+        print(f'[DEBUG] 有効な選択インデックス: {selected_indices}')
+        print(f'[DEBUG] 最大選択可能数: {len(added_contents)}')
         
         cancelled = []
         choice_index = 1
@@ -1488,3 +1489,42 @@ def get_welcome_message():
 
 def get_not_registered_message():
     return "ご登録情報が見つかりません。LPからご登録ください。" 
+
+def extract_numbers_from_text(text):
+    """テキストから数字を抽出する高度な処理"""
+    import re
+    
+    # 基本的な数字抽出
+    numbers = re.findall(r'\d+', text)
+    
+    # 日本語の数字表現も対応（一、二、三など）
+    japanese_numbers = {
+        '一': 1, '二': 2, '三': 3, '四': 4, '五': 5,
+        '六': 6, '七': 7, '八': 8, '九': 9, '十': 10
+    }
+    
+    # 日本語数字を検索
+    for japanese, arabic in japanese_numbers.items():
+        if japanese in text:
+            numbers.append(str(arabic))
+    
+    # 重複を除去してソート
+    unique_numbers = list(set(numbers))
+    unique_numbers.sort(key=lambda x: int(x))
+    
+    return unique_numbers
+
+def validate_selection_numbers(numbers, max_count):
+    """選択された数字が有効かチェック"""
+    valid_numbers = []
+    for num in numbers:
+        try:
+            num_int = int(num)
+            if 1 <= num_int <= max_count:
+                valid_numbers.append(num_int)
+            else:
+                print(f'[DEBUG] 無効な番号: {num_int} (範囲外: 1-{max_count})')
+        except ValueError:
+            print(f'[DEBUG] 無効な数字形式: {num}')
+    
+    return valid_numbers
