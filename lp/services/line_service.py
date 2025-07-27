@@ -526,8 +526,8 @@ def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, co
         is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
         
         # 1個目は常に無料、2個目以降はトライアル期間中は無料、それ以外は有料
-        is_free = total_usage_count == 0 or (is_trial_period and total_usage_count > 0)
         current_count = total_usage_count + 1
+        is_free = current_count == 1 or (is_trial_period and current_count > 1)
         
         if is_trial_period:
             if current_count == 1:
@@ -689,15 +689,15 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
         # usage_logsから再度カウントしてis_freeを決定
         conn_count = get_db_connection()
         c_count = conn_count.cursor()
-        # 全コンテンツの合計数を取得（重複を除外）
-        c_count.execute('SELECT COUNT(DISTINCT content_type) FROM usage_logs WHERE user_id = %s', (user_id_db,))
+        # 全コンテンツの合計数を取得（実際の追加回数）
+        c_count.execute('SELECT COUNT(*) FROM usage_logs WHERE user_id = %s', (user_id_db,))
         total_usage_count = c_count.fetchone()[0]
         # 同じコンテンツの追加回数を確認
         c_count.execute('SELECT COUNT(*) FROM usage_logs WHERE user_id = %s AND content_type = %s', (user_id_db, content['name']))
         same_content_count = c_count.fetchone()[0]
         conn_count.close()
         
-        print(f"[DEBUG] total_usage_count (distinct): {total_usage_count}")
+        print(f"[DEBUG] total_usage_count (actual): {total_usage_count}")
         print(f"[DEBUG] same_content_count: {same_content_count}")
         
         # 同じコンテンツが既に追加されている場合
@@ -731,8 +731,8 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
         is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
         
         # 1個目は常に無料、2個目以降はトライアル期間中は無料、それ以外は有料
-        is_free = total_usage_count == 0 or (is_trial_period and total_usage_count > 0)
         current_count = total_usage_count + 1
+        is_free = current_count == 1 or (is_trial_period and current_count > 1)
         
         if is_trial_period:
             if current_count == 1:
