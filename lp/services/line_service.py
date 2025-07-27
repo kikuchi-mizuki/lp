@@ -791,7 +791,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
         if current_count == 1:
             price_message = f"料金：無料（{current_count}個目）"
         else:
-            price_message = f"料金：1,500円（{current_count}個目、1週間後に課金）"
+            price_message = f"料金：1,500円（{current_count}個目、月額期間で課金）"
             print(f'[DEBUG] 2個目以降のコンテンツ追加: is_free={is_free}, current_count={current_count}')
         print(f"[DEBUG] content_type: {content['name']}")
         print(f"[DEBUG] DATABASE_URL: {os.getenv('DATABASE_URL')}")
@@ -832,15 +832,15 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                                 print(f'[DEBUG] DB登録成功（1個目・無料・トライアル期間中）: user_id={user_id_db}')
                             else:
                                 # 通常期間中はUsageRecordを作成
-                                # 追加日から1週間後の期間で課金するため、1週間後のtimestampを設定
-                                one_week_later = datetime.datetime.now() + datetime.timedelta(days=7)
+                                # 月額料金と同じ期間で課金するため、現在時刻のtimestampを設定
+                                current_timestamp = datetime.datetime.now()
                                 usage_record = stripe.SubscriptionItem.create_usage_record(
                                     usage_item['id'],
                                     quantity=1,  # 1個目も使用量として記録
-                                    timestamp=int(one_week_later.timestamp()),
+                                    timestamp=int(current_timestamp.timestamp()),
                                     action='increment'  # 既存の使用量に追加
                                 )
-                                print(f'[DEBUG] Stripe UsageRecord作成成功（無料・1週間後課金）: {usage_record.id}, timestamp={one_week_later}')
+                                print(f'[DEBUG] Stripe UsageRecord作成成功（無料・月額期間課金）: {usage_record.id}, timestamp={current_timestamp}')
                                 
                                 # データベースに記録
                                 conn = get_db_connection()
@@ -901,8 +901,8 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                 conn.close()
                 print(f'[DEBUG] DB登録成功（1個目・無料・エラー時）: user_id={user_id_db}')
         else:
-            # 2個目以降は1週間後に課金するため、pending_chargeフラグを設定
-            print(f'[DEBUG] 2個目以降のコンテンツ追加: 1週間後に課金予定, is_free={is_free}, current_count={current_count}')
+            # 2個目以降は月額料金と同じ期間で課金するため、pending_chargeフラグを設定
+            print(f'[DEBUG] 2個目以降のコンテンツ追加: 月額期間で課金予定, is_free={is_free}, current_count={current_count}')
             try:
                 # Stripe Usage Recordを作成（課金予定）
                 import stripe
@@ -931,15 +931,15 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                             print(f'[DEBUG] DB登録成功（2個目以降・課金予定・トライアル期間中）: user_id={user_id_db}')
                         else:
                             # 通常期間中はUsageRecordを作成
-                            # 追加日から1週間後の期間で課金するため、1週間後のtimestampを設定
-                            one_week_later = datetime.datetime.now() + datetime.timedelta(days=7)
+                            # 月額料金と同じ期間で課金するため、現在時刻のtimestampを設定
+                            current_timestamp = datetime.datetime.now()
                             usage_record = stripe.SubscriptionItem.create_usage_record(
                                 usage_item['id'],
                                 quantity=1,  # 課金予定の場合は1
-                                timestamp=int(one_week_later.timestamp()),
+                                timestamp=int(current_timestamp.timestamp()),
                                 action='increment'  # 既存の使用量に追加
                             )
-                            print(f'[DEBUG] Stripe UsageRecord作成成功（課金予定・1週間後課金）: {usage_record.id}, timestamp={one_week_later}')
+                            print(f'[DEBUG] Stripe UsageRecord作成成功（課金予定・月額期間課金）: {usage_record.id}, timestamp={current_timestamp}')
                             
                             # データベースに記録
                             conn = get_db_connection()
@@ -1039,7 +1039,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                 "template": {
                     "type": "buttons",
                     "title": "コンテンツ追加完了！",
-                    "text": f"追加内容：{content['name']}\n料金：1,500円（{total_usage_count + 1}個目、1週間後に課金）",
+                    "text": f"追加内容：{content['name']}\n料金：1,500円（{total_usage_count + 1}個目、月額期間で課金）",
                     "actions": [
                         {
                             "type": "message",
