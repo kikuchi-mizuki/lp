@@ -908,63 +908,49 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                 print(f'[DEBUG] Stripe InvoiceItem作成エラー: {e}')
                 # エラーが発生してもデータベースには記録済みなので続行
         
-        # 成功メッセージを送信
+        # 1通目: 追加完了のテキストメッセージ
         if is_free:
-            success_message = {
-                "type": "template",
-                "altText": "追加完了",
-                "template": {
-                    "type": "buttons",
-                    "title": "✅ 追加完了",
-                    "text": f"追加内容：{content['name']}\n{price_message}\n\n次回請求時に月額料金に含まれます。",
-                    "actions": [
-                        {
-                            "type": "message",
-                            "label": "📚 他のコンテンツ追加",
-                            "text": "追加"
-                        },
-                        {
-                            "type": "message",
-                            "label": "📊 利用状況確認",
-                            "text": "状態"
-                        },
-                        {
-                            "type": "message",
-                            "label": "❓ ヘルプ",
-                            "text": "ヘルプ"
-                        }
-                    ]
-                }
+            success_text_message = {
+                "type": "text",
+                "text": f"✅ 追加完了\n\n追加内容：{content['name']}\n{price_message}\n\n次回請求時に月額料金に含まれます。"
             }
         else:
-            success_message = {
-                "type": "template",
-                "altText": "追加完了",
-                "template": {
-                    "type": "buttons",
-                    "title": "✅ 追加完了",
-                    "text": f"追加内容：{content['name']}\n{price_message}\n\n次回請求時に月額料金に含まれます。",
-                    "actions": [
-                        {
-                            "type": "message",
-                            "label": "📚 他のコンテンツ追加",
-                            "text": "追加"
-                        },
-                        {
-                            "type": "message",
-                            "label": "📊 利用状況確認",
-                            "text": "状態"
-                        },
-                        {
-                            "type": "message",
-                            "label": "❓ ヘルプ",
-                            "text": "ヘルプ"
-                        }
-                    ]
-                }
+            success_text_message = {
+                "type": "text",
+                "text": f"✅ 追加完了\n\n追加内容：{content['name']}\n{price_message}\n\n次回請求時に月額料金に含まれます。"
             }
         
-        send_line_message(reply_token, [success_message])
+        send_line_message(reply_token, [success_text_message])
+        
+        # 2通目: アクションボタン
+        success_buttons_message = {
+            "type": "template",
+            "altText": "次のアクションを選択",
+            "template": {
+                "type": "buttons",
+                "title": "次のアクション",
+                "text": "何か他にお手伝いできることはありますか？",
+                "actions": [
+                    {
+                        "type": "message",
+                        "label": "📚 他のコンテンツ追加",
+                        "text": "追加"
+                    },
+                    {
+                        "type": "message",
+                        "label": "📊 利用状況確認",
+                        "text": "状態"
+                    },
+                    {
+                        "type": "message",
+                        "label": "❓ ヘルプ",
+                        "text": "ヘルプ"
+                    }
+                ]
+            }
+        }
+        
+        send_line_message(reply_token, [success_buttons_message])
         
     except Exception as e:
         print(f'[DEBUG] handle_content_confirmation エラー: {e}')
@@ -1374,13 +1360,21 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
             subscription_status = check_subscription_status(stripe_subscription_id)
             is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
             
-            cancel_success_message = {
+            # 1通目: 解約完了のテキストメッセージ
+            cancel_text_message = {
+                "type": "text",
+                "text": f"以下のコンテンツの解約を受け付けました：\n\n" + "\n".join([f"• {content}" for content in cancelled])
+            }
+            send_line_message(reply_token, [cancel_text_message])
+            
+            # 2通目: アクションボタン
+            cancel_buttons_message = {
                 "type": "template",
-                "altText": "コンテンツ解約完了",
+                "altText": "次のアクションを選択",
                 "template": {
                     "type": "buttons",
-                    "title": "コンテンツ解約完了",
-                    "text": f"以下のコンテンツの解約を受け付けました：\n" + "\n".join(cancelled),
+                    "title": "次のアクション",
+                    "text": "何か他にお手伝いできることはありますか？",
                     "actions": [
                         {
                             "type": "message",
@@ -1400,7 +1394,7 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
                     ]
                 }
             }
-            send_line_message(reply_token, [cancel_success_message])
+            send_line_message(reply_token, [cancel_buttons_message])
             
             # 請求期間についての説明を別メッセージで送信
             if is_trial_period:
