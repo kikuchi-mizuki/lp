@@ -1143,11 +1143,11 @@ def handle_status_check(reply_token, user_id_db):
         if is_trial_period:
             status_lines.append("💰 料金体系（トライアル期間中）:")
             status_lines.append("• 1個目: 無料")
-            status_lines.append("• 2個目以降: 1,500円/件（1週間後に課金）")
+            status_lines.append("• 2個目以降: 1,500円/件（月額料金に追加）")
         else:
             status_lines.append("💰 料金体系:")
             status_lines.append("• 1個目: 無料")
-            status_lines.append("• 2個目以降: 1,500円/件（1週間後に課金）")
+            status_lines.append("• 2個目以降: 1,500円/件（月額料金に追加）")
         
         status_lines.append("")  # 空行
         
@@ -1183,7 +1183,7 @@ def handle_status_check(reply_token, user_id_db):
             if next_count == 1:
                 next_price = "無料"
             else:
-                next_price = "1,500円（1週間後に課金）"
+                next_price = "1,500円（月額料金に追加）"
             status_lines.append(f"📝 次回追加時（{next_count}個目）: {next_price}")
             
             status_lines.append("")
