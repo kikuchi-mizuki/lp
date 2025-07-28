@@ -824,30 +824,12 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                 customer_id = subscription.customer
                 
                 # 請求期間を取得（月額料金と同じ期間を使用）
-                if subscription.status == 'trialing':
-                    # トライアル期間中の場合は、次の通常期間を計算
-                    trial_end = subscription.trial_end
-                    from datetime import datetime, timedelta
-                    
-                    # trial_endをdatetimeオブジェクトに変換
-                    if isinstance(trial_end, int):
-                        trial_end_dt = datetime.fromtimestamp(trial_end)
-                    else:
-                        trial_end_dt = trial_end
-                    
-                    # 次の月額期間の開始日（トライアル終了日の翌日）
-                    current_period_start = int((trial_end_dt + timedelta(days=1)).timestamp())
-                    
-                    # 次の月額期間の終了日（開始日から1ヶ月後）
-                    next_period_end = trial_end_dt + timedelta(days=1) + timedelta(days=30)
-                    current_period_end = int(next_period_end.timestamp())
-                    
-                    print(f'[DEBUG] トライアル期間中（次の通常期間計算）: trial_end={trial_end_dt}, next_period_start={datetime.fromtimestamp(current_period_start)}, next_period_end={datetime.fromtimestamp(current_period_end)}')
-                else:
-                    # 通常期間の場合は現在の期間を使用
-                    current_period_start = subscription.current_period_start
-                    current_period_end = subscription.current_period_end
-                    print(f'[DEBUG] 通常期間: period_start={datetime.fromtimestamp(current_period_start)}, period_end={datetime.fromtimestamp(current_period_end)}')
+                # トライアル期間中でも、月額料金の期間を直接取得
+                current_period_start = subscription.current_period_start
+                current_period_end = subscription.current_period_end
+                
+                from datetime import datetime
+                print(f'[DEBUG] 月額料金期間使用: period_start={datetime.fromtimestamp(current_period_start)}, period_end={datetime.fromtimestamp(current_period_end)}')
                 
                 # Invoice Itemを作成（月額料金と同じ期間で課金）
                 invoice_item = stripe.InvoiceItem.create(
