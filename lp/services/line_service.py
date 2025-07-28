@@ -867,15 +867,15 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                     trial_end = subscription.trial_end
                     # 月額料金の開始日（トライアル終了日）
                     current_period_start = trial_end
-                    # 月額料金の終了日（翌月の同じ日付の2日前）
+                    # 月額料金の終了日（翌月の同じ日付の前日）
                     start_date = datetime.fromtimestamp(trial_end)
                     # 次の月の同じ日付を計算
                     if start_date.month == 12:
                         end_date = start_date.replace(year=start_date.year + 1, month=1)
                     else:
                         end_date = start_date.replace(month=start_date.month + 1)
-                    # 2日前に調整（30日間の期間にする）
-                    end_date = end_date - timedelta(days=2)
+                    # 1日前に調整（翌月の同じ日付の前日）
+                    end_date = end_date - timedelta(days=1)
                     current_period_end = int(end_date.timestamp())
                     print(f'[DEBUG] トライアル期間中: 月額料金期間使用: period_start={datetime.fromtimestamp(current_period_start)}, period_end={datetime.fromtimestamp(current_period_end)}')
                 else:

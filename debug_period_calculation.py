@@ -25,9 +25,9 @@ def debug_period_calculation():
     
     print(f"次の月の同じ日付: {end_date}")
     
-    # 2日前に調整（30日間の期間にする）
-    end_date_adjusted = end_date - timedelta(days=2)
-    print(f"2日前に調整後: {end_date_adjusted}")
+    # 1日前に調整（翌月の同じ日付の前日）
+    end_date_adjusted = end_date - timedelta(days=1)
+    print(f"1日前に調整後: {end_date_adjusted}")
     
     # 期間の日数を計算
     period_days = (end_date_adjusted - start_date).days + 1
@@ -36,8 +36,8 @@ def debug_period_calculation():
     # 期待される結果
     print(f"\n期待される期間:")
     print(f"開始: 2025-08-04")
-    print(f"終了: 2025-09-02")
-    print(f"日数: 30日")
+    print(f"終了: 2025-09-03")
+    print(f"日数: 31日")
 
 if __name__ == "__main__":
     debug_period_calculation() 

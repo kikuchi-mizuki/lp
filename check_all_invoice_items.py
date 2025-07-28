@@ -46,7 +46,7 @@ def check_all_invoice_items():
             
             # 正しい期間かチェック
             expected_start = datetime(2025, 8, 4, 8, 5, 6)  # 2025-08-04 08:05:06
-            expected_end = datetime(2025, 9, 2, 8, 5, 6)    # 2025-09-02 08:05:06
+            expected_end = datetime(2025, 9, 3, 8, 5, 6)    # 2025-09-03 08:05:06
             
             if start_date != expected_start or end_date != expected_end:
                 print(f"  ❌ 期間がずれています！")
