@@ -1375,7 +1375,7 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
             }
             send_line_message(reply_token, [cancel_text_message])
             
-            # 2通目: アクションボタン
+            # 2通目: アクションボタン（push_messageで送信）
             cancel_buttons_message = {
                 "type": "template",
                 "altText": "次のアクションを選択",
@@ -1402,9 +1402,48 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
                     ]
                 }
             }
-            send_line_message(reply_token, [cancel_buttons_message])
             
-            # 請求期間についての説明を別メッセージで送信
+            # LINEユーザーIDを取得してpush_messageで送信
+            line_user_id = None
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute('SELECT line_user_id FROM users WHERE id = %s', (user_id_db,))
+            result = c.fetchone()
+            conn.close()
+            
+            if result and result[0]:
+                line_user_id = result[0]
+                # push_messageで2通目のメッセージを送信
+                import requests
+                import json
+                from dotenv import load_dotenv
+                import os
+                load_dotenv()
+                
+                headers = {
+                    'Content-Type': 'application/json',
+                    'Authorization': f'Bearer {os.getenv("LINE_CHANNEL_ACCESS_TOKEN")}'
+                }
+                
+                push_data = {
+                    'to': line_user_id,
+                    'messages': [cancel_buttons_message]
+                }
+                
+                response = requests.post(
+                    'https://api.line.me/v2/bot/message/push',
+                    headers=headers,
+                    data=json.dumps(push_data)
+                )
+                
+                if response.status_code == 200:
+                    print(f'[DEBUG] 2通目のボタンメッセージ送信成功: {line_user_id}')
+                else:
+                    print(f'[DEBUG] 2通目のボタンメッセージ送信失敗: {response.status_code}, {response.text}')
+            else:
+                print(f'[DEBUG] LINEユーザーIDが見つかりません: user_id_db={user_id_db}')
+            
+            # 請求期間についての説明を別メッセージで送信（push_messageで送信）
             if is_trial_period:
                 period_message = {
                     "type": "text",
@@ -1415,19 +1454,28 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
                     "type": "text",
                     "text": "請求期間終了まで利用可能です。"
                 }
-            send_line_message(reply_token, [period_message])
+            
+            # push_messageで3通目のメッセージを送信
+            if line_user_id:
+                push_data = {
+                    'to': line_user_id,
+                    'messages': [period_message]
+                }
+                
+                response = requests.post(
+                    'https://api.line.me/v2/bot/message/push',
+                    headers=headers,
+                    data=json.dumps(push_data)
+                )
+                
+                if response.status_code == 200:
+                    print(f'[DEBUG] 3通目の期間説明メッセージ送信成功: {line_user_id}')
+                else:
+                    print(f'[DEBUG] 3通目の期間説明メッセージ送信失敗: {response.status_code}, {response.text}')
             
             # ユーザー状態をリセット
             from models.user_state import clear_user_state
-            line_user_id = None
-            # LINEユーザーIDを取得
-            conn = get_db_connection()
-            c = conn.cursor()
-            c.execute('SELECT line_user_id FROM users WHERE id = %s', (user_id_db,))
-            result = c.fetchone()
-            conn.close()
-            if result and result[0]:
-                line_user_id = result[0]
+            if line_user_id:
                 clear_user_state(line_user_id)
                 print(f'[DEBUG] ユーザー状態リセット: {line_user_id}')
         else:
