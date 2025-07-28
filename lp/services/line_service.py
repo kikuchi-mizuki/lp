@@ -1322,7 +1322,7 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
             send_line_message(reply_token, [period_message])
             
             # ユーザー状態をリセット
-            from routes.line import user_states
+            from models.user_state import clear_user_state
             line_user_id = None
             # LINEユーザーIDを取得
             conn = get_db_connection()
@@ -1332,9 +1332,8 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
             conn.close()
             if result and result[0]:
                 line_user_id = result[0]
-                if line_user_id in user_states:
-                    del user_states[line_user_id]
-                    print(f'[DEBUG] ユーザー状態リセット: {line_user_id}')
+                clear_user_state(line_user_id)
+                print(f'[DEBUG] ユーザー状態リセット: {line_user_id}')
         else:
             send_line_message(reply_token, [{"type": "text", "text": "有効な番号が選択されませんでした。もう一度お試しください。"}])
     except Exception as e:

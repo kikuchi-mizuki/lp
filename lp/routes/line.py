@@ -44,7 +44,7 @@ def payment_completed_webhook_by_user_id(user_id):
                 success = send_welcome_with_buttons_push(line_user_id)
                 if success:
                     # 自動案内文送信後にユーザー状態を設定（重複防止）
-                    user_states[line_user_id] = 'welcome_sent'
+                    set_user_state(line_user_id, 'welcome_sent')
                     print(f'[DEBUG] 自動案内文送信完了、ユーザー状態を設定: line_user_id={line_user_id}')
                     return jsonify({
                         'success': True, 
@@ -293,7 +293,7 @@ def debug_line_users():
         
         return jsonify({
             'users': user_list,
-            'user_states': user_states
+            'message': 'user_statesはデータベースで管理されています'
         })
     except Exception as e:
         return jsonify({'error': str(e)})
@@ -644,12 +644,13 @@ def line_webhook():
                     else:
                         print(f'[DEBUG] 一般的なデフォルト処理: state={state}')
                         # 初回案内文が未送信の場合のみ送信
-                        if user_id not in user_states or user_states[user_id] is None:
+                        current_state = get_user_state(user_id)
+                        if current_state != 'welcome_sent':
                             print(f'[DEBUG] 初回案内文送信: user_id={user_id}')
                             try:
                                 from services.line_service import send_welcome_with_buttons
                                 send_welcome_with_buttons(event['replyToken'])
-                                user_states[user_id] = 'welcome_sent'
+                                set_user_state(user_id, 'welcome_sent')
                             except Exception as e:
                                 print(f'[DEBUG] 初回案内文送信エラー: {e}')
                                 send_line_message(event['replyToken'], [get_default_message()])
@@ -672,7 +673,7 @@ def line_webhook():
                 stripe_subscription_id = user[1]
                 # postbackデータに基づいて処理
                 if postback_data == 'action=add_content':
-                    user_states[user_id] = 'add_select'
+                    set_user_state(user_id, 'add_select')
                     handle_add_content(event['replyToken'], user_id_db, stripe_subscription_id)
                 elif postback_data == 'action=check_status':
                     handle_status_check(event['replyToken'], user_id_db)

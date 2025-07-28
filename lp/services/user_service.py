@@ -35,19 +35,20 @@ def get_user_by_line_id(line_user_id):
         print(f'ユーザー取得エラー: {e}')
         return None
 
-def set_user_state(line_user_id, state):
-    """ユーザー状態管理（本番はDBやRedis推奨、今はメモリ）"""
-    # メモリベースの状態管理（簡易版）
-    global user_states
-    if 'user_states' not in globals():
-        global user_states
-        user_states = {}
-    user_states[line_user_id] = state
+# 永続的な状態管理を使用するため、メモリベースの状態管理は削除
+# def set_user_state(line_user_id, state):
+#     """ユーザー状態管理（本番はDBやRedis推奨、今はメモリ）"""
+#     # メモリベースの状態管理（簡易版）
+#     global user_states
+#     if 'user_states' not in globals():
+#         global user_states
+#         user_states = {}
+#     user_states[line_user_id] = state
 
-def get_user_state(line_user_id):
-    """ユーザー状態取得"""
-    global user_states
-    if 'user_states' not in globals():
-        global user_states
-        user_states = {}
-    return user_states.get(line_user_id) 
+# def get_user_state(line_user_id):
+#     """ユーザー状態取得"""
+#     global user_states
+#     if 'user_states' not in globals():
+#         global user_states
+#         user_states = {}
+#     return user_states.get(line_user_id) 
