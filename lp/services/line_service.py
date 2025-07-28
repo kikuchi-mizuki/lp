@@ -859,13 +859,22 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                 subscription = stripe.Subscription.retrieve(stripe_subscription_id)
                 customer_id = subscription.customer
                 
-                # 請求期間を取得（月額料金と同じ期間を使用）
-                # トライアル期間中でも、月額料金の期間を直接取得
-                current_period_start = subscription.current_period_start
-                current_period_end = subscription.current_period_end
+                # 請求期間を取得
+                from datetime import datetime, timedelta
                 
-                from datetime import datetime
-                print(f'[DEBUG] 月額料金期間使用: period_start={datetime.fromtimestamp(current_period_start)}, period_end={datetime.fromtimestamp(current_period_end)}')
+                if subscription.status == 'trialing':
+                    # トライアル期間中の場合、月額料金の開始期間を使用
+                    trial_end = subscription.trial_end
+                    # 月額料金の開始日（トライアル終了日の翌日）
+                    current_period_start = trial_end
+                    # 月額料金の終了日（開始日から1ヶ月後）
+                    current_period_end = trial_end + (30 * 24 * 60 * 60)  # 30日後
+                    print(f'[DEBUG] トライアル期間中: 月額料金期間使用: period_start={datetime.fromtimestamp(current_period_start)}, period_end={datetime.fromtimestamp(current_period_end)}')
+                else:
+                    # 通常の月額期間の場合
+                    current_period_start = subscription.current_period_start
+                    current_period_end = subscription.current_period_end
+                    print(f'[DEBUG] 通常期間: 月額料金期間使用: period_start={datetime.fromtimestamp(current_period_start)}, period_end={datetime.fromtimestamp(current_period_end)}')
                 
                 # Invoice Itemを作成（月額料金と同じ期間で課金）
                 invoice_item = stripe.InvoiceItem.create(
