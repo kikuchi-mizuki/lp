@@ -462,7 +462,7 @@ def line_webhook():
                 
                 # ユーザー状態の確認
                 state = user_states.get(user_id, 'welcome_sent')
-                print(f'[DEBUG] ユーザー状態: user_id={user_id}, state={state}')
+                print(f'[DEBUG] ユーザー状態確認: user_id={user_id}, state={state}, user_states={user_states}')
                 
                 # 初回案内文が既に送信されている場合は、通常のメッセージ処理に進む
                 if state == 'welcome_sent':
@@ -527,7 +527,7 @@ def line_webhook():
                         # 数字が抽出できない場合は詳細なエラーメッセージ
                         error_message = "数字を入力してください。\n\n対応形式:\n• 1,2,3 (カンマ区切り)\n• 1.2.3 (ドット区切り)\n• 1 2 3 (スペース区切り)\n• 一二三 (日本語数字)\n• 1番目,2番目 (序数表現)\n• 最初,二番目 (日本語序数)"
                         send_line_message(event['replyToken'], [{"type": "text", "text": error_message}])
-                # その他のコマンド処理（cancel_select状態以外）
+                # add_select状態の処理を優先
                 elif state == 'add_select':
                     print(f'[DEBUG] add_select状態での処理: user_id={user_id}, text={text}')
                     # 主要なコマンドの場合は通常の処理に切り替え
@@ -550,6 +550,7 @@ def line_webhook():
                         print(f'[DEBUG] 無効な入力: text={text}')
                         # 無効な入力の場合はコンテンツ選択を促す
                         send_line_message(event['replyToken'], [{"type": "text", "text": "1〜3の数字でコンテンツを選択してください。\n\nまたは「メニュー」でメインメニューに戻ります。"}])
+                # その他のコマンド処理（add_select状態以外）
                 elif text == '追加' and state != 'cancel_select':
                     print(f'[DEBUG] 追加コマンド受信: user_id={user_id}, state={state}')
                     user_states[user_id] = 'add_select'
