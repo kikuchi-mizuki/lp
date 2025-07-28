@@ -16,11 +16,7 @@
         {
           "name": "ai-collections.herokuapp.com"
         }
-      ],
-      "variables": {
-        "NODE_ENV": "production",
-        "PYTHON_VERSION": "3.11.7"
-      }
+      ]
     },
     {
       "name": "ai-schedule-secretary",
@@ -29,12 +25,7 @@
         {
           "name": "ai-schedule-secretary.railway.app"
         }
-      ],
-      "variables": {
-        "NODE_ENV": "production",
-        "SERVICE_TYPE": "schedule",
-        "PYTHON_VERSION": "3.11.7"
-      }
+      ]
     },
     {
       "name": "ai-accounting-secretary",
@@ -43,12 +34,7 @@
         {
           "name": "ai-accounting-secretary.railway.app"
         }
-      ],
-      "variables": {
-        "NODE_ENV": "production",
-        "SERVICE_TYPE": "accounting",
-        "PYTHON_VERSION": "3.11.7"
-      }
+      ]
     },
     {
       "name": "ai-task-concierge",
@@ -57,12 +43,7 @@
         {
           "name": "ai-task-concierge.railway.app"
         }
-      ],
-      "variables": {
-        "NODE_ENV": "production",
-        "SERVICE_TYPE": "task",
-        "PYTHON_VERSION": "3.11.7"
-      }
+      ]
     }
   ],
   "databases": [
