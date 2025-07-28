@@ -1241,20 +1241,20 @@ def handle_cancel_request(reply_token, user_id_db, stripe_subscription_id):
             # コンテンツが存在しない場合のメッセージを改善
             no_content_message = {
                 "type": "template",
-                "altText": "契約中コンテンツなし",
+                "altText": "解約できるコンテンツがありません",
                 "template": {
                     "type": "buttons",
-                    "title": "契約中コンテンツなし",
-                    "text": "現在契約中のコンテンツはありません。\n\nコンテンツを追加してから解約してください。",
+                    "title": "解約できるコンテンツがありません",
+                    "text": "現在利用中のコンテンツはありません。\n\nまずはコンテンツを追加してみませんか？",
                     "actions": [
                         {
                             "type": "message",
-                            "label": "コンテンツ追加",
+                            "label": "📚 コンテンツを追加",
                             "text": "追加"
                         },
                         {
                             "type": "message",
-                            "label": "メニューに戻る",
+                            "label": "🏠 メニューに戻る",
                             "text": "メニュー"
                         }
                     ]
@@ -1264,9 +1264,9 @@ def handle_cancel_request(reply_token, user_id_db, stripe_subscription_id):
             return
         
         choice_message = "\n".join(content_choices)
-        send_line_message(reply_token, [{"type": "text", "text": f"解約したいコンテンツを選んでください（AI対応：様々な形式で入力可能）:\n{choice_message}\n\n対応形式:\n• 1,2,3 (カンマ区切り)\n• 1.2.3 (ドット区切り)\n• 1 2 3 (スペース区切り)\n• 一二三 (日本語数字)\n• 1番目,2番目 (序数表現)\n• 最初,二番目 (日本語序数)"}])
+        send_line_message(reply_token, [{"type": "text", "text": f"どのコンテンツを解約されますか？\n\n{choice_message}\n\n📝 選び方は自由です！\n• 数字で選ぶ：1、2、3\n• 日本語で選ぶ：一、二、三\n• 番号で選ぶ：1番目、2番目\n• 複数選ぶ：1,2 や 1 2 など\n\nお気軽に選んでください 😊"}])
     except Exception as e:
-        send_line_message(reply_token, [{"type": "text", "text": "❌ 契約中コンテンツの取得に失敗しました。しばらく時間をおいて再度お試しください。"}])
+        send_line_message(reply_token, [{"type": "text", "text": "😅 申し訳ございません。\n\nコンテンツの情報を取得できませんでした。\n\nしばらく時間をおいて、もう一度お試しください。"}])
 
 def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, selection_text):
     try:
