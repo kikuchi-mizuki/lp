@@ -1290,6 +1290,30 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
             if content_type in ['AI予定秘書', 'AI経理秘書', 'AIタスクコンシェルジュ']:
                 print(f'[DEBUG] 処理中: choice_index={choice_index}, content_type={content_type}, usage_id={usage_id}')
                 if choice_index in selected_indices:
+                    # StripeのInvoice Itemを削除（有料コンテンツの場合）
+                    if not is_free:
+                        try:
+                            # stripe_usage_record_idからInvoice Item IDを取得
+                            c.execute('SELECT stripe_usage_record_id FROM usage_logs WHERE id = %s', (usage_id,))
+                            result = c.fetchone()
+                            if result and result[0]:
+                                invoice_item_id = result[0]
+                                print(f'[DEBUG] Stripe InvoiceItem削除開始: {invoice_item_id}')
+                                
+                                # StripeのInvoice Itemを削除
+                                import stripe
+                                from dotenv import load_dotenv
+                                import os
+                                load_dotenv()
+                                stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+                                
+                                invoice_item = stripe.InvoiceItem.retrieve(invoice_item_id)
+                                invoice_item.delete()
+                                print(f'[DEBUG] Stripe InvoiceItem削除成功: {invoice_item_id}')
+                        except Exception as e:
+                            print(f'[DEBUG] Stripe InvoiceItem削除エラー: {e}')
+                            # エラーが発生してもデータベースの削除は続行
+                    
                     # データベースからusage_logsを削除
                     c.execute('DELETE FROM usage_logs WHERE id = %s', (usage_id,))
                     cancelled.append(content_type)
@@ -1400,13 +1424,32 @@ def handle_subscription_cancel(reply_token, user_id_db, stripe_subscription_id):
         conn = get_db_connection()
         c = conn.cursor()
         
-        # 1週間以内の課金予定コンテンツを取得
+        # 1週間以内の課金予定コンテンツを取得（Stripe Invoice Item削除用）
         c.execute('''
-            SELECT id, content_type, created_at 
+            SELECT id, content_type, created_at, stripe_usage_record_id 
             FROM usage_logs 
             WHERE user_id = %s AND pending_charge = TRUE AND created_at > %s
         ''', (user_id_db, one_week_ago))
         recent_pending = c.fetchall()
+        
+        # StripeのInvoice Itemを削除
+        stripe_cancelled_count = 0
+        for usage_id, content_type, created_at, stripe_usage_record_id in recent_pending:
+            if stripe_usage_record_id:
+                try:
+                    import stripe
+                    from dotenv import load_dotenv
+                    import os
+                    load_dotenv()
+                    stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+                    
+                    print(f'[DEBUG] Stripe InvoiceItem削除開始: {stripe_usage_record_id}')
+                    invoice_item = stripe.InvoiceItem.retrieve(stripe_usage_record_id)
+                    invoice_item.delete()
+                    print(f'[DEBUG] Stripe InvoiceItem削除成功: {stripe_usage_record_id}')
+                    stripe_cancelled_count += 1
+                except Exception as e:
+                    print(f'[DEBUG] Stripe InvoiceItem削除エラー: {e}')
         
         # 1週間以内の課金予定をキャンセル（pending_chargeをFalseに設定）
         c.execute('''
@@ -1428,6 +1471,8 @@ def handle_subscription_cancel(reply_token, user_id_db, stripe_subscription_id):
         # キャンセルされたコンテンツの情報をメッセージに追加
         if cancelled_count > 0:
             cancel_message_text += f"\n\n1週間以内に追加された{cancelled_count}個のコンテンツの課金がキャンセルされました。"
+        if stripe_cancelled_count > 0:
+            cancel_message_text += f"\n\nStripeから{stripe_cancelled_count}個のInvoice Itemが削除されました。"
         
         print(f'[DEBUG] サブスクリプション解約: user_id={user_id_db}, deleted_count={deleted_count}, is_trial={is_trial_period}')
         
