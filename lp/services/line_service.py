@@ -825,13 +825,24 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
                 
                 # 請求期間を取得（月額料金と同じ期間を使用）
                 if subscription.status == 'trialing':
-                    # トライアル期間中の場合は、次の通常期間を使用
-                    # 月額料金の期間を直接取得
-                    current_period_start = subscription.current_period_start
-                    current_period_end = subscription.current_period_end
+                    # トライアル期間中の場合は、次の通常期間を計算
+                    trial_end = subscription.trial_end
+                    from datetime import datetime, timedelta
                     
-                    from datetime import datetime
-                    print(f'[DEBUG] トライアル期間中（月額料金期間使用）: period_start={datetime.fromtimestamp(current_period_start)}, period_end={datetime.fromtimestamp(current_period_end)}')
+                    # trial_endをdatetimeオブジェクトに変換
+                    if isinstance(trial_end, int):
+                        trial_end_dt = datetime.fromtimestamp(trial_end)
+                    else:
+                        trial_end_dt = trial_end
+                    
+                    # 次の月額期間の開始日（トライアル終了日の翌日）
+                    current_period_start = int((trial_end_dt + timedelta(days=1)).timestamp())
+                    
+                    # 次の月額期間の終了日（開始日から1ヶ月後）
+                    next_period_end = trial_end_dt + timedelta(days=1) + timedelta(days=30)
+                    current_period_end = int(next_period_end.timestamp())
+                    
+                    print(f'[DEBUG] トライアル期間中（次の通常期間計算）: trial_end={trial_end_dt}, next_period_start={datetime.fromtimestamp(current_period_start)}, next_period_end={datetime.fromtimestamp(current_period_end)}')
                 else:
                     # 通常期間の場合は現在の期間を使用
                     current_period_start = subscription.current_period_start
@@ -1290,34 +1301,37 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
             if content_type in ['AI予定秘書', 'AI経理秘書', 'AIタスクコンシェルジュ']:
                 print(f'[DEBUG] 処理中: choice_index={choice_index}, content_type={content_type}, usage_id={usage_id}')
                 if choice_index in selected_indices:
-                    # StripeのInvoice Itemを削除（有料コンテンツの場合）
+                    # まずstripe_usage_record_idを取得（削除前に）
+                    stripe_usage_record_id = None
                     if not is_free:
-                        try:
-                            # stripe_usage_record_idからInvoice Item IDを取得
-                            c.execute('SELECT stripe_usage_record_id FROM usage_logs WHERE id = %s', (usage_id,))
-                            result = c.fetchone()
-                            if result and result[0]:
-                                invoice_item_id = result[0]
-                                print(f'[DEBUG] Stripe InvoiceItem削除開始: {invoice_item_id}')
-                                
-                                # StripeのInvoice Itemを削除
-                                import stripe
-                                from dotenv import load_dotenv
-                                import os
-                                load_dotenv()
-                                stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
-                                
-                                invoice_item = stripe.InvoiceItem.retrieve(invoice_item_id)
-                                invoice_item.delete()
-                                print(f'[DEBUG] Stripe InvoiceItem削除成功: {invoice_item_id}')
-                        except Exception as e:
-                            print(f'[DEBUG] Stripe InvoiceItem削除エラー: {e}')
-                            # エラーが発生してもデータベースの削除は続行
+                        c.execute('SELECT stripe_usage_record_id FROM usage_logs WHERE id = %s', (usage_id,))
+                        result = c.fetchone()
+                        if result and result[0]:
+                            stripe_usage_record_id = result[0]
                     
                     # データベースからusage_logsを削除
                     c.execute('DELETE FROM usage_logs WHERE id = %s', (usage_id,))
                     cancelled.append(content_type)
                     print(f'[DEBUG] 解約処理: content_type={content_type}, usage_id={usage_id}')
+                    
+                    # StripeのInvoice Itemを削除（有料コンテンツの場合）
+                    if stripe_usage_record_id:
+                        try:
+                            print(f'[DEBUG] Stripe InvoiceItem削除開始: {stripe_usage_record_id}')
+                            
+                            # StripeのInvoice Itemを削除
+                            import stripe
+                            from dotenv import load_dotenv
+                            import os
+                            load_dotenv()
+                            stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+                            
+                            invoice_item = stripe.InvoiceItem.retrieve(stripe_usage_record_id)
+                            invoice_item.delete()
+                            print(f'[DEBUG] Stripe InvoiceItem削除成功: {stripe_usage_record_id}')
+                        except Exception as e:
+                            print(f'[DEBUG] Stripe InvoiceItem削除エラー: {e}')
+                            # エラーが発生しても処理は続行
                 choice_index += 1
         
         print(f'[DEBUG] 解約対象コンテンツ数: {len(cancelled)}')
