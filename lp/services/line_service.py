@@ -1251,6 +1251,13 @@ def handle_cancel_request(reply_token, user_id_db, stripe_subscription_id):
 
 def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, selection_text):
     try:
+        # Stripeモジュールをインポート
+        import stripe
+        from dotenv import load_dotenv
+        import os
+        load_dotenv()
+        stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+        
         subscription = stripe.Subscription.retrieve(stripe_subscription_id)
         items = subscription['items']['data']
         
@@ -1302,12 +1309,6 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
                             print(f'[DEBUG] Stripe InvoiceItem削除開始: {stripe_usage_record_id}')
                             
                             # StripeのInvoice Itemを削除
-                            import stripe
-                            from dotenv import load_dotenv
-                            import os
-                            load_dotenv()
-                            stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
-                            
                             invoice_item = stripe.InvoiceItem.retrieve(stripe_usage_record_id)
                             invoice_item.delete()
                             print(f'[DEBUG] Stripe InvoiceItem削除成功: {stripe_usage_record_id}')
