@@ -529,7 +529,7 @@ def line_webhook():
                         send_line_message(event['replyToken'], [{"type": "text", "text": error_message}])
                 # add_select状態の処理を優先
                 elif state == 'add_select':
-                    print(f'[DEBUG] add_select状態での処理: user_id={user_id}, text={text}')
+                    print(f'[DEBUG] add_select状態での処理: user_id={user_id}, text={text}, user_states={user_states}')
                     # 主要なコマンドの場合は通常の処理に切り替え
                     if text in ['1', '2', '3', '4']:
                         print(f'[DEBUG] コンテンツ選択: text={text}')
@@ -554,7 +554,7 @@ def line_webhook():
                 elif text == '追加' and state != 'cancel_select':
                     print(f'[DEBUG] 追加コマンド受信: user_id={user_id}, state={state}')
                     user_states[user_id] = 'add_select'
-                    print(f'[DEBUG] ユーザー状態をadd_selectに設定: user_id={user_id}')
+                    print(f'[DEBUG] ユーザー状態をadd_selectに設定: user_id={user_id}, user_states={user_states}')
                     handle_add_content(event['replyToken'], user_id_db, stripe_subscription_id)
                 elif text == 'メニュー' and state != 'cancel_select':
                     print(f'[DEBUG] メニューコマンド受信: user_id={user_id}, state={state}')
