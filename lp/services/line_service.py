@@ -804,9 +804,45 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
         print(f"[DEBUG] is_trial_period: {is_trial_period}")
         print(f"[DEBUG] price_message: {price_message}")
         
-        # データベースに記録
+        # 既に同じコンテンツが追加されているかチェック
         conn = get_db_connection()
         c = conn.cursor()
+        c.execute('SELECT COUNT(*) FROM usage_logs WHERE user_id = %s AND content_type = %s', (user_id_db, content['name']))
+        existing_count = c.fetchone()[0]
+        
+        if existing_count > 0:
+            # 既に追加済み
+            conn.close()
+            error_message = {
+                "type": "template",
+                "altText": "既に追加済み",
+                "template": {
+                    "type": "buttons",
+                    "title": "⚠️ 既に追加済み",
+                    "text": f"{content['name']}は既に追加されています。\n\n他のコンテンツを選択してください。",
+                    "actions": [
+                        {
+                            "type": "message",
+                            "label": "📚 他のコンテンツ追加",
+                            "text": "追加"
+                        },
+                        {
+                            "type": "message",
+                            "label": "📊 利用状況確認",
+                            "text": "状態"
+                        },
+                        {
+                            "type": "message",
+                            "label": "❓ ヘルプ",
+                            "text": "ヘルプ"
+                        }
+                    ]
+                }
+            }
+            send_line_message(reply_token, [error_message])
+            return
+        
+        # データベースに記録
         c.execute('''
             INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type, pending_charge)
             VALUES (%s, %s, %s, %s, %s, %s)

@@ -6,7 +6,7 @@ Invoice Itemの期間を修正するスクリプト
 import os
 import stripe
 from dotenv import load_dotenv
-from datetime import datetime, timedelta
+from datetime import datetime
 
 # 環境変数を読み込み
 load_dotenv('lp/.env')
@@ -20,77 +20,63 @@ def fix_invoice_item_period():
         print("❌ STRIPE_SECRET_KEYが設定されていません")
         return
     
+    print("=== Invoice Item期間修正 ===")
+    
     # サブスクリプションID
     subscription_id = "sub_1RpdcsIxg6C5hAVdneqtbnUG"
-    invoice_item_id = "ii_1RpinXIxg6C5hAVduOkSbWDE"
+    invoice_item_id = "ii_1RpoEtIxg6C5hAVdmfOaRuni"
     
     try:
-        # サブスクリプションを取得
+        # サブスクリプション情報を取得
         subscription = stripe.Subscription.retrieve(subscription_id)
-        print(f"✅ サブスクリプション取得: {subscription.id}")
-        print(f"   ステータス: {subscription.status}")
-        print(f"   期間: {datetime.fromtimestamp(subscription.current_period_start)} - {datetime.fromtimestamp(subscription.current_period_end)}")
-        if subscription.status == 'trialing':
-            print(f"   トライアル終了: {datetime.fromtimestamp(subscription.trial_end)}")
+        customer_id = subscription.customer
+        
+        print(f"サブスクリプションID: {subscription_id}")
+        print(f"顧客ID: {customer_id}")
+        print(f"現在の期間: {datetime.fromtimestamp(subscription.current_period_start)} - {datetime.fromtimestamp(subscription.current_period_end)}")
         
         # 現在のInvoice Itemを取得
         invoice_item = stripe.InvoiceItem.retrieve(invoice_item_id)
         description = invoice_item.description
         amount = invoice_item.amount
         
-        print(f"\n=== 現在のInvoice Item ===")
+        print(f"\n現在のInvoice Item:")
         print(f"ID: {invoice_item.id}")
         print(f"説明: {description}")
-        print(f"金額: {amount}")
-        if hasattr(invoice_item, 'period') and invoice_item.period:
-            print(f"現在の期間: {datetime.fromtimestamp(invoice_item.period.start)} - {datetime.fromtimestamp(invoice_item.period.end)}")
+        print(f"金額: ¥{amount:,}")
+        print(f"現在の期間: {datetime.fromtimestamp(invoice_item.period.start)} - {datetime.fromtimestamp(invoice_item.period.end)}")
         
-        # 正しい期間を計算
-        if subscription.status == 'trialing':
-            trial_end = subscription.trial_end
-            if isinstance(trial_end, int):
-                trial_end_dt = datetime.fromtimestamp(trial_end)
-            else:
-                trial_end_dt = trial_end
-            
-            # 次の月額期間の開始日（トライアル終了日の翌日）
-            correct_period_start = int((trial_end_dt + timedelta(days=1)).timestamp())
-            
-            # 次の月額期間の終了日（開始日から1ヶ月後）
-            next_period_end = trial_end_dt + timedelta(days=1) + timedelta(days=30)
-            correct_period_end = int(next_period_end.timestamp())
-            
-            print(f"\n=== 正しい期間 ===")
-            print(f"トライアル終了: {trial_end_dt}")
-            print(f"正しい開始日: {datetime.fromtimestamp(correct_period_start)}")
-            print(f"正しい終了日: {datetime.fromtimestamp(correct_period_end)}")
+        # 正しい期間を設定
+        correct_start = subscription.current_period_start
+        correct_end = subscription.current_period_end
         
-        # 現在のInvoice Itemを削除
-        print(f"\n=== Invoice Item削除 ===")
+        print(f"\n正しい期間: {datetime.fromtimestamp(correct_start)} - {datetime.fromtimestamp(correct_end)}")
+        
+        # Invoice Itemを削除して再作成
+        print(f"\nInvoice Itemを削除中...")
         invoice_item.delete()
-        print(f"✅ 削除成功: {invoice_item_id}")
+        print(f"✅ 削除完了")
         
-        # 正しい期間で新しいInvoice Itemを作成
-        print(f"\n=== 新しいInvoice Item作成 ===")
+        # 新しいInvoice Itemを作成
+        print(f"新しいInvoice Itemを作成中...")
         new_invoice_item = stripe.InvoiceItem.create(
-            customer=subscription.customer,
+            customer=customer_id,
             amount=amount,
             currency='jpy',
             description=description,
             subscription=subscription_id,
             period={
-                'start': correct_period_start,
-                'end': correct_period_end
+                'start': correct_start,
+                'end': correct_end
             }
         )
-        print(f"✅ 作成成功: {new_invoice_item.id}")
-        print(f"期間: {datetime.fromtimestamp(new_invoice_item.period.start)} - {datetime.fromtimestamp(new_invoice_item.period.end)}")
         
-        print(f"\n=== 修正完了 ===")
-        print("Invoice Itemの期間を正しく修正しました。")
+        print(f"✅ 作成完了")
+        print(f"新しいID: {new_invoice_item.id}")
+        print(f"新しい期間: {datetime.fromtimestamp(new_invoice_item.period.start)} - {datetime.fromtimestamp(new_invoice_item.period.end)}")
         
     except Exception as e:
-        print(f"❌ エラー: {e}")
+        print(f"エラー: {e}")
 
 if __name__ == "__main__":
     fix_invoice_item_period() 
