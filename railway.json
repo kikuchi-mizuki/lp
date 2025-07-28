@@ -1,0 +1,75 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "NIXPACKS"
+  },
+  "deploy": {
+    "numReplicas": 1,
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 10
+  },
+  "services": [
+    {
+      "name": "ai-collections-main",
+      "source": ".",
+      "domains": [
+        {
+          "name": "ai-collections.herokuapp.com"
+        }
+      ],
+      "variables": {
+        "NODE_ENV": "production"
+      }
+    },
+    {
+      "name": "ai-schedule-secretary",
+      "source": "./schedule-service",
+      "domains": [
+        {
+          "name": "ai-schedule-secretary.railway.app"
+        }
+      ],
+      "variables": {
+        "NODE_ENV": "production",
+        "SERVICE_TYPE": "schedule"
+      }
+    },
+    {
+      "name": "ai-accounting-secretary",
+      "source": "./accounting-service",
+      "domains": [
+        {
+          "name": "ai-accounting-secretary.railway.app"
+        }
+      ],
+      "variables": {
+        "NODE_ENV": "production",
+        "SERVICE_TYPE": "accounting"
+      }
+    },
+    {
+      "name": "ai-task-concierge",
+      "source": "./task-service",
+      "domains": [
+        {
+          "name": "ai-task-concierge.railway.app"
+        }
+      ],
+      "variables": {
+        "NODE_ENV": "production",
+        "SERVICE_TYPE": "task"
+      }
+    }
+  ],
+  "databases": [
+    {
+      "name": "shared-postgresql",
+      "type": "postgresql",
+      "version": "14",
+      "variables": {
+        "POSTGRES_DB": "ai_collections",
+        "POSTGRES_USER": "postgres"
+      }
+    }
+  ]
+} 

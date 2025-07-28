@@ -102,34 +102,21 @@ def is_paid_user(line_user_id):
         # Stripeサブスクリプションの状態をチェック
         subscription_status = check_subscription_status(stripe_subscription_id)
         
-        if not subscription_status.get('success'):
+        if not subscription_status.get('is_active'):
             return {
                 'is_paid': False,
-                'subscription_status': 'subscription_error',
-                'message': 'サブスクリプション情報の取得に失敗しました。',
-                'redirect_url': 'https://line.me/R/ti/p/@ai_collections'
-            }
-        
-        subscription = subscription_status.get('subscription', {})
-        status = subscription.get('status')
-        
-        # 有効なサブスクリプション状態をチェック
-        valid_statuses = ['active', 'trialing']
-        
-        if status in valid_statuses:
-            return {
-                'is_paid': True,
-                'subscription_status': status,
-                'message': None,
-                'redirect_url': None
-            }
-        else:
-            return {
-                'is_paid': False,
-                'subscription_status': status,
+                'subscription_status': subscription_status.get('status', 'inactive'),
                 'message': 'サブスクリプションが無効です。AIコレクションズの公式LINEで再度ご登録ください。',
                 'redirect_url': 'https://line.me/R/ti/p/@ai_collections'
             }
+        
+        # 有効なサブスクリプション
+        return {
+            'is_paid': True,
+            'subscription_status': subscription_status.get('status', 'active'),
+            'message': None,
+            'redirect_url': None
+        }
             
     except Exception as e:
         print(f'[ERROR] 決済状況チェックエラー: {e}')

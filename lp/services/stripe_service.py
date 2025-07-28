@@ -19,6 +19,34 @@ def grant_referral_free_content(user_id):
     """紹介特典の無料枠付与（今後拡張用）"""
     pass
 
+def check_subscription_status(stripe_subscription_id):
+    """サブスクリプションの状態をチェック"""
+    try:
+        subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+        status = subscription['status']
+        cancel_at_period_end = subscription.get('cancel_at_period_end', False)
+        
+        print(f'[DEBUG] サブスクリプション状態: status={status}, cancel_at_period_end={cancel_at_period_end}')
+        
+        # 有効な状態かチェック
+        # trialing（試用期間）とactive（有効）の場合は有効とする
+        is_active = status in ['active', 'trialing']
+        
+        return {
+            'is_active': is_active,
+            'status': status,
+            'cancel_at_period_end': cancel_at_period_end,
+            'current_period_end': subscription.get('current_period_end'),
+            'subscription': subscription
+        }
+    except Exception as e:
+        print(f'[ERROR] サブスクリプション状態確認エラー: {e}')
+        return {
+            'is_active': False,
+            'status': 'error',
+            'error': str(e)
+        }
+
 def add_metered_price_to_subscription(subscription_id, price_id=None):
     """サブスクリプションに従量課金Priceを追加"""
     try:
