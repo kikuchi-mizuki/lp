@@ -161,6 +161,15 @@ app.register_blueprint(stripe_bp)
 def index():
     return render_template('index.html')
 
+@app.route('/health')
+def health_check():
+    """アプリケーションの起動確認用エンドポイント"""
+    return jsonify({
+        'status': 'ok',
+        'message': 'Application is running',
+        'timestamp': '2025-07-29 08:30:00'
+    })
+
 @app.route('/wait_for_registration')
 def wait_for_registration():
     return render_template('wait_for_registration.html')
