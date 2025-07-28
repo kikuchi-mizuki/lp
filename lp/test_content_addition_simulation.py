@@ -2,7 +2,7 @@ import os
 import sys
 sys.path.append('.')
 
-from services.line_service import check_subscription_status
+from services.stripe_service import check_subscription_status
 from utils.db import get_db_connection
 
 print('=== コンテンツ追加シミュレーションテスト ===')
@@ -100,6 +100,6 @@ try:
             print('   処理: Stripe UsageRecordを作成（有料、1週間後に課金）')
     
 except Exception as e:
-    print(f'❌ エラー: {e}')
+    print(f'エラー: {e}')
     import traceback
     traceback.print_exc() 

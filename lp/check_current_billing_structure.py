@@ -4,100 +4,115 @@
 """
 
 import os
+import sys
+sys.path.append('.')
+
+import stripe
 from dotenv import load_dotenv
-from services.user_service import get_user_by_line_id
 from utils.db import get_db_connection
+from services.stripe_service import check_subscription_status
 
-# 環境変数を読み込み
 load_dotenv()
+stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
 
-def check_current_billing_structure():
-    """現在の課金構造を確認"""
-    print("=== 現在の課金構造確認 ===")
+print('=== 現在の請求構造チェック ===')
+
+try:
+    # サブスクリプションIDを取得（実際のIDを使用）
+    stripe_subscription_id = 'sub_1RpNPVIxg6C5hAVdQET1f85P'
     
-    # テスト用のLINEユーザーID
-    test_line_user_id = "U1234567890abcdef"
+    # サブスクリプションの状態をチェック
+    subscription_status = check_subscription_status(stripe_subscription_id)
+    
+    print(f'サブスクリプションID: {stripe_subscription_id}')
+    print(f'ステータス: {subscription_status["status"]}')
+    print(f'有効かどうか: {subscription_status["is_active"]}')
+    
+    # Stripeサブスクリプションの詳細を取得
+    subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+    
+    print(f'\n=== Stripeサブスクリプション構造 ===')
+    print(f'サブスクリプションID: {subscription.id}')
+    print(f'ステータス: {subscription.status}')
+    print(f'現在の期間開始: {subscription.current_period_start}')
+    print(f'現在の期間終了: {subscription.current_period_end}')
+    print(f'トライアル終了: {subscription.trial_end}')
+    
+    print(f'\n=== サブスクリプションアイテム ===')
+    for i, item in enumerate(subscription.items.data):
+        print(f'アイテム {i+1}:')
+        print(f'  ID: {item.id}')
+        print(f'  Price ID: {item.price.id}')
+        print(f'  Price 説明: {item.price.nickname}')
+        print(f'  Price 金額: {item.price.unit_amount} {item.price.currency}')
+        print(f'  Quantity: {item.quantity}')
+        print(f'  Usage Type: {item.price.usage_type}')
+        print(f'  Billing Scheme: {item.price.billing_scheme}')
+    
+    # データベースの状況を確認
+    conn = get_db_connection()
+    c = conn.cursor()
     
     # ユーザー情報を取得
-    user = get_user_by_line_id(test_line_user_id)
-    if not user:
-        print("❌ テストユーザーが見つかりません")
-        return
+    c.execute('SELECT id, email, stripe_subscription_id FROM users WHERE stripe_subscription_id = %s', (stripe_subscription_id,))
+    user = c.fetchone()
     
-    print(f"✅ ユーザー取得成功: {user['id']}")
-    print(f"Stripe Subscription ID: {user['stripe_subscription_id']}")
-    
-    # サブスクリプション状態を確認
-    print("\n=== サブスクリプション状態 ===")
-    from services.line_service import check_subscription_status
-    subscription_status = check_subscription_status(user['stripe_subscription_id'])
-    
-    print(f"ステータス: {subscription_status.get('status', 'unknown')}")
-    print(f"有効: {subscription_status.get('is_active', False)}")
-    print(f"期間終了時解約予定: {subscription_status.get('cancel_at_period_end', False)}")
-    
-    if subscription_status.get('current_period_end'):
-        import datetime
-        period_end = datetime.datetime.fromtimestamp(subscription_status['current_period_end'])
-        print(f"現在の期間終了: {period_end}")
-    
-    # 使用量ログを確認
-    print("\n=== 使用量ログ確認 ===")
-    try:
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute('''
-            SELECT id, content_type, is_free, pending_charge, created_at
-            FROM usage_logs
-            WHERE user_id = %s
-            ORDER BY created_at ASC
-        ''', (user['id'],))
-        logs = c.fetchall()
-        conn.close()
+    if user:
+        user_id, email, db_subscription_id = user
+        print(f'\n=== データベースユーザー情報 ===')
+        print(f'ユーザーID: {user_id}')
+        print(f'メール: {email}')
+        print(f'サブスクリプションID: {db_subscription_id}')
         
-        print(f"使用量ログ総数: {len(logs)}件")
+        # 使用ログを取得
+        c.execute('SELECT * FROM usage_logs WHERE user_id = %s ORDER BY created_at', (user_id,))
+        usage_logs = c.fetchall()
         
-        for i, log in enumerate(logs, 1):
-            log_id, content_type, is_free, pending_charge, created_at = log
-            print(f"ログ{i}: {content_type}")
-            print(f"  無料: {is_free}")
-            print(f"  課金予定: {pending_charge}")
-            print(f"  作成日時: {created_at}")
-            print("---")
-            
-        # 課金構造の分析
-        print("\n=== 課金構造分析 ===")
+        print(f'\n=== 使用ログ ===')
+        print(f'総ログ数: {len(usage_logs)}')
         
-        if subscription_status.get('status') == 'trialing':
-            print("📋 現在の課金構造:")
-            print("・AIコレクションズ → 月額3,900円（トライアル期間中は無料）")
-            print("・AIコレクションズ（追加） → コンテンツ追加は無料（トライアル期間中）")
-            
-            # トライアル期間終了後の予定
-            free_count = sum(1 for log in logs if log[2])  # is_free
-            paid_count = len(logs) - free_count
-            
-            print(f"\n📊 トライアル期間終了後の予定:")
-            print(f"・無料コンテンツ: {free_count}件")
-            print(f"・有料コンテンツ: {paid_count}件")
-            
-            if free_count > 0:
-                print(f"・2個目以降のコンテンツ: ¥1,500/個 × {free_count - 1}個 = ¥{(free_count - 1) * 1500:,}円")
-                print(f"・月額合計予定: ¥3,900 + ¥{(free_count - 1) * 1500:,} = ¥{3900 + (free_count - 1) * 1500:,}円")
-        else:
-            print("📋 現在の課金構造:")
-            print("・AIコレクションズ → 月額3,900円")
-            
-            paid_count = sum(1 for log in logs if not log[2])  # not is_free
-            if paid_count > 0:
-                print(f"・AIコレクションズ（追加） → ¥1,500/個 × {paid_count}個 = ¥{paid_count * 1500:,}円")
-                print(f"・月額合計: ¥3,900 + ¥{paid_count * 1500:,} = ¥{3900 + paid_count * 1500:,}円")
-            else:
-                print("・AIコレクションズ（追加） → なし")
-                print("・月額合計: ¥3,900円")
-                
-    except Exception as e:
-        print(f"❌ データベース確認エラー: {e}")
-
-if __name__ == "__main__":
-    check_current_billing_structure() 
+        for i, log in enumerate(usage_logs):
+            print(f'ログ {i+1}:')
+            print(f'  ID: {log[0]}')
+            print(f'  ユーザーID: {log[1]}')
+            print(f'  使用量: {log[2]}')
+            print(f'  Stripe Usage Record ID: {log[3]}')
+            print(f'  無料かどうか: {log[4]}')
+            print(f'  コンテンツタイプ: {log[5]}')
+            print(f'  課金予定: {log[6]}')
+            print(f'  作成日: {log[7]}')
+    else:
+        print(f'\n❌ データベースにユーザーが見つかりません')
+    
+    conn.close()
+    
+    print(f'\n=== 請求構造の分析 ===')
+    
+    # 月額料金の確認
+    monthly_items = [item for item in subscription.items.data if item.price.usage_type == 'licensed']
+    if monthly_items:
+        print(f'✅ 月額料金アイテム: {len(monthly_items)}個')
+        for item in monthly_items:
+            print(f'  - {item.price.nickname}: {item.price.unit_amount} {item.price.currency}')
+    else:
+        print(f'❌ 月額料金アイテムが見つかりません')
+    
+    # 従量課金の確認
+    metered_items = [item for item in subscription.items.data if item.price.usage_type == 'metered']
+    if metered_items:
+        print(f'✅ 従量課金アイテム: {len(metered_items)}個')
+        for item in metered_items:
+            print(f'  - {item.price.nickname}: {item.price.unit_amount} {item.price.currency}')
+    else:
+        print(f'❌ 従量課金アイテムが見つかりません')
+    
+    print(f'\n=== 推奨事項 ===')
+    if not metered_items:
+        print('1. 従量課金Priceをサブスクリプションに追加してください')
+    if not monthly_items:
+        print('2. 月額料金Priceをサブスクリプションに追加してください')
+    
+except Exception as e:
+    print(f'エラー: {e}')
+    import traceback
+    traceback.print_exc() 
