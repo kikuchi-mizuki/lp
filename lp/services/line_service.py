@@ -546,6 +546,7 @@ def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, co
             # トライアル期間中は常に無料
             current_count = total_usage_count + 1
             is_free = True
+            print(f'[DEBUG] トライアル期間中: total_usage_count={total_usage_count}, current_count={current_count}, is_free={is_free}')
         else:
             # トライアル期間終了後は、トライアル期間中の追加分を除いて計算
             # トライアル期間中の追加分を取得
@@ -562,6 +563,7 @@ def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, co
             post_trial_count = total_usage_count - trial_additions + 1
             current_count = post_trial_count
             is_free = current_count == 1
+            print(f'[DEBUG] 通常期間: total_usage_count={total_usage_count}, trial_additions={trial_additions}, current_count={current_count}, is_free={is_free}')
         
         if current_count == 1:
             price_message = f"料金：無料（{current_count}個目）"
@@ -754,26 +756,40 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
         is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
         is_trial = subscription_status['status'] == 'trialing'
         
-        # トライアル期間終了後のコンテンツ追加回数を正しく計算
+        # 全コンテンツの合計数を取得（handle_content_selectionと同じロジック）
+        conn_count = get_db_connection()
+        c_count = conn_count.cursor()
+        from utils.db import get_db_type
+        db_type = get_db_type()
+        placeholder = '%s' if db_type == 'postgresql' else '?'
+        
+        c_count.execute(f'SELECT COUNT(*) FROM usage_logs WHERE user_id = {placeholder}', (user_id_db,))
+        total_usage_count = c_count.fetchone()[0]
+        conn_count.close()
+        
+        # トライアル期間終了後のコンテンツ追加回数を正しく計算（handle_content_selectionと同じロジック）
         if is_trial_period:
             # トライアル期間中は常に無料
-            current_count = 1  # トライアル期間中は1個目として扱う
+            current_count = total_usage_count + 1
             is_free = True
+            print(f'[DEBUG] トライアル期間中: total_usage_count={total_usage_count}, current_count={current_count}, is_free={is_free}')
         else:
-            # トライアル期間終了後は、新しく追加するコンテンツを1個目として扱う
-            # トライアル期間終了後の追加分のみをカウント
-            conn_post_trial = get_db_connection()
-            c_post_trial = conn_post_trial.cursor()
-            c_post_trial.execute('''
+            # トライアル期間終了後は、トライアル期間中の追加分を除いて計算
+            # トライアル期間中の追加分を取得
+            conn_trial = get_db_connection()
+            c_trial = conn_trial.cursor()
+            c_trial.execute('''
                 SELECT COUNT(*) FROM usage_logs 
-                WHERE user_id = %s AND pending_charge = TRUE
+                WHERE user_id = %s AND pending_charge = FALSE
             ''', (user_id_db,))
-            post_trial_additions = c_post_trial.fetchone()[0]
-            conn_post_trial.close()
+            trial_additions = c_trial.fetchone()[0]
+            conn_trial.close()
             
             # トライアル期間終了後の追加回数
-            current_count = post_trial_additions + 1
+            post_trial_count = total_usage_count - trial_additions + 1
+            current_count = post_trial_count
             is_free = current_count == 1
+            print(f'[DEBUG] 通常期間: total_usage_count={total_usage_count}, trial_additions={trial_additions}, current_count={current_count}, is_free={is_free}')
         
         if current_count == 1:
             price_message = f"料金：無料（{current_count}個目）"
