@@ -10,6 +10,7 @@ from services.line_service import (
 from utils.message_templates import get_menu_message, get_help_message, get_default_message
 from utils.db import get_db_connection
 from models.user_state import get_user_state, set_user_state, clear_user_state, init_user_states_table
+from services.user_service import is_paid_user, get_restricted_message
 import datetime
 
 line_bp = Blueprint('line', __name__)
@@ -319,6 +320,15 @@ def line_webhook():
                 user_id = event['source']['userId']
                 print(f'[DEBUG] 友達追加イベント: user_id={user_id}')
                 
+                # 決済状況をチェック
+                payment_check = is_paid_user(user_id)
+                if not payment_check['is_paid']:
+                    print(f'[DEBUG] 未決済ユーザーの友達追加: user_id={user_id}, status={payment_check["subscription_status"]}')
+                    # 制限メッセージを送信
+                    restricted_message = get_restricted_message()
+                    send_line_message(event['replyToken'], [restricted_message])
+                    continue
+                
                 # 既に案内文が送信されているかチェック
                 if get_user_state(user_id) == 'welcome_sent':
                     print(f'[DEBUG] 既に案内文送信済み、スキップ: user_id={user_id}')
@@ -388,6 +398,15 @@ def line_webhook():
                 user_id = event['source']['userId']
                 text = event['message']['text']
                 print(f'[DEBUG] テキストメッセージ受信: user_id={user_id}, text={text}')
+                
+                # 決済状況をチェック
+                payment_check = is_paid_user(user_id)
+                if not payment_check['is_paid']:
+                    print(f'[DEBUG] 未決済ユーザー: user_id={user_id}, status={payment_check["subscription_status"]}')
+                    # 制限メッセージを送信
+                    restricted_message = get_restricted_message()
+                    send_line_message(event['replyToken'], [restricted_message])
+                    continue
                 
                 conn = get_db_connection()
                 c = conn.cursor()

@@ -465,21 +465,24 @@ def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, co
                 'price': 1500,
                 "description": '日程調整のストレスから解放される、スケジュール管理の相棒',
                 'usage': 'Googleカレンダーと連携し、LINEで予定の追加・確認・空き時間の提案まで。調整のやりとりに追われる時間を、もっとクリエイティブに使えるように。',
-                'url': 'https://lp-production-9e2c.up.railway.app/schedule'
+                'url': 'https://lp-production-9e2c.up.railway.app/schedule',
+                'line_url': 'https://line.me/R/ti/p/@ai_schedule_secretary'
             },
             '2': {
                 'name': 'AI経理秘書',
                 'price': 1500,
                 "description": '打合せ後すぐ送れる、スマートな請求書作成アシスタント',
                 'usage': 'LINEで項目を送るだけで、見積書や請求書を即作成。営業から事務処理までを一気通貫でスムーズに。',
-                'url': 'https://lp-production-9e2c.up.railway.app/accounting'
+                'url': 'https://lp-production-9e2c.up.railway.app/accounting',
+                'line_url': 'https://line.me/R/ti/p/@ai_accounting_secretary'
             },
             '3': {
                 'name': 'AIタスクコンシェルジュ',
                 'price': 1500,
                 "description": '今日やるべきことを、ベストなタイミングで',
                 'usage': '登録したタスクを空き時間に自動で配置し、理想的な1日をAIが提案。「やりたいのにできない」を、「自然にこなせる」毎日に。',
-                'url': 'https://lp-production-9e2c.up.railway.app/task'
+                'url': 'https://lp-production-9e2c.up.railway.app/task',
+                'line_url': 'https://line.me/R/ti/p/@ai_task_concierge'
             }
         }
         if content_number not in content_info:
@@ -930,7 +933,36 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
         
         send_line_message(reply_token, [success_text_message])
         
-        # 2通目: アクションボタン
+        # 2通目: 公式LINEのURLメッセージ
+        line_url_message = {
+            "type": "template",
+            "altText": f"{content['name']}の公式LINE",
+            "template": {
+                "type": "buttons",
+                "title": f"{content['name']}の公式LINE",
+                "text": f"{content['name']}の公式LINEにご登録ください。\n\n{content['description']}",
+                "thumbnailImageUrl": "https://ai-collections.herokuapp.com/static/images/logo.png",
+                "imageAspectRatio": "rectangle",
+                "imageSize": "cover",
+                "imageBackgroundColor": "#FFFFFF",
+                "actions": [
+                    {
+                        "type": "uri",
+                        "label": "公式LINEに登録",
+                        "uri": content['line_url']
+                    },
+                    {
+                        "type": "uri",
+                        "label": "サービス詳細",
+                        "uri": content['url']
+                    }
+                ]
+            }
+        }
+        
+        send_line_message(reply_token, [line_url_message])
+        
+        # 3通目: アクションボタン（push_messageで送信）
         success_buttons_message = {
             "type": "template",
             "altText": "次のアクションを選択",
@@ -958,7 +990,44 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
             }
         }
         
-        send_line_message(reply_token, [success_buttons_message])
+        # LINEユーザーIDを取得してpush_messageで送信
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute('SELECT line_user_id FROM users WHERE id = %s', (user_id_db,))
+        result = c.fetchone()
+        conn.close()
+        
+        if result and result[0]:
+            line_user_id = result[0]
+            # push_messageで3通目のメッセージを送信
+            import requests
+            import json
+            from dotenv import load_dotenv
+            import os
+            load_dotenv()
+            
+            headers = {
+                'Content-Type': 'application/json',
+                'Authorization': f'Bearer {os.getenv("LINE_CHANNEL_ACCESS_TOKEN")}'
+            }
+            
+            push_data = {
+                'to': line_user_id,
+                'messages': [success_buttons_message]
+            }
+            
+            response = requests.post(
+                'https://api.line.me/v2/bot/message/push',
+                headers=headers,
+                data=json.dumps(push_data)
+            )
+            
+            if response.status_code == 200:
+                print(f'[DEBUG] 3通目のアクションボタンメッセージ送信成功: {line_user_id}')
+            else:
+                print(f'[DEBUG] 3通目のアクションボタンメッセージ送信失敗: {response.status_code}, {response.text}')
+        else:
+            print(f'[DEBUG] LINEユーザーIDが見つかりません: user_id_db={user_id_db}')
         
     except Exception as e:
         print(f'[DEBUG] handle_content_confirmation エラー: {e}')
@@ -1375,7 +1444,52 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
             }
             send_line_message(reply_token, [cancel_text_message])
             
-            # 2通目: アクションボタン（push_messageで送信）
+            # 2通目: 公式LINE利用制限メッセージ
+            line_restriction_message = {
+                "type": "template",
+                "altText": "公式LINEの利用制限",
+                "template": {
+                    "type": "buttons",
+                    "title": "公式LINEの利用制限",
+                    "text": f"解約されたコンテンツの公式LINEは利用できなくなります。\n\n解約されたコンテンツ：\n" + "\n".join([f"• {content}" for content in cancelled]),
+                    "thumbnailImageUrl": "https://ai-collections.herokuapp.com/static/images/logo.png",
+                    "imageAspectRatio": "rectangle",
+                    "imageSize": "cover",
+                    "imageBackgroundColor": "#FFFFFF",
+                    "actions": [
+                        {
+                            "type": "message",
+                            "label": "他のコンテンツ追加",
+                            "text": "追加"
+                        },
+                        {
+                            "type": "message",
+                            "label": "利用状況確認",
+                            "text": "状態"
+                        }
+                    ]
+                }
+            }
+            
+            # push_messageで2通目のメッセージを送信
+            if line_user_id:
+                push_data = {
+                    'to': line_user_id,
+                    'messages': [line_restriction_message]
+                }
+                
+                response = requests.post(
+                    'https://api.line.me/v2/bot/message/push',
+                    headers=headers,
+                    data=json.dumps(push_data)
+                )
+                
+                if response.status_code == 200:
+                    print(f'[DEBUG] 2通目の公式LINE制限メッセージ送信成功: {line_user_id}')
+                else:
+                    print(f'[DEBUG] 2通目の公式LINE制限メッセージ送信失敗: {response.status_code}, {response.text}')
+            
+            # 3通目: アクションボタン（push_messageで送信）
             cancel_buttons_message = {
                 "type": "template",
                 "altText": "次のアクションを選択",

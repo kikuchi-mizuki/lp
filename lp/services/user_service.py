@@ -1,5 +1,12 @@
 # ユーザー関連のサービス層
+import stripe
+import os
+from dotenv import load_dotenv
 from utils.db import get_db_connection
+from services.stripe_service import check_subscription_status
+
+load_dotenv()
+stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
 
 def register_user(line_user_id, stripe_customer_id, stripe_subscription_id):
     """ユーザー登録"""
@@ -52,3 +59,113 @@ def get_user_by_line_id(line_user_id):
 #         global user_states
 #         user_states = {}
 #     return user_states.get(line_user_id) 
+
+def is_paid_user(line_user_id):
+    """
+    ユーザーが決済済みかどうかをチェック
+    
+    Args:
+        line_user_id (str): LINEユーザーID
+        
+    Returns:
+        dict: {
+            'is_paid': bool,
+            'subscription_status': str,
+            'message': str,
+            'redirect_url': str
+        }
+    """
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # ユーザー情報を取得
+        c.execute('''
+            SELECT id, stripe_subscription_id 
+            FROM users 
+            WHERE line_user_id = %s
+        ''', (line_user_id,))
+        
+        result = c.fetchone()
+        conn.close()
+        
+        if not result:
+            return {
+                'is_paid': False,
+                'subscription_status': 'not_registered',
+                'message': 'AIコレクションズの公式LINEにご登録ください。',
+                'redirect_url': 'https://line.me/R/ti/p/@ai_collections'
+            }
+        
+        user_id, stripe_subscription_id = result
+        
+        # Stripeサブスクリプションの状態をチェック
+        subscription_status = check_subscription_status(stripe_subscription_id)
+        
+        if not subscription_status.get('success'):
+            return {
+                'is_paid': False,
+                'subscription_status': 'subscription_error',
+                'message': 'サブスクリプション情報の取得に失敗しました。',
+                'redirect_url': 'https://line.me/R/ti/p/@ai_collections'
+            }
+        
+        subscription = subscription_status.get('subscription', {})
+        status = subscription.get('status')
+        
+        # 有効なサブスクリプション状態をチェック
+        valid_statuses = ['active', 'trialing']
+        
+        if status in valid_statuses:
+            return {
+                'is_paid': True,
+                'subscription_status': status,
+                'message': None,
+                'redirect_url': None
+            }
+        else:
+            return {
+                'is_paid': False,
+                'subscription_status': status,
+                'message': 'サブスクリプションが無効です。AIコレクションズの公式LINEで再度ご登録ください。',
+                'redirect_url': 'https://line.me/R/ti/p/@ai_collections'
+            }
+            
+    except Exception as e:
+        print(f'[ERROR] 決済状況チェックエラー: {e}')
+        return {
+            'is_paid': False,
+            'subscription_status': 'error',
+            'message': 'システムエラーが発生しました。',
+            'redirect_url': 'https://line.me/R/ti/p/@ai_collections'
+        }
+
+def get_restricted_message():
+    """
+    制限メッセージを取得
+    """
+    return {
+        "type": "template",
+        "altText": "AIコレクションズの公式LINEにご登録ください",
+        "template": {
+            "type": "buttons",
+            "title": "AIコレクションズ",
+            "text": "このLINEアカウントは決済済みユーザーのみご利用いただけます。\n\nAIコレクションズの公式LINEにご登録いただき、サービスをご利用ください。\n\n• AI予定秘書\n• AI経理秘書\n• AIタスクコンシェルジュ",
+            "thumbnailImageUrl": "https://ai-collections.herokuapp.com/static/images/logo.png",
+            "imageAspectRatio": "rectangle",
+            "imageSize": "cover",
+            "imageBackgroundColor": "#FFFFFF",
+            "actions": [
+                {
+                    "type": "uri",
+                    "label": "公式LINEに登録",
+                    "uri": "https://line.me/R/ti/p/@ai_collections"
+                },
+                {
+                    "type": "uri",
+                    "label": "サービス詳細",
+                    "uri": "https://ai-collections.herokuapp.com"
+                }
+            ]
+        }
+    } 
