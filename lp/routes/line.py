@@ -9,11 +9,13 @@ from services.line_service import (
 )
 from utils.message_templates import get_menu_message, get_help_message, get_default_message
 from utils.db import get_db_connection
+from models.user_state import get_user_state, set_user_state, clear_user_state, init_user_states_table
 import datetime
 
 line_bp = Blueprint('line', __name__)
 
-user_states = {}
+# 永続的な状態管理を使用するため、メモリ上のuser_statesは使用しない
+# user_states = {}
 # 決済完了後の案内文送信待ちユーザーを管理
 pending_welcome_users = set()
 
@@ -318,7 +320,7 @@ def line_webhook():
                 print(f'[DEBUG] 友達追加イベント: user_id={user_id}')
                 
                 # 既に案内文が送信されているかチェック
-                if user_states.get(user_id) == 'welcome_sent':
+                if get_user_state(user_id) == 'welcome_sent':
                     print(f'[DEBUG] 既に案内文送信済み、スキップ: user_id={user_id}')
                     continue
                 
@@ -345,7 +347,7 @@ def line_webhook():
                         send_welcome_with_buttons(event['replyToken'])
                         print(f'[DEBUG] ウェルカムメッセージ送信完了: user_id={user_id}')
                         # ユーザー状態を設定して重複送信を防ぐ
-                        user_states[user_id] = 'welcome_sent'
+                        set_user_state(user_id, 'welcome_sent')
                     except Exception as e:
                         print(f'[DEBUG] ウェルカムメッセージ送信エラー: {e}')
                         import traceback
@@ -353,7 +355,7 @@ def line_webhook():
                         # エラーが発生した場合は簡単なテキストメッセージを送信
                         print(f'[DEBUG] 代替メッセージ送信開始: user_id={user_id}')
                         send_line_message(event['replyToken'], [{"type": "text", "text": "ようこそ！AIコレクションズへ\n\n「追加」と入力してコンテンツを追加してください。"}])
-                        user_states[user_id] = 'welcome_sent'
+                        set_user_state(user_id, 'welcome_sent')
                         print(f'[DEBUG] 代替メッセージ送信完了: user_id={user_id}')
                 else:
                     # 未登録ユーザーの場合
@@ -377,8 +379,7 @@ def line_webhook():
                 conn.close()
                 
                 # ユーザー状態もクリア
-                if user_id in user_states:
-                    del user_states[user_id]
+                clear_user_state(user_id)
                 print(f'[DEBUG] ユーザー紐付け解除: user_id={user_id}')
                 continue
             
@@ -404,7 +405,7 @@ def line_webhook():
                         print(f'[DEBUG] 未紐付けユーザー発見、紐付け処理開始: user_id={user_id}, db_user_id={user[0]}')
                         
                         # 既に案内文が送信されているかチェック
-                        if user_states.get(user_id) == 'welcome_sent':
+                        if get_user_state(user_id) == 'welcome_sent':
                             print(f'[DEBUG] 既に案内文送信済み、スキップ: user_id={user_id}')
                             conn.close()
                             continue
@@ -424,14 +425,14 @@ def line_webhook():
                             send_welcome_with_buttons(event['replyToken'])
                             print(f'[DEBUG] 初回メッセージ時の案内文送信完了: user_id={user_id}')
                             # ユーザー状態を設定して重複送信を防ぐ
-                            user_states[user_id] = 'welcome_sent'
+                            set_user_state(user_id, 'welcome_sent')
                         except Exception as e:
                             print(f'[DEBUG] 初回メッセージ時の案内文送信エラー: {e}')
                             import traceback
                             traceback.print_exc()
                             # エラーが発生した場合は簡単なテキストメッセージを送信
                             send_line_message(event['replyToken'], [{"type": "text", "text": "ようこそ！AIコレクションズへ\n\n「追加」と入力してコンテンツを追加してください。"}])
-                            user_states[user_id] = 'welcome_sent'
+                            set_user_state(user_id, 'welcome_sent')
                     else:
                         print(f'[DEBUG] 未紐付けユーザーも見つからない')
                         send_line_message(event['replyToken'], [{"type": "text", "text": get_not_registered_message()}])
@@ -442,7 +443,7 @@ def line_webhook():
                     stripe_subscription_id = user[1]
                     
                     # 既に案内文が送信されているかチェック
-                    if user_states.get(user_id) == 'welcome_sent':
+                    if get_user_state(user_id) == 'welcome_sent':
                         print(f'[DEBUG] 既に案内文送信済み、通常メッセージ処理に進む: user_id={user_id}')
                         # 通常のメッセージ処理に進む
                     else:
@@ -452,18 +453,18 @@ def line_webhook():
                             from services.line_service import send_welcome_with_buttons
                             send_welcome_with_buttons(event['replyToken'])
                             print(f'[DEBUG] 初回案内文送信完了: user_id={user_id}')
-                            user_states[user_id] = 'welcome_sent'
+                            set_user_state(user_id, 'welcome_sent')
                             conn.close()
                             # continueを削除して通常のメッセージ処理に進む
                         except Exception as e:
                             print(f'[DEBUG] 初回案内文送信エラー: {e}')
                             # エラーが発生した場合は通常のメッセージ処理に進む
-                            user_states[user_id] = 'welcome_sent'
+                            set_user_state(user_id, 'welcome_sent')
                             conn.close()
                 
                 # ユーザー状態の確認
-                state = user_states.get(user_id, 'welcome_sent')
-                print(f'[DEBUG] ユーザー状態確認: user_id={user_id}, state={state}, user_states={user_states}')
+                state = get_user_state(user_id)
+                print(f'[DEBUG] ユーザー状態確認: user_id={user_id}, state={state}')
                 
                 # 初回案内文が既に送信されている場合は、通常のメッセージ処理に進む
                 if state == 'welcome_sent':
@@ -479,20 +480,20 @@ def line_webhook():
                 elif text == 'サブスクリプション解約':
                     handle_subscription_cancel(event['replyToken'], user_id_db, stripe_subscription_id)
                 elif text == 'コンテンツ解約':
-                    user_states[user_id] = 'cancel_select'
+                    set_user_state(user_id, 'cancel_select')
                     handle_cancel_request(event['replyToken'], user_id_db, stripe_subscription_id)
                 elif state == 'cancel_select':
                     print(f'[DEBUG] 解約選択処理: user_id={user_id}, state={state}, text={text}')
                     
                     # 「メニュー」コマンドの場合は状態をリセットしてメニューを表示
                     if text == 'メニュー':
-                        user_states[user_id] = 'welcome_sent'
+                        set_user_state(user_id, 'welcome_sent')
                         send_line_message(event['replyToken'], [get_menu_message()])
                         continue
                     
                     # 主要なコマンドの場合は通常の処理に切り替え
                     if text == '追加':
-                        user_states[user_id] = 'add_select'
+                        set_user_state(user_id, 'add_select')
                         handle_add_content(event['replyToken'], user_id_db, stripe_subscription_id)
                         continue
                     elif text == '状態':
@@ -523,23 +524,23 @@ def line_webhook():
                     
                     if valid_numbers:  # 有効な数字が抽出できた場合のみ処理
                         handle_cancel_selection(event['replyToken'], user_id_db, stripe_subscription_id, text)
-                        user_states[user_id] = 'welcome_sent'
+                        set_user_state(user_id, 'welcome_sent')
                     else:
                         # 数字が抽出できない場合は詳細なエラーメッセージ
                         error_message = "数字を入力してください。\n\n対応形式:\n• 1,2,3 (カンマ区切り)\n• 1.2.3 (ドット区切り)\n• 1 2 3 (スペース区切り)\n• 一二三 (日本語数字)\n• 1番目,2番目 (序数表現)\n• 最初,二番目 (日本語序数)"
                         send_line_message(event['replyToken'], [{"type": "text", "text": error_message}])
                 # add_select状態の処理を最優先
                 elif state == 'add_select':
-                    print(f'[DEBUG] add_select状態での処理: user_id={user_id}, text={text}, user_states={user_states}')
+                    print(f'[DEBUG] add_select状態での処理: user_id={user_id}, text={text}')
                     # 主要なコマンドの場合は通常の処理に切り替え
                     if text in ['1', '2', '3', '4']:
                         print(f'[DEBUG] コンテンツ選択: text={text}')
                         # 選択したコンテンツ番号を保存
-                        user_states[user_id] = f'confirm_{text}'
+                        set_user_state(user_id, f'confirm_{text}')
                         handle_content_selection(event['replyToken'], user_id_db, stripe_subscription_id, text)
                     elif text == 'メニュー':
                         print(f'[DEBUG] メニューコマンド: text={text}')
-                        user_states[user_id] = 'welcome_sent'
+                        set_user_state(user_id, 'welcome_sent')
                         send_line_message(event['replyToken'], [get_menu_message()])
                     elif text == 'ヘルプ':
                         print(f'[DEBUG] ヘルプコマンド: text={text}')
@@ -555,8 +556,8 @@ def line_webhook():
                 # その他のコマンド処理（add_select状態以外）
                 elif text == '追加' and state != 'cancel_select':
                     print(f'[DEBUG] 追加コマンド受信: user_id={user_id}, state={state}')
-                    user_states[user_id] = 'add_select'
-                    print(f'[DEBUG] ユーザー状態をadd_selectに設定: user_id={user_id}, user_states={user_states}')
+                    set_user_state(user_id, 'add_select')
+                    print(f'[DEBUG] ユーザー状態をadd_selectに設定: user_id={user_id}')
                     handle_add_content(event['replyToken'], user_id_db, stripe_subscription_id)
                 elif text == 'メニュー' and state != 'cancel_select':
                     print(f'[DEBUG] メニューコマンド受信: user_id={user_id}, state={state}')
@@ -573,14 +574,14 @@ def line_webhook():
                         # 確認状態からコンテンツ番号を取得
                         content_number = state.split('_')[1]
                         handle_content_confirmation(event['replyToken'], user_id_db, stripe_subscription_id, content_number, True)
-                        user_states[user_id] = 'welcome_sent'
+                        set_user_state(user_id, 'welcome_sent')
                     elif text.lower() in ['いいえ', 'no', 'n']:
                         # 確認状態からコンテンツ番号を取得
                         content_number = state.split('_')[1]
                         handle_content_confirmation(event['replyToken'], user_id_db, stripe_subscription_id, content_number, False)
-                        user_states[user_id] = 'welcome_sent'
+                        set_user_state(user_id, 'welcome_sent')
                     elif text == 'メニュー':
-                        user_states[user_id] = 'welcome_sent'
+                        set_user_state(user_id, 'welcome_sent')
                         send_line_message(event['replyToken'], [get_menu_message()])
                     else:
                         # 無効な入力の場合は確認を促す
