@@ -465,6 +465,7 @@ def line_webhook():
                 # ユーザー状態の確認
                 state = get_user_state(user_id)
                 print(f'[DEBUG] ユーザー状態確認: user_id={user_id}, state={state}')
+                print(f'[DEBUG] 状態詳細: state={state}, text={text}')
                 
                 # 初回案内文が既に送信されている場合は、通常のメッセージ処理に進む
                 if state == 'welcome_sent':
@@ -474,6 +475,7 @@ def line_webhook():
                     print(f'[DEBUG] ユーザーは特定の状態: user_id={user_id}, state={state}')
                 
                 # 状態に基づく処理（優先順位順）
+                print(f'[DEBUG] 状態チェック: state={state}, text={text}')
                 if state == 'add_select':
                     print(f'[DEBUG] add_select状態での処理: user_id={user_id}, text={text}')
                     if text in ['1', '2', '3', '4']:
