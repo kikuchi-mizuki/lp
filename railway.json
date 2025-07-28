@@ -11,7 +11,7 @@
   "services": [
     {
       "name": "ai-collections-main",
-      "source": ".",
+      "source": "./lp",
       "domains": [
         {
           "name": "ai-collections.herokuapp.com"

@@ -1,0 +1,7 @@
+Flask
+stripe==7.11.0
+python-dotenv
+requests
+gunicorn
+psycopg2-binary
+Pillow 
