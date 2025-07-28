@@ -33,6 +33,10 @@ def init_db():
     conn = get_db_connection()
     c = conn.cursor()
     
+    # user_statesテーブルを確実に初期化
+    from models.user_state import init_user_states_table
+    init_user_states_table()
+    
     # PostgreSQLとSQLiteの違いを吸収
     if DATABASE_URL.startswith('postgresql://'):
         # PostgreSQL用のテーブル作成

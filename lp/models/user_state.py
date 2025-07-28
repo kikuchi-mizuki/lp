@@ -11,7 +11,13 @@ def get_user_state(line_user_id):
     try:
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute('SELECT state FROM user_states WHERE line_user_id = %s', (line_user_id,))
+        
+        # データベースタイプに応じて適切なプレースホルダーを使用
+        from utils.db import get_db_type
+        db_type = get_db_type()
+        placeholder = '%s' if db_type == 'postgresql' else '?'
+        
+        c.execute(f'SELECT state FROM user_states WHERE line_user_id = {placeholder}', (line_user_id,))
         result = c.fetchone()
         conn.close()
         
@@ -29,13 +35,24 @@ def set_user_state(line_user_id, state):
         conn = get_db_connection()
         c = conn.cursor()
         
-        # 既存の状態を更新、なければ新規作成
-        c.execute('''
-            INSERT INTO user_states (line_user_id, state, updated_at) 
-            VALUES (%s, %s, %s)
-            ON CONFLICT (line_user_id) 
-            DO UPDATE SET state = %s, updated_at = %s
-        ''', (line_user_id, state, datetime.datetime.now(), state, datetime.datetime.now()))
+        # データベースタイプに応じて適切なSQL構文を使用
+        from utils.db import get_db_type
+        db_type = get_db_type()
+        
+        if db_type == 'postgresql':
+            # PostgreSQL用のUPSERT構文
+            c.execute('''
+                INSERT INTO user_states (line_user_id, state, updated_at) 
+                VALUES (%s, %s, %s)
+                ON CONFLICT (line_user_id) 
+                DO UPDATE SET state = %s, updated_at = %s
+            ''', (line_user_id, state, datetime.datetime.now(), state, datetime.datetime.now()))
+        else:
+            # SQLite用のREPLACE構文
+            c.execute('''
+                INSERT OR REPLACE INTO user_states (line_user_id, state, updated_at) 
+                VALUES (?, ?, ?)
+            ''', (line_user_id, state, datetime.datetime.now()))
         
         conn.commit()
         conn.close()
@@ -48,7 +65,13 @@ def clear_user_state(line_user_id):
     try:
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute('DELETE FROM user_states WHERE line_user_id = %s', (line_user_id,))
+        
+        # データベースタイプに応じて適切なプレースホルダーを使用
+        from utils.db import get_db_type
+        db_type = get_db_type()
+        placeholder = '%s' if db_type == 'postgresql' else '?'
+        
+        c.execute(f'DELETE FROM user_states WHERE line_user_id = {placeholder}', (line_user_id,))
         conn.commit()
         conn.close()
         print(f'[DEBUG] ユーザー状態クリア: line_user_id={line_user_id}')
@@ -61,16 +84,32 @@ def init_user_states_table():
         conn = get_db_connection()
         c = conn.cursor()
         
-        # user_statesテーブルが存在しない場合は作成
-        c.execute('''
-            CREATE TABLE IF NOT EXISTS user_states (
-                id SERIAL PRIMARY KEY,
-                line_user_id VARCHAR(255) UNIQUE NOT NULL,
-                state VARCHAR(100) NOT NULL DEFAULT 'welcome_sent',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
+        # データベースタイプに応じて適切なテーブル作成構文を使用
+        from utils.db import get_db_type
+        db_type = get_db_type()
+        
+        if db_type == 'postgresql':
+            # PostgreSQL用のテーブル作成構文
+            c.execute('''
+                CREATE TABLE IF NOT EXISTS user_states (
+                    id SERIAL PRIMARY KEY,
+                    line_user_id VARCHAR(255) UNIQUE NOT NULL,
+                    state VARCHAR(100) NOT NULL DEFAULT 'welcome_sent',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+        else:
+            # SQLite用のテーブル作成構文
+            c.execute('''
+                CREATE TABLE IF NOT EXISTS user_states (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    line_user_id TEXT UNIQUE NOT NULL,
+                    state TEXT NOT NULL DEFAULT 'welcome_sent',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
         
         conn.commit()
         conn.close()
