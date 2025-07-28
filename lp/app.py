@@ -170,6 +170,60 @@ def health_check():
         'timestamp': '2025-07-29 08:30:00'
     })
 
+@app.route('/debug/db')
+def debug_database():
+    """データベース接続確認用エンドポイント"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # データベースタイプを確認
+        from utils.db import get_db_type
+        db_type = get_db_type()
+        
+        # テーブル一覧を取得
+        if db_type == 'postgresql':
+            c.execute("""
+                SELECT table_name 
+                FROM information_schema.tables 
+                WHERE table_schema = 'public'
+                ORDER BY table_name
+            """)
+        else:
+            c.execute("""
+                SELECT name FROM sqlite_master 
+                WHERE type='table'
+                ORDER BY name
+            """)
+        
+        tables = [row[0] for row in c.fetchall()]
+        
+        # 各テーブルの行数を確認
+        table_counts = {}
+        for table in tables:
+            try:
+                c.execute(f'SELECT COUNT(*) FROM {table}')
+                count = c.fetchone()[0]
+                table_counts[table] = count
+            except Exception as e:
+                table_counts[table] = f"Error: {str(e)}"
+        
+        conn.close()
+        
+        return jsonify({
+            'status': 'ok',
+            'database_type': db_type,
+            'database_url': DATABASE_URL[:20] + '...' if len(DATABASE_URL) > 20 else DATABASE_URL,
+            'tables': tables,
+            'table_counts': table_counts
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e),
+            'database_url': DATABASE_URL[:20] + '...' if len(DATABASE_URL) > 20 else DATABASE_URL
+        })
+
 @app.route('/wait_for_registration')
 def wait_for_registration():
     return render_template('wait_for_registration.html')
