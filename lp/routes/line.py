@@ -485,14 +485,17 @@ def line_webhook():
                 elif state == 'cancel_select':
                     print(f'[DEBUG] 解約選択処理: user_id={user_id}, state={state}, text={text}')
                     
+                    # 単純な数字（1,2,3）の場合は解約処理ではなく、通常の処理に委ねる
+                    if text in ['1', '2', '3']:
+                        print(f'[DEBUG] 単純な数字のため解約処理をスキップ: text={text}')
+                        # 通常の処理に委ねる（add_select状態の処理が実行される）
                     # 「メニュー」コマンドの場合は状態をリセットしてメニューを表示
-                    if text == 'メニュー':
+                    elif text == 'メニュー':
                         set_user_state(user_id, 'welcome_sent')
                         send_line_message(event['replyToken'], [get_menu_message()])
                         continue
-                    
                     # 主要なコマンドの場合は通常の処理に切り替え
-                    if text == '追加':
+                    elif text == '追加':
                         set_user_state(user_id, 'add_select')
                         handle_add_content(event['replyToken'], user_id_db, stripe_subscription_id)
                         continue
@@ -502,34 +505,34 @@ def line_webhook():
                     elif text == 'ヘルプ':
                         send_line_message(event['replyToken'], get_help_message())
                         continue
-                    
-                    # AI技術を活用した高度な数字抽出関数を使用して処理
-                    from services.line_service import smart_number_extraction, validate_selection_numbers
-                    
-                    # データベースからコンテンツ数を取得
-                    conn = get_db_connection()
-                    c = conn.cursor()
-                    # データベースタイプに応じてプレースホルダーを選択
-                    from utils.db import get_db_type
-                    db_type = get_db_type()
-                    placeholder = '%s' if db_type == 'postgresql' else '?'
-                    
-                    c.execute(f'SELECT COUNT(*) FROM usage_logs WHERE user_id = {placeholder} AND content_type IN ({placeholder}, {placeholder}, {placeholder})', 
-                             (user_id_db, 'AI予定秘書', 'AI経理秘書', 'AIタスクコンシェルジュ'))
-                    content_count = c.fetchone()[0]
-                    conn.close()
-                    
-                    numbers = smart_number_extraction(text)
-                    valid_numbers, invalid_reasons, duplicates = validate_selection_numbers(numbers, content_count)
-                    
-                    if valid_numbers:  # 有効な数字が抽出できた場合のみ処理
-                        handle_cancel_selection(event['replyToken'], user_id_db, stripe_subscription_id, text)
-                        set_user_state(user_id, 'welcome_sent')
                     else:
-                        # 数字が抽出できない場合は詳細なエラーメッセージ
-                        error_message = "数字を入力してください。\n\n対応形式:\n• 1,2,3 (カンマ区切り)\n• 1.2.3 (ドット区切り)\n• 1 2 3 (スペース区切り)\n• 一二三 (日本語数字)\n• 1番目,2番目 (序数表現)\n• 最初,二番目 (日本語序数)"
-                        send_line_message(event['replyToken'], [{"type": "text", "text": error_message}])
-                # add_select状態の処理を最優先
+                        # AI技術を活用した高度な数字抽出関数を使用して処理
+                        from services.line_service import smart_number_extraction, validate_selection_numbers
+                        
+                        # データベースからコンテンツ数を取得
+                        conn = get_db_connection()
+                        c = conn.cursor()
+                        # データベースタイプに応じてプレースホルダーを選択
+                        from utils.db import get_db_type
+                        db_type = get_db_type()
+                        placeholder = '%s' if db_type == 'postgresql' else '?'
+                        
+                        c.execute(f'SELECT COUNT(*) FROM usage_logs WHERE user_id = {placeholder} AND content_type IN ({placeholder}, {placeholder}, {placeholder})', 
+                                 (user_id_db, 'AI予定秘書', 'AI経理秘書', 'AIタスクコンシェルジュ'))
+                        content_count = c.fetchone()[0]
+                        conn.close()
+                        
+                        numbers = smart_number_extraction(text)
+                        valid_numbers, invalid_reasons, duplicates = validate_selection_numbers(numbers, content_count)
+                        
+                        if valid_numbers:  # 有効な数字が抽出できた場合のみ処理
+                            handle_cancel_selection(event['replyToken'], user_id_db, stripe_subscription_id, text)
+                            set_user_state(user_id, 'welcome_sent')
+                        else:
+                            # 数字が抽出できない場合は詳細なエラーメッセージ
+                            error_message = "数字を入力してください。\n\n対応形式:\n• 1,2,3 (カンマ区切り)\n• 1.2.3 (ドット区切り)\n• 1 2 3 (スペース区切り)\n• 一二三 (日本語数字)\n• 1番目,2番目 (序数表現)\n• 最初,二番目 (日本語序数)"
+                            send_line_message(event['replyToken'], [{"type": "text", "text": error_message}])
+                # add_select状態の処理を最優先（cancel_selectより前に配置）
                 elif state == 'add_select':
                     print(f'[DEBUG] add_select状態での処理: user_id={user_id}, text={text}')
                     # 主要なコマンドの場合は通常の処理に切り替え
