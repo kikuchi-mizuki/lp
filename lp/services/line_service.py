@@ -6,6 +6,7 @@ import stripe
 import traceback
 import time
 from utils.db import get_db_connection
+from services.cancellation_service import record_cancellation
 import re
 import datetime
 
@@ -1405,6 +1406,9 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
                         result = c.fetchone()
                         if result and result[0]:
                             stripe_usage_record_id = result[0]
+                    
+                    # 解約履歴を記録
+                    record_cancellation(user_id_db, content_type)
                     
                     # データベースからusage_logsを削除
                     c.execute('DELETE FROM usage_logs WHERE id = %s', (usage_id,))

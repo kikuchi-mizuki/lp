@@ -65,6 +65,17 @@ def init_db():
             )
         ''')
         
+        # 解約履歴テーブルを作成
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS cancellation_history (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                content_type VARCHAR(255) NOT NULL,
+                cancelled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        ''')
+        
         # 既存テーブルにpending_chargeカラムを追加（マイグレーション）
         try:
             c.execute("""
@@ -106,6 +117,17 @@ def init_db():
                 content_type VARCHAR(255),
                 pending_charge BOOLEAN DEFAULT FALSE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        ''')
+        
+        # 解約履歴テーブルを作成（SQLite用）
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS cancellation_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                content_type VARCHAR(255) NOT NULL,
+                cancelled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
         ''')

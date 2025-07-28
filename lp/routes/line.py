@@ -11,6 +11,7 @@ from utils.message_templates import get_menu_message, get_help_message, get_defa
 from utils.db import get_db_connection
 from models.user_state import get_user_state, set_user_state, clear_user_state, init_user_states_table
 from services.user_service import is_paid_user, get_restricted_message
+from services.cancellation_service import is_content_cancelled, get_restriction_message_for_content
 import datetime
 
 line_bp = Blueprint('line', __name__)
@@ -295,6 +296,142 @@ def debug_line_users():
         return jsonify({
             'users': user_list,
             'message': 'user_statesはデータベースで管理されています'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
+@line_bp.route('/line/check_restriction/<content_type>', methods=['POST'])
+def check_line_restriction(content_type):
+    """
+    公式LINEの利用制限をチェックするAPI
+    
+    Args:
+        content_type (str): チェックするコンテンツタイプ
+        
+    Request Body:
+        {
+            "line_user_id": "U1234567890abcdef"
+        }
+    """
+    try:
+        data = request.get_json()
+        line_user_id = data.get('line_user_id')
+        
+        if not line_user_id:
+            return jsonify({
+                'error': 'line_user_id is required',
+                'restricted': False
+            }), 400
+        
+        # ユーザーIDを取得
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute('SELECT id FROM users WHERE line_user_id = %s', (line_user_id,))
+        result = c.fetchone()
+        conn.close()
+        
+        if not result:
+            return jsonify({
+                'error': 'User not found',
+                'restricted': False
+            }), 404
+        
+        user_id = result[0]
+        
+        # コンテンツが解約されているかチェック
+        is_restricted = is_content_cancelled(user_id, content_type)
+        
+        return jsonify({
+            'line_user_id': line_user_id,
+            'user_id': user_id,
+            'content_type': content_type,
+            'restricted': is_restricted,
+            'message': f'{content_type}は解約されているため利用できません。' if is_restricted else f'{content_type}は利用可能です。'
+        })
+        
+    except Exception as e:
+        print(f'[ERROR] 利用制限チェックエラー: {e}')
+        return jsonify({
+            'error': str(e),
+            'restricted': False
+        }), 500
+
+@line_bp.route('/line/restriction_message/<content_type>', methods=['POST'])
+def get_restriction_message(content_type):
+    """
+    公式LINEの利用制限メッセージを取得するAPI
+    
+    Args:
+        content_type (str): コンテンツタイプ
+        
+    Request Body:
+        {
+            "line_user_id": "U1234567890abcdef"
+        }
+    """
+    try:
+        data = request.get_json()
+        line_user_id = data.get('line_user_id')
+        
+        if not line_user_id:
+            return jsonify({
+                'error': 'line_user_id is required'
+            }), 400
+        
+        # ユーザーIDを取得
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute('SELECT id FROM users WHERE line_user_id = %s', (line_user_id,))
+        result = c.fetchone()
+        conn.close()
+        
+        if not result:
+            return jsonify({
+                'error': 'User not found'
+            }), 404
+        
+        user_id = result[0]
+        
+        # コンテンツが解約されているかチェック
+        is_restricted = is_content_cancelled(user_id, content_type)
+        
+        if is_restricted:
+            # 制限メッセージを取得
+            restriction_message = get_restriction_message_for_content(content_type)
+            return jsonify({
+                'line_user_id': line_user_id,
+                'user_id': user_id,
+                'content_type': content_type,
+                'restricted': True,
+                'message': restriction_message
+            })
+        else:
+            return jsonify({
+                'line_user_id': line_user_id,
+                'user_id': user_id,
+                'content_type': content_type,
+                'restricted': False,
+                'message': f'{content_type}は利用可能です。'
+            })
+        
+    except Exception as e:
+        print(f'[ERROR] 制限メッセージ取得エラー: {e}')
+        return jsonify({
+            'error': str(e)
+        }), 500
+
+@line_bp.route('/line/debug/cancellation_history/<int:user_id>')
+def debug_cancellation_history(user_id):
+    """デバッグ用：ユーザーの解約履歴を確認"""
+    try:
+        from services.cancellation_service import get_cancelled_contents
+        
+        cancelled_contents = get_cancelled_contents(user_id)
+        
+        return jsonify({
+            'user_id': user_id,
+            'cancelled_contents': cancelled_contents,
+            'count': len(cancelled_contents)
         })
     except Exception as e:
         return jsonify({'error': str(e)})
