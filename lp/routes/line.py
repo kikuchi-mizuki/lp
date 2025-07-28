@@ -473,8 +473,32 @@ def line_webhook():
                 else:
                     print(f'[DEBUG] ユーザーは特定の状態: user_id={user_id}, state={state}')
                 
+                # add_select状態の処理を最優先（cancel_selectより前に配置）
+                if state == 'add_select':
+                    print(f'[DEBUG] add_select状態での処理: user_id={user_id}, text={text}')
+                    # 主要なコマンドの場合は通常の処理に切り替え
+                    if text in ['1', '2', '3', '4']:
+                        print(f'[DEBUG] コンテンツ選択: text={text}')
+                        # 選択したコンテンツ番号を保存
+                        set_user_state(user_id, f'confirm_{text}')
+                        handle_content_selection(event['replyToken'], user_id_db, stripe_subscription_id, text)
+                    elif text == 'メニュー':
+                        print(f'[DEBUG] メニューコマンド: text={text}')
+                        set_user_state(user_id, 'welcome_sent')
+                        send_line_message(event['replyToken'], [get_menu_message()])
+                    elif text == 'ヘルプ':
+                        print(f'[DEBUG] ヘルプコマンド: text={text}')
+                        send_line_message(event['replyToken'], get_help_message())
+                    elif text == '状態':
+                        print(f'[DEBUG] 状態コマンド: text={text}')
+                        handle_status_check(event['replyToken'], user_id_db)
+                    else:
+                        print(f'[DEBUG] 無効な入力: text={text}')
+                        # 無効な入力の場合はコンテンツ選択を促す
+                        send_line_message(event['replyToken'], [{"type": "text", "text": "1〜3の数字でコンテンツを選択してください。\n\nまたは「メニュー」でメインメニューに戻ります。"}])
+                    continue  # add_select状態の処理後は確実に終了
                 # 解約関連のコマンドを優先処理
-                if text == '解約':
+                elif text == '解約':
                     print(f'[DEBUG] 解約コマンド受信: user_id={user_id}')
                     handle_cancel_menu(event['replyToken'], user_id_db, stripe_subscription_id)
                 elif text == 'サブスクリプション解約':
@@ -485,10 +509,19 @@ def line_webhook():
                 elif state == 'cancel_select':
                     print(f'[DEBUG] 解約選択処理: user_id={user_id}, state={state}, text={text}')
                     
-                    # 単純な数字（1,2,3）の場合は解約処理ではなく、通常の処理に委ねる
+                    # 単純な数字（1,2,3）の場合は解約処理ではなく、add_select状態の処理を実行
                     if text in ['1', '2', '3']:
-                        print(f'[DEBUG] 単純な数字のため解約処理をスキップ: text={text}')
-                        # 通常の処理に委ねる（add_select状態の処理が実行される）
+                        print(f'[DEBUG] 単純な数字のため解約処理をスキップし、add_select処理を実行: text={text}')
+                        # add_select状態の処理を直接実行
+                        if text in ['1', '2', '3', '4']:
+                            print(f'[DEBUG] コンテンツ選択: text={text}')
+                            # 選択したコンテンツ番号を保存
+                            set_user_state(user_id, f'confirm_{text}')
+                            handle_content_selection(event['replyToken'], user_id_db, stripe_subscription_id, text)
+                        else:
+                            print(f'[DEBUG] 無効な入力: text={text}')
+                            send_line_message(event['replyToken'], [{"type": "text", "text": "1〜3の数字でコンテンツを選択してください。"}])
+                        continue
                     # 「メニュー」コマンドの場合は状態をリセットしてメニューを表示
                     elif text == 'メニュー':
                         set_user_state(user_id, 'welcome_sent')
@@ -532,30 +565,6 @@ def line_webhook():
                             # 数字が抽出できない場合は詳細なエラーメッセージ
                             error_message = "数字を入力してください。\n\n対応形式:\n• 1,2,3 (カンマ区切り)\n• 1.2.3 (ドット区切り)\n• 1 2 3 (スペース区切り)\n• 一二三 (日本語数字)\n• 1番目,2番目 (序数表現)\n• 最初,二番目 (日本語序数)"
                             send_line_message(event['replyToken'], [{"type": "text", "text": error_message}])
-                # add_select状態の処理を最優先（cancel_selectより前に配置）
-                elif state == 'add_select':
-                    print(f'[DEBUG] add_select状態での処理: user_id={user_id}, text={text}')
-                    # 主要なコマンドの場合は通常の処理に切り替え
-                    if text in ['1', '2', '3', '4']:
-                        print(f'[DEBUG] コンテンツ選択: text={text}')
-                        # 選択したコンテンツ番号を保存
-                        set_user_state(user_id, f'confirm_{text}')
-                        handle_content_selection(event['replyToken'], user_id_db, stripe_subscription_id, text)
-                    elif text == 'メニュー':
-                        print(f'[DEBUG] メニューコマンド: text={text}')
-                        set_user_state(user_id, 'welcome_sent')
-                        send_line_message(event['replyToken'], [get_menu_message()])
-                    elif text == 'ヘルプ':
-                        print(f'[DEBUG] ヘルプコマンド: text={text}')
-                        send_line_message(event['replyToken'], get_help_message())
-                    elif text == '状態':
-                        print(f'[DEBUG] 状態コマンド: text={text}')
-                        handle_status_check(event['replyToken'], user_id_db)
-                    else:
-                        print(f'[DEBUG] 無効な入力: text={text}')
-                        # 無効な入力の場合はコンテンツ選択を促す
-                        send_line_message(event['replyToken'], [{"type": "text", "text": "1〜3の数字でコンテンツを選択してください。\n\nまたは「メニュー」でメインメニューに戻ります。"}])
-                    continue  # add_select状態の処理後は確実に終了
                 # その他のコマンド処理（add_select状態以外）
                 elif text == '追加' and state != 'cancel_select':
                     print(f'[DEBUG] 追加コマンド受信: user_id={user_id}, state={state}')
