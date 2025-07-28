@@ -543,9 +543,9 @@ def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, co
         
         # トライアル期間終了後のコンテンツ追加回数を正しく計算
         if is_trial_period:
-            # トライアル期間中は常に無料
+            # トライアル期間中でも、1個目は無料、2個目以降は有料（トライアル終了後に課金）
             current_count = total_usage_count + 1
-            is_free = True
+            is_free = current_count == 1
             print(f'[DEBUG] トライアル期間中: total_usage_count={total_usage_count}, current_count={current_count}, is_free={is_free}')
         else:
             # トライアル期間終了後は、トライアル期間中の追加分を除いて計算
@@ -568,7 +568,7 @@ def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, co
         if current_count == 1:
             price_message = f"料金：無料（{current_count}個目）"
         else:
-            price_message = f"料金：1,500円（{current_count}個目、1週間後に課金）"
+            price_message = f"料金：1,500円（{current_count}個目、月額料金に追加）"
             print(f'[DEBUG] 2個目以降のコンテンツ追加: is_free={is_free}, current_count={current_count}')
         confirm_message = {
             "type": "template",
@@ -769,9 +769,9 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
         
         # トライアル期間終了後のコンテンツ追加回数を正しく計算（handle_content_selectionと同じロジック）
         if is_trial_period:
-            # トライアル期間中は常に無料
+            # トライアル期間中でも、1個目は無料、2個目以降は有料（トライアル終了後に課金）
             current_count = total_usage_count + 1
-            is_free = True
+            is_free = current_count == 1
             print(f'[DEBUG] トライアル期間中: total_usage_count={total_usage_count}, current_count={current_count}, is_free={is_free}')
         else:
             # トライアル期間終了後は、トライアル期間中の追加分を除いて計算
@@ -816,6 +816,7 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
         print(f'[DEBUG] DB登録成功: user_id={user_id_db}, content={content["name"]}, is_free={is_free}')
         
         # Stripe Invoice Itemを作成（月額料金に統合）
+        # トライアル期間中でも、2個目以降のコンテンツはInvoice Itemを作成（トライアル終了後に課金）
         if not is_free:
             try:
                 # サブスクリプションから顧客IDを取得
