@@ -442,25 +442,7 @@ def line_webhook():
                     user_id_db = user[0]
                     stripe_subscription_id = user[1]
                     
-                    # 既に案内文が送信されているかチェック
-                    if get_user_state(user_id) == 'welcome_sent':
-                        print(f'[DEBUG] 既に案内文送信済み、通常メッセージ処理に進む: user_id={user_id}')
-                        # 通常のメッセージ処理に進む
-                    else:
-                        # 初回案内文が未送信の場合のみ送信
-                        print(f'[DEBUG] 初回案内文未送信、案内文送信: user_id={user_id}')
-                        try:
-                            from services.line_service import send_welcome_with_buttons
-                            send_welcome_with_buttons(event['replyToken'])
-                            print(f'[DEBUG] 初回案内文送信完了: user_id={user_id}')
-                            set_user_state(user_id, 'welcome_sent')
-                            conn.close()
-                            # continueを削除して通常のメッセージ処理に進む
-                        except Exception as e:
-                            print(f'[DEBUG] 初回案内文送信エラー: {e}')
-                            # エラーが発生した場合は通常のメッセージ処理に進む
-                            set_user_state(user_id, 'welcome_sent')
-                            conn.close()
+                    # 通常のメッセージ処理に進む（初回案内文の送信は後で処理）
                 
                 # ユーザー状態の確認
                 state = get_user_state(user_id)
@@ -646,19 +628,24 @@ def line_webhook():
                         send_line_message(event['replyToken'], [{"type": "text", "text": "無効な入力です。メニューから選択してください。"}])
                     else:
                         print(f'[DEBUG] 一般的なデフォルト処理: state={state}')
-                        # 初回案内文が未送信の場合のみ送信
-                        current_state = get_user_state(user_id)
-                        if current_state != 'welcome_sent':
-                            print(f'[DEBUG] 初回案内文送信: user_id={user_id}')
-                            try:
-                                from services.line_service import send_welcome_with_buttons
-                                send_welcome_with_buttons(event['replyToken'])
-                                set_user_state(user_id, 'welcome_sent')
-                            except Exception as e:
-                                print(f'[DEBUG] 初回案内文送信エラー: {e}')
-                                send_line_message(event['replyToken'], [get_default_message()])
-                        else:
+                        # 特定の状態の場合は初回案内文を送信しない
+                        if state in ['add_select', 'cancel_select'] or (state and state.startswith('confirm_')):
+                            print(f'[DEBUG] 特定状態のため初回案内文をスキップ: state={state}')
                             send_line_message(event['replyToken'], [get_default_message()])
+                        else:
+                            # 初回案内文が未送信の場合のみ送信
+                            current_state = get_user_state(user_id)
+                            if current_state != 'welcome_sent':
+                                print(f'[DEBUG] 初回案内文送信: user_id={user_id}')
+                                try:
+                                    from services.line_service import send_welcome_with_buttons
+                                    send_welcome_with_buttons(event['replyToken'])
+                                    set_user_state(user_id, 'welcome_sent')
+                                except Exception as e:
+                                    print(f'[DEBUG] 初回案内文送信エラー: {e}')
+                                    send_line_message(event['replyToken'], [get_default_message()])
+                            else:
+                                send_line_message(event['replyToken'], [get_default_message()])
                 conn.close()
             # リッチメニューのpostbackイベントの処理
             elif event.get('type') == 'postback':
