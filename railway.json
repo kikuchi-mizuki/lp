@@ -18,7 +18,8 @@
         }
       ],
       "variables": {
-        "NODE_ENV": "production"
+        "NODE_ENV": "production",
+        "PYTHON_VERSION": "3.11.7"
       }
     },
     {
@@ -31,7 +32,8 @@
       ],
       "variables": {
         "NODE_ENV": "production",
-        "SERVICE_TYPE": "schedule"
+        "SERVICE_TYPE": "schedule",
+        "PYTHON_VERSION": "3.11.7"
       }
     },
     {
@@ -44,7 +46,8 @@
       ],
       "variables": {
         "NODE_ENV": "production",
-        "SERVICE_TYPE": "accounting"
+        "SERVICE_TYPE": "accounting",
+        "PYTHON_VERSION": "3.11.7"
       }
     },
     {
@@ -57,7 +60,8 @@
       ],
       "variables": {
         "NODE_ENV": "production",
-        "SERVICE_TYPE": "task"
+        "SERVICE_TYPE": "task",
+        "PYTHON_VERSION": "3.11.7"
       }
     }
   ],
