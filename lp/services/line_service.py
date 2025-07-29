@@ -610,15 +610,14 @@ def handle_content_confirmation(user_id_db, content, line_user_id):
             try:
                 subscription = stripe.Subscription.retrieve(stripe_subscription_id)
                 
-                # subscription_periodsテーブルに保存
+                # subscription_periodsテーブルに保存（content_typeカラムなし）
                 c.execute(f'''
                     INSERT INTO subscription_periods 
-                    (user_id, content_type, stripe_subscription_id, subscription_status, 
+                    (user_id, stripe_subscription_id, subscription_status, 
                      current_period_start, current_period_end, trial_start, trial_end)
-                    VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
+                    VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
                 ''', (
                     user_id_db,
-                    content['name'],
                     stripe_subscription_id,
                     subscription.status,
                     datetime.fromtimestamp(subscription.current_period_start) if subscription.current_period_start else None,
@@ -631,12 +630,12 @@ def handle_content_confirmation(user_id_db, content, line_user_id):
                 
             except Exception as e:
                 print(f'[DEBUG] Stripe API エラー: {e}')
-                # Stripe APIエラーの場合でも基本的な情報を保存
+                # Stripe APIエラーの場合でも基本的な情報を保存（content_typeカラムなし）
                 c.execute(f'''
                     INSERT INTO subscription_periods 
-                    (user_id, content_type, stripe_subscription_id, subscription_status)
-                    VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder})
-                ''', (user_id_db, content['name'], stripe_subscription_id, 'unknown'))
+                    (user_id, stripe_subscription_id, subscription_status)
+                    VALUES ({placeholder}, {placeholder}, {placeholder})
+                ''', (user_id_db, stripe_subscription_id, 'unknown'))
             
             # 契約期間情報をcancellation_historyにも保存
             from services.cancellation_period_service import CancellationPeriodService
@@ -670,6 +669,17 @@ def handle_content_confirmation(user_id_db, content, line_user_id):
         
     except Exception as e:
         print(f'[ERROR] コンテンツ確認処理エラー: {e}')
+        import traceback
+        traceback.print_exc()
+        
+        # データベース接続が開いている場合はロールバックして閉じる
+        try:
+            if 'conn' in locals() and conn:
+                conn.rollback()
+                conn.close()
+        except:
+            pass
+        
         return {"status": "error", "message": f"エラーが発生しました: {e}"}
 
 def handle_cancel_request(reply_token, user_id_db, stripe_subscription_id):
