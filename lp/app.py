@@ -300,6 +300,38 @@ def debug_cancellation_history():
             'message': str(e)
         })
 
+@app.route('/debug/add_test_data')
+def add_test_data():
+    """テストデータを手動で追加するエンドポイント"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # テスト用のusage_logを追加
+        c.execute('''
+            INSERT INTO usage_logs (user_id, usage_quantity, content_type, is_free, created_at)
+            VALUES (1, 1, 'AI予定秘書', true, CURRENT_TIMESTAMP)
+        ''')
+        
+        # テスト用のcancellation_historyを追加
+        c.execute('''
+            INSERT INTO cancellation_history (user_id, content_type, cancelled_at)
+            VALUES (1, 'AI予定秘書', CURRENT_TIMESTAMP)
+        ''')
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'status': 'ok',
+            'message': 'テストデータを追加しました'
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        })
+
 @app.route('/wait_for_registration')
 def wait_for_registration():
     return render_template('wait_for_registration.html')
