@@ -94,61 +94,58 @@ def send_welcome_with_buttons(reply_token):
     import requests
     import os
     LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
+    
+    if not LINE_CHANNEL_ACCESS_TOKEN:
+        print('❌ LINE_CHANNEL_ACCESS_TOKENが設定されていません')
+        return
+    
     headers = {
         'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}',
         'Content-Type': 'application/json'
     }
+    
+    # シンプルなテキストメッセージのみでテスト
     data = {
         'replyToken': reply_token,
         'messages': [
             {
                 "type": "text",
-                "text": "ようこそ！AIコレクションズへ\n\n📋 サービス内容：\n• AI予定秘書：スケジュール管理\n• AI経理秘書：見積書・請求書作成\n• AIタスクコンシェルジュ：タスク管理\n\n💰 料金：月額3,900円（1週間無料）\n追加コンテンツ：1個目無料、2個目以降1,500円\n\n下のボタンからお選びください。"
-            },
-            {
-                "type": "template",
-                "altText": "メニュー",
-                "template": {
-                    "type": "buttons",
-                    "title": "メニュー",
-                    "text": "ご希望の機能を選択してください。",
-                    "actions": [
-                        {
-                            "type": "message",
-                            "label": "コンテンツ追加",
-                            "text": "追加"
-                        },
-                        {
-                            "type": "message",
-                            "label": "利用状況確認",
-                            "text": "状態"
-                        },
-                        {
-                            "type": "message",
-                            "label": "解約",
-                            "text": "解約"
-                        },
-                        {
-                            "type": "message",
-                            "label": "ヘルプ",
-                            "text": "ヘルプ"
-                        }
-                    ]
-                }
+                "text": "ようこそ！AIコレクションズへ\n\n📋 サービス内容：\n• AI予定秘書：スケジュール管理\n• AI経理秘書：見積書・請求書作成\n• AIタスクコンシェルジュ：タスク管理\n\n💰 料金：月額3,900円（1週間無料）\n追加コンテンツ：1個目無料、2個目以降1,500円\n\n「追加」と入力してコンテンツを追加してください。"
             }
         ]
     }
+    
     try:
         print(f'[DEBUG] LINE API送信開始: data={data}')
-        response = requests.post('https://api.line.me/v2/bot/message/reply', headers=headers, json=data)
+        response = requests.post('https://api.line.me/v2/bot/message/reply', headers=headers, json=data, timeout=10)
+        
+        if response.status_code == 400:
+            print(f'[DEBUG] LINE API 400エラー詳細: {response.text}')
+            # 400エラーの場合は、よりシンプルなメッセージを試す
+            simple_data = {
+                'replyToken': reply_token,
+                'messages': [
+                    {
+                        "type": "text",
+                        "text": "ようこそ！AIコレクションズへ\n\n「追加」と入力してコンテンツを追加してください。"
+                    }
+                ]
+            }
+            print(f'[DEBUG] シンプルメッセージで再試行: {simple_data}')
+            response = requests.post('https://api.line.me/v2/bot/message/reply', headers=headers, json=simple_data, timeout=10)
+        
         response.raise_for_status()
         print(f'[DEBUG] LINE API送信成功: status_code={response.status_code}')
     except Exception as e:
         print(f'LINEテンプレートメッセージ送信エラー: {e}')
+        if hasattr(e, 'response') and e.response is not None:
+            print(f'LINE API エラー詳細: {e.response.text}')
         import traceback
         traceback.print_exc()
         with open('error.log', 'a', encoding='utf-8') as f:
             f.write('LINEテンプレートメッセージ送信エラー: ' + str(e) + '\n')
+            if hasattr(e, 'response') and e.response is not None:
+                f.write(f'LINE API エラー詳細: {e.response.text}\n')
             f.write(traceback.format_exc() + '\n')
 
 def send_welcome_with_buttons_push(user_id):

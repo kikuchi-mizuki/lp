@@ -182,6 +182,18 @@ app.register_blueprint(stripe_bp)
 def index():
     return render_template('index.html')
 
+@app.route('/error_log')
+def error_log():
+    """エラーログを表示するエンドポイント"""
+    try:
+        with open('error.log', 'r', encoding='utf-8') as f:
+            log_content = f.read()
+        return log_content
+    except FileNotFoundError:
+        return "エラーログファイルが見つかりません"
+    except Exception as e:
+        return f"エラーログ読み込みエラー: {e}"
+
 @app.route('/health')
 def health_check():
     """アプリケーションの起動確認用エンドポイント"""
