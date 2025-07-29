@@ -40,16 +40,33 @@ AI経理秘書のLINE公式アカウントで、解約済みユーザーがサ�
 -- 1. ユーザーIDを取得
 SELECT id FROM users WHERE line_user_id = ?
 
--- 2. 解約履歴をチェック
-SELECT COUNT(*) FROM cancellation_history 
-WHERE user_id = ? AND content_type = 'AI経理秘書'
+-- 2. subscription_periodsテーブルでサブスクリプション状態をチェック
+SELECT subscription_status FROM subscription_periods 
+WHERE user_id = ? AND stripe_subscription_id IS NOT NULL
+ORDER BY created_at DESC
+LIMIT 1
 
 -- 3. 解約されているかどうかを判定
-if count > 0:
+if subscription_status in ['canceled', 'incomplete', 'incomplete_expired', 'unpaid', 'past_due']:
     return True  # 解約済み（利用不可）
+elif subscription_status in ['active', 'trialing']:
+    return False  # 利用可能
 else:
-    return False  # 解約されていない（利用可能）
+    return True  # レコードが存在しない場合は解約済みとみなす
 ```
+
+**解約制限の判定基準：**
+- **利用不可（制限対象）**：
+  - `canceled` - 解約済み（期間終了後）
+  - `incomplete` - 支払い未完了
+  - `incomplete_expired` - 支払い期限切れ
+  - `unpaid` - 未払い
+  - `past_due` - 支払い遅延
+  - レコードが存在しない場合
+
+- **利用可能**：
+  - `active` - アクティブ（解約後も期限内であれば利用可能）
+  - `trialing` - トライアル期間中
 
 #### 2.1.2 制限メッセージ送信機能
 **機能名：** 解約制限メッセージ送信
@@ -117,12 +134,18 @@ usersテーブル + cancellation_historyテーブル
     - `stripe_customer_id`: Stripe顧客ID
     - `stripe_subscription_id`: StripeサブスクリプションID
 
-- テーブル：`cancellation_history`
+- テーブル：`subscription_periods`
   - カラム：
     - `id`: 主キー
     - `user_id`: ユーザーID（usersテーブルへの外部キー）
-    - `content_type`: コンテンツタイプ（'AI経理秘書'）
-    - `cancelled_at`: 解約日時
+    - `stripe_subscription_id`: StripeサブスクリプションID
+    - `subscription_status`: サブスクリプション状態
+    - `current_period_start`: 現在の期間開始日
+    - `current_period_end`: 現在の期間終了日
+    - `trial_start`: トライアル開始日
+    - `trial_end`: トライアル終了日
+    - `created_at`: 作成日時
+    - `updated_at`: 更新日時
 
 ### 3.3 外部連携
 - **AIコレクションズメインアプリ**: ユーザー管理・コンテンツ管理
@@ -174,13 +197,13 @@ LINE_CHANNEL_SECRET=your_line_channel_secret
 
 ### 5.1 完了済み機能
 ✅ **データベース構造**
-- `cancellation_history`テーブルの作成
+- `subscription_periods`テーブルの作成
 - インデックスの作成
 - Railway PostgreSQLでの動作確認
 
 ✅ **解約制限チェック機能**
 - `check_user_restriction`関数の実装
-- 解約履歴の確認ロジック
+- サブスクリプション状態の確認ロジック
 - エラーハンドリング
 
 ✅ **制限メッセージ機能**
@@ -190,7 +213,7 @@ LINE_CHANNEL_SECRET=your_line_channel_secret
 
 ✅ **統合システム**
 - AIコレクションズメインアプリとの連携
-- 解約処理時の履歴記録
+- 解約処理時のサブスクリプション状態更新
 - 複数サービス（AI予定秘書、AI経理秘書、AIタスクコンシェルジュ）対応
 
 ### 5.2 実装済みAPI
@@ -211,8 +234,8 @@ GET /line/debug/cancellation_history/{user_id}
 
 ### 5.3 実装済みサービス
 ✅ **cancellation_service.py**
-- 解約履歴の記録
-- 解約状態のチェック
+- サブスクリプション状態のチェック
+- 解約状態の判定
 - 解約コンテンツの取得
 
 ✅ **cancellation_period_service.py**
@@ -238,19 +261,25 @@ GET /line/debug/cancellation_history/{user_id}
 2. 制限メッセージが表示される
 3. AIコレクションズ公式LINEとWEBサイトへの誘導が正常に動作
 
-**シナリオ2: 解約済みユーザー**
+**シナリオ2: 解約済みユーザー（期間終了後）**
 1. 解約済みユーザーがAI経理秘書にメッセージ送信
-2. `cancellation_history`テーブルでAI経理秘書の解約履歴が存在することを確認
+2. `subscription_periods`テーブルでサブスクリプション状態が`canceled`であることを確認
 3. 制限メッセージが表示される
 4. AIコレクションズ公式LINEとWEBサイトへの誘導が正常に動作
 
 **シナリオ3: アクティブユーザー**
 1. アクティブユーザーがAI経理秘書にメッセージ送信
-2. `cancellation_history`テーブルでAI経理秘書の解約履歴が存在しないことを確認
+2. `subscription_periods`テーブルでサブスクリプション状態が`active`であることを確認
 3. 通常のAI経理秘書サービスが提供される
 4. 制限メッセージは表示されない
 
-**シナリオ4: データベース接続エラー**
+**シナリオ4: 解約後も期限内のユーザー**
+1. 解約後も期限内のユーザーがAI経理秘書にメッセージ送信
+2. `subscription_periods`テーブルでサブスクリプション状態が`active`であることを確認
+3. 通常のAI経理秘書サービスが提供される（期限内のため利用可能）
+4. 制限メッセージは表示されない
+
+**シナリオ5: データベース接続エラー**
 1. データベース接続エラーが発生
 2. 制限チェックをスキップして通常サービスを提供
 3. エラーログが記録される
@@ -284,8 +313,8 @@ GET /line/debug/cancellation_history/{user_id}
 **リスク**: API応答遅延
 **対策**: タイムアウト設定とリトライ機能を実装済み
 
-**リスク**: 解約履歴の同期遅延
-**対策**: リアルタイムでの解約履歴記録を実装済み
+**リスク**: サブスクリプション状態の同期遅延
+**対策**: リアルタイムでのサブスクリプション状態更新を実装済み
 
 ### 8.2 運用リスク
 **リスク**: 誤ってアクティブユーザーを制限
@@ -339,7 +368,7 @@ GET /line/debug/cancellation_history/{user_id}
 ---
 
 **文書作成日**: 2024年12月19日  
-**文書バージョン**: 3.0  
+**文書バージョン**: 4.0  
 **作成者**: AI Assistant  
 **最終更新日**: 2024年12月19日  
-**更新内容**: 実装完了状況の反映、データベース構造の更新、API実装状況の追加 
+**更新内容**: subscription_periodsテーブルを使用した解約制限チェックへの変更、解約後も期限内は利用可能とする仕様の明確化 
