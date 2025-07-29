@@ -239,6 +239,67 @@ def debug_database():
             'database_url': DATABASE_URL[:20] + '...' if len(DATABASE_URL) > 20 else DATABASE_URL
         })
 
+@app.route('/debug/cancellation_history')
+def debug_cancellation_history():
+    """解約履歴の詳細確認用エンドポイント"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 解約履歴を取得
+        c.execute('''
+            SELECT ch.id, ch.user_id, ch.content_type, ch.cancelled_at,
+                   u.email, u.line_user_id
+            FROM cancellation_history ch
+            LEFT JOIN users u ON ch.user_id = u.id
+            ORDER BY ch.cancelled_at DESC
+        ''')
+        
+        cancellations = []
+        for row in c.fetchall():
+            cancellations.append({
+                'id': row[0],
+                'user_id': row[1],
+                'content_type': row[2],
+                'cancelled_at': row[3],
+                'user_email': row[4],
+                'line_user_id': row[5]
+            })
+        
+        # 現在のusage_logsも確認
+        c.execute('''
+            SELECT ul.id, ul.user_id, ul.content_type, ul.created_at, ul.is_free,
+                   u.email, u.line_user_id
+            FROM usage_logs ul
+            LEFT JOIN users u ON ul.user_id = u.id
+            ORDER BY ul.created_at DESC
+        ''')
+        
+        usage_logs = []
+        for row in c.fetchall():
+            usage_logs.append({
+                'id': row[0],
+                'user_id': row[1],
+                'content_type': row[2],
+                'created_at': row[3],
+                'is_free': row[4],
+                'user_email': row[5],
+                'line_user_id': row[6]
+            })
+        
+        conn.close()
+        
+        return jsonify({
+            'status': 'ok',
+            'cancellation_history': cancellations,
+            'usage_logs': usage_logs
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        })
+
 @app.route('/wait_for_registration')
 def wait_for_registration():
     return render_template('wait_for_registration.html')
