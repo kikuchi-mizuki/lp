@@ -307,14 +307,17 @@ def add_test_data():
         conn = get_db_connection()
         c = conn.cursor()
         
-        # テーブル構造を確認
+        # テーブル構造を詳細に確認
         c.execute("""
-            SELECT column_name, data_type 
+            SELECT column_name, data_type, ordinal_position
             FROM information_schema.columns 
             WHERE table_name = 'cancellation_history' 
             ORDER BY ordinal_position
         """)
         columns = c.fetchall()
+        
+        # カラム名を順序通りに取得
+        column_names = [col[0] for col in columns]
         
         # テスト用のusage_logを追加
         c.execute('''
@@ -322,11 +325,18 @@ def add_test_data():
             VALUES (1, 1, 'AI予定秘書', true, CURRENT_TIMESTAMP)
         ''')
         
-        # テスト用のcancellation_historyを追加（正しいデータ型で）
-        c.execute('''
-            INSERT INTO cancellation_history (user_id, content_type, cancelled_at)
-            VALUES (1, 'AI予定秘書', CURRENT_TIMESTAMP)
-        ''')
+        # カラム名を明示的に指定してcancellation_historyに追加
+        if 'user_id' in column_names and 'content_type' in column_names and 'cancelled_at' in column_names:
+            c.execute('''
+                INSERT INTO cancellation_history (user_id, content_type, cancelled_at)
+                VALUES (1, 'AI予定秘書', CURRENT_TIMESTAMP)
+            ''')
+        else:
+            # カラム名が異なる場合、最初の3つのカラムに挿入
+            c.execute(f'''
+                INSERT INTO cancellation_history ({', '.join(column_names[1:4])})
+                VALUES (1, 'AI予定秘書', CURRENT_TIMESTAMP)
+            ''')
         
         conn.commit()
         conn.close()
@@ -334,7 +344,8 @@ def add_test_data():
         return jsonify({
             'status': 'ok',
             'message': 'テストデータを追加しました',
-            'table_structure': [{'column': col[0], 'type': col[1]} for col in columns]
+            'table_structure': [{'column': col[0], 'type': col[1], 'position': col[2]} for col in columns],
+            'column_names': column_names
         })
     except Exception as e:
         return jsonify({
