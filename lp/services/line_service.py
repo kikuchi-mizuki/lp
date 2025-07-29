@@ -771,6 +771,13 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
         if duplicates:
             print(f'[DEBUG] 重複除去: {duplicates}')
         
+        # LINEユーザーIDを事前に取得
+        line_user_id = None
+        c.execute('SELECT line_user_id FROM users WHERE id = %s', (user_id_db,))
+        line_result = c.fetchone()
+        if line_result and line_result[0]:
+            line_user_id = line_result[0]
+        
         cancelled = []
         choice_index = 1
         
@@ -857,6 +864,17 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
             
             # push_messageで2通目のメッセージを送信
             if line_user_id:
+                import requests
+                import json
+                from dotenv import load_dotenv
+                import os
+                load_dotenv()
+                
+                headers = {
+                    'Content-Type': 'application/json',
+                    'Authorization': f'Bearer {os.getenv("LINE_CHANNEL_ACCESS_TOKEN")}'
+                }
+                
                 push_data = {
                     'to': line_user_id,
                     'messages': [line_restriction_message]
@@ -901,28 +919,8 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
                 }
             }
             
-            # LINEユーザーIDを取得してpush_messageで送信
-            line_user_id = None
-            conn = get_db_connection()
-            c = conn.cursor()
-            c.execute('SELECT line_user_id FROM users WHERE id = %s', (user_id_db,))
-            result = c.fetchone()
-            conn.close()
-            
-            if result and result[0]:
-                line_user_id = result[0]
-                # push_messageで2通目のメッセージを送信
-                import requests
-                import json
-                from dotenv import load_dotenv
-                import os
-                load_dotenv()
-                
-                headers = {
-                    'Content-Type': 'application/json',
-                    'Authorization': f'Bearer {os.getenv("LINE_CHANNEL_ACCESS_TOKEN")}'
-                }
-                
+            # push_messageで3通目のボタンメッセージを送信
+            if line_user_id:
                 push_data = {
                     'to': line_user_id,
                     'messages': [cancel_buttons_message]
@@ -935,9 +933,9 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
                 )
                 
                 if response.status_code == 200:
-                    print(f'[DEBUG] 2通目のボタンメッセージ送信成功: {line_user_id}')
+                    print(f'[DEBUG] 3通目のボタンメッセージ送信成功: {line_user_id}')
                 else:
-                    print(f'[DEBUG] 2通目のボタンメッセージ送信失敗: {response.status_code}, {response.text}')
+                    print(f'[DEBUG] 3通目のボタンメッセージ送信失敗: {response.status_code}, {response.text}')
             else:
                 print(f'[DEBUG] LINEユーザーIDが見つかりません: user_id_db={user_id_db}')
             
