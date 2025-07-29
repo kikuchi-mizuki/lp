@@ -16,6 +16,7 @@ from utils.message_templates import get_default_message, get_menu_message, get_h
 from routes.line import line_bp
 from routes.stripe import stripe_bp
 from utils.db import get_db_connection
+import time
 
 load_dotenv()
 
@@ -475,6 +476,80 @@ def test_cancellation():
                 'status': 'error',
                 'message': 'ユーザーデータが見つかりません'
             })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        })
+
+@app.route('/debug/add_user_data')
+def add_user_data():
+    """ユーザーデータを追加するエンドポイント"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 新しいユーザーデータを追加
+        new_user_data = {
+            'email': 'test_user@example.com',
+            'stripe_customer_id': 'cus_test_' + str(int(time.time())),
+            'stripe_subscription_id': 'sub_test_' + str(int(time.time())),
+            'line_user_id': 'U231cdb3fc0687f3abc7bcaba5214dfff'
+        }
+        
+        c.execute('''
+            INSERT INTO users (email, stripe_customer_id, stripe_subscription_id, line_user_id)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (line_user_id) DO NOTHING
+        ''', (new_user_data['email'], new_user_data['stripe_customer_id'], 
+              new_user_data['stripe_subscription_id'], new_user_data['line_user_id']))
+        
+        conn.commit()
+        
+        # 追加されたユーザーを確認
+        c.execute('SELECT id, email, line_user_id FROM users WHERE line_user_id = %s', (new_user_data['line_user_id'],))
+        user_result = c.fetchone()
+        
+        if user_result:
+            user_id = user_result[0]
+            # このユーザーにAI予定秘書の解約履歴を追加
+            c.execute('''
+                INSERT INTO cancellation_history (user_id, content_type, cancelled_at)
+                VALUES (%s, %s, CURRENT_TIMESTAMP)
+                ON CONFLICT DO NOTHING
+            ''', (user_id, 'AI予定秘書'))
+            
+            conn.commit()
+            
+            # 全ユーザーを取得
+            c.execute('SELECT id, email, line_user_id FROM users ORDER BY id')
+            all_users = []
+            for row in c.fetchall():
+                all_users.append({
+                    'id': row[0],
+                    'email': row[1],
+                    'line_user_id': row[2]
+                })
+            
+            conn.close()
+            
+            return jsonify({
+                'status': 'ok',
+                'message': 'ユーザーデータを追加しました',
+                'added_user': {
+                    'id': user_id,
+                    'email': new_user_data['email'],
+                    'line_user_id': new_user_data['line_user_id']
+                },
+                'all_users': all_users
+            })
+        else:
+            conn.close()
+            return jsonify({
+                'status': 'error',
+                'message': 'ユーザーの追加に失敗しました'
+            })
+            
     except Exception as e:
         return jsonify({
             'status': 'error',
