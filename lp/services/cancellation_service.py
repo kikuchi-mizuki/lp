@@ -32,7 +32,7 @@ def record_cancellation(user_id, content_type):
 
 def is_content_cancelled(user_id, content_type):
     """
-    コンテンツが解約されているかチェック
+    コンテンツが解約されているかチェック（subscription_periodsテーブルを使用）
     
     Args:
         user_id (int): ユーザーID
@@ -45,18 +45,27 @@ def is_content_cancelled(user_id, content_type):
         conn = get_db_connection()
         c = conn.cursor()
         
+        # subscription_periodsテーブルでサブスクリプション状態をチェック
         c.execute('''
-            SELECT COUNT(*) FROM cancellation_history 
-            WHERE user_id = %s AND content_type = %s
-        ''', (user_id, content_type))
+            SELECT subscription_status FROM subscription_periods 
+            WHERE user_id = %s AND stripe_subscription_id IS NOT NULL
+            ORDER BY created_at DESC
+            LIMIT 1
+        ''', (user_id,))
         
-        count = c.fetchone()[0]
+        result = c.fetchone()
         conn.close()
         
-        is_cancelled = count > 0
-        print(f'[DEBUG] 解約チェック: user_id={user_id}, content_type={content_type}, is_cancelled={is_cancelled}')
-        
-        return is_cancelled
+        if result:
+            subscription_status = result[0]
+            # 解約済みまたは無効なステータスをチェック
+            is_cancelled = subscription_status in ['canceled', 'incomplete', 'incomplete_expired', 'unpaid', 'past_due']
+            print(f'[DEBUG] 解約チェック: user_id={user_id}, content_type={content_type}, status={subscription_status}, is_cancelled={is_cancelled}')
+            return is_cancelled
+        else:
+            # subscription_periodsにレコードがない場合は解約済みとみなす
+            print(f'[DEBUG] 解約チェック: user_id={user_id}, content_type={content_type}, no_subscription_record, is_cancelled=True')
+            return True
         
     except Exception as e:
         print(f'[ERROR] 解約チェックエラー: {e}')
@@ -66,7 +75,7 @@ def is_content_cancelled(user_id, content_type):
 
 def get_cancelled_contents(user_id):
     """
-    ユーザーが解約したコンテンツのリストを取得
+    ユーザーが解約したコンテンツのリストを取得（subscription_periodsテーブルを使用）
     
     Args:
         user_id (int): ユーザーID
@@ -78,10 +87,11 @@ def get_cancelled_contents(user_id):
         conn = get_db_connection()
         c = conn.cursor()
         
+        # subscription_periodsテーブルで解約済みのサブスクリプションをチェック
         c.execute('''
-            SELECT content_type FROM cancellation_history 
-            WHERE user_id = %s
-            ORDER BY cancelled_at DESC
+            SELECT content_type FROM subscription_periods 
+            WHERE user_id = %s AND subscription_status IN ('canceled', 'incomplete', 'incomplete_expired', 'unpaid', 'past_due')
+            ORDER BY created_at DESC
         ''', (user_id,))
         
         results = c.fetchall()

@@ -34,13 +34,23 @@ def check_user_restriction(line_user_id):
         
         user_id = user_result[0]
         
-        # 解約履歴をチェック
+        # subscription_periodsテーブルでサブスクリプション状態をチェック
         cursor.execute('''
-            SELECT COUNT(*) FROM cancellation_history 
-            WHERE user_id = %s AND content_type = 'AI予定秘書'
+            SELECT subscription_status FROM subscription_periods 
+            WHERE user_id = %s AND stripe_subscription_id IS NOT NULL
+            ORDER BY created_at DESC
+            LIMIT 1
         ''', (user_id,))
         
-        is_cancelled = cursor.fetchone()[0] > 0
+        result = cursor.fetchone()
+        
+        if result:
+            subscription_status = result[0]
+            # 解約済みまたは無効なステータスをチェック
+            is_cancelled = subscription_status in ['canceled', 'incomplete', 'incomplete_expired', 'unpaid', 'past_due']
+        else:
+            # subscription_periodsにレコードがない場合は解約済みとみなす
+            is_cancelled = True
         
         conn.close()
         
