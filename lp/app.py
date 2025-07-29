@@ -412,6 +412,52 @@ def fix_table_structure():
             'message': str(e)
         })
 
+@app.route('/debug/test_cancellation')
+def test_cancellation():
+    """解約処理のテスト用エンドポイント"""
+    try:
+        from services.cancellation_service import record_cancellation
+        
+        # テスト用の解約記録
+        record_cancellation(1, 'AI経理秘書')
+        
+        # 解約履歴を確認
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute('''
+            SELECT ch.id, ch.user_id, ch.content_type, ch.cancelled_at,
+                   u.email, u.line_user_id
+            FROM cancellation_history ch
+            LEFT JOIN users u ON ch.user_id = u.id
+            WHERE ch.content_type = 'AI経理秘書'
+            ORDER BY ch.cancelled_at DESC
+        ''')
+        
+        cancellations = []
+        for row in c.fetchall():
+            cancellations.append({
+                'id': row[0],
+                'user_id': row[1],
+                'content_type': row[2],
+                'cancelled_at': row[3],
+                'user_email': row[4],
+                'line_user_id': row[5]
+            })
+        
+        conn.close()
+        
+        return jsonify({
+            'status': 'ok',
+            'message': '解約処理テスト完了',
+            'cancellations': cancellations,
+            'count': len(cancellations)
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        })
+
 @app.route('/wait_for_registration')
 def wait_for_registration():
     return render_template('wait_for_registration.html')
