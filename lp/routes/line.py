@@ -438,6 +438,10 @@ def debug_cancellation_history(user_id):
 
 @line_bp.route('/line/webhook', methods=['POST'])
 def line_webhook():
+    print(f'[DEBUG] LINE Webhook受信: {request.method}')
+    print(f'[DEBUG] ヘッダー: {dict(request.headers)}')
+    print(f'[DEBUG] ボディ: {request.data.decode("utf-8")}')
+    
     signature = request.headers.get('X-Line-Signature', '')
     body = request.data.decode('utf-8')
     LINE_CHANNEL_SECRET = os.getenv('LINE_CHANNEL_SECRET')
@@ -446,12 +450,18 @@ def line_webhook():
             hash = hmac.new(LINE_CHANNEL_SECRET.encode('utf-8'), body.encode('utf-8'), hashlib.sha256).digest()
             expected_signature = base64.b64encode(hash).decode('utf-8')
             if not hmac.compare_digest(signature, expected_signature):
+                print(f'[DEBUG] 署名検証失敗: expected={expected_signature}, received={signature}')
                 return 'Invalid signature', 400
-        except Exception:
+            else:
+                print(f'[DEBUG] 署名検証成功')
+        except Exception as e:
+            print(f'[DEBUG] 署名検証エラー: {e}')
             return 'Signature verification error', 400
     try:
         events = json.loads(body).get('events', [])
+        print(f'[DEBUG] イベント数: {len(events)}')
         for event in events:
+            print(f'[DEBUG] イベント処理開始: {event.get("type")}')
             # 友達追加イベントの処理
             if event.get('type') == 'follow':
                 user_id = event['source']['userId']
