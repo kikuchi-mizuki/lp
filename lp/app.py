@@ -31,126 +31,134 @@ LINE_CHANNEL_SECRET = os.getenv('LINE_CHANNEL_SECRET')
 DATABASE_URL = os.getenv('DATABASE_URL', 'database.db')
 
 def init_db():
+    """データベースの初期化"""
     conn = get_db_connection()
     c = conn.cursor()
     
-    # user_statesテーブルを確実に初期化
-    from models.user_state import init_user_states_table
-    init_user_states_table()
+    # データベースタイプを確認
+    from utils.db import get_db_type
+    db_type = get_db_type()
     
-    # PostgreSQLとSQLiteの違いを吸収
-    if DATABASE_URL.startswith('postgresql://'):
+    if db_type == 'postgresql':
         # PostgreSQL用のテーブル作成
         c.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
                 email VARCHAR(255) UNIQUE NOT NULL,
-                stripe_customer_id VARCHAR(255) UNIQUE NOT NULL,
-                stripe_subscription_id VARCHAR(255) UNIQUE NOT NULL,
-                line_user_id VARCHAR(255) UNIQUE,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                stripe_customer_id VARCHAR(255),
+                stripe_subscription_id VARCHAR(255),
+                line_user_id VARCHAR(255) UNIQUE
             )
         ''')
+        
         c.execute('''
             CREATE TABLE IF NOT EXISTS usage_logs (
                 id SERIAL PRIMARY KEY,
                 user_id INTEGER NOT NULL,
-                usage_quantity INTEGER DEFAULT 1,
-                stripe_usage_record_id VARCHAR(255),
+                content_type VARCHAR(100) NOT NULL,
                 is_free BOOLEAN DEFAULT FALSE,
-                content_type VARCHAR(255),
-                pending_charge BOOLEAN DEFAULT FALSE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id)
+                FOREIGN KEY (user_id) REFERENCES users (id)
             )
         ''')
         
-        # 解約履歴テーブルを作成
         c.execute('''
             CREATE TABLE IF NOT EXISTS cancellation_history (
                 id SERIAL PRIMARY KEY,
                 user_id INTEGER NOT NULL,
-                content_type VARCHAR(255) NOT NULL,
-                cancelled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id)
+                content_type VARCHAR(100) NOT NULL,
+                cancelled_at TIMESTAMP NOT NULL,
+                subscription_status VARCHAR(50),
+                current_period_start TIMESTAMP,
+                current_period_end TIMESTAMP,
+                trial_start TIMESTAMP,
+                trial_end TIMESTAMP,
+                stripe_subscription_id VARCHAR(255),
+                FOREIGN KEY (user_id) REFERENCES users (id)
             )
         ''')
         
-        # 既存テーブルにpending_chargeカラムを追加（マイグレーション）
-        try:
-            c.execute("""
-                SELECT column_name 
-                FROM information_schema.columns 
-                WHERE table_name = 'usage_logs' AND column_name = 'pending_charge'
-            """)
-            
-            if not c.fetchone():
-                c.execute("""
-                    ALTER TABLE usage_logs 
-                    ADD COLUMN pending_charge BOOLEAN DEFAULT FALSE
-                """)
-                print("✅ pending_chargeカラムを追加しました")
-            else:
-                print("ℹ️ pending_chargeカラムは既に存在します")
-        except Exception as e:
-            print(f"❌ マイグレーションエラー: {e}")
+        # 契約期間管理テーブルを追加
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS subscription_periods (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                stripe_subscription_id VARCHAR(255) NOT NULL,
+                subscription_status VARCHAR(50) NOT NULL,
+                current_period_start TIMESTAMP,
+                current_period_end TIMESTAMP,
+                trial_start TIMESTAMP,
+                trial_end TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id),
+                UNIQUE(stripe_subscription_id)
+            )
+        ''')
+        
     else:
         # SQLite用のテーブル作成
         c.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                email VARCHAR(255) UNIQUE NOT NULL,
-                stripe_customer_id VARCHAR(255) UNIQUE NOT NULL,
-                stripe_subscription_id VARCHAR(255) UNIQUE NOT NULL,
-                line_user_id VARCHAR(255) UNIQUE,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                email TEXT UNIQUE NOT NULL,
+                stripe_customer_id TEXT,
+                stripe_subscription_id TEXT,
+                line_user_id TEXT UNIQUE
             )
         ''')
+        
         c.execute('''
             CREATE TABLE IF NOT EXISTS usage_logs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
-                usage_quantity INTEGER DEFAULT 1,
-                stripe_usage_record_id VARCHAR(255),
-                is_free BOOLEAN DEFAULT FALSE,
-                content_type VARCHAR(255),
-                pending_charge BOOLEAN DEFAULT FALSE,
+                content_type TEXT NOT NULL,
+                is_free BOOLEAN DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id)
+                FOREIGN KEY (user_id) REFERENCES users (id)
             )
         ''')
         
-        # 解約履歴テーブルを作成（SQLite用）
         c.execute('''
             CREATE TABLE IF NOT EXISTS cancellation_history (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
-                content_type VARCHAR(255) NOT NULL,
-                cancelled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id)
+                content_type TEXT NOT NULL,
+                cancelled_at TIMESTAMP NOT NULL,
+                subscription_status TEXT,
+                current_period_start TIMESTAMP,
+                current_period_end TIMESTAMP,
+                trial_start TIMESTAMP,
+                trial_end TIMESTAMP,
+                stripe_subscription_id TEXT,
+                FOREIGN KEY (user_id) REFERENCES users (id)
             )
         ''')
         
-        # SQLite用のマイグレーション
-        try:
-            c.execute("PRAGMA table_info(usage_logs)")
-            columns = [column[1] for column in c.fetchall()]
-            
-            if 'pending_charge' not in columns:
-                c.execute("""
-                    ALTER TABLE usage_logs 
-                    ADD COLUMN pending_charge BOOLEAN DEFAULT FALSE
-                """)
-                print("✅ pending_chargeカラムを追加しました")
-            else:
-                print("ℹ️ pending_chargeカラムは既に存在します")
-        except Exception as e:
-            print(f"❌ マイグレーションエラー: {e}")
+        # 契約期間管理テーブルを追加
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS subscription_periods (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                stripe_subscription_id TEXT NOT NULL,
+                subscription_status TEXT NOT NULL,
+                current_period_start TIMESTAMP,
+                current_period_end TIMESTAMP,
+                trial_start TIMESTAMP,
+                trial_end TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id),
+                UNIQUE(stripe_subscription_id)
+            )
+        ''')
     
     conn.commit()
     conn.close()
+    
+    # ユーザー状態テーブルの初期化
+    from models.user_state import init_user_states_table
+    init_user_states_table()
 
 init_db()
 
@@ -379,7 +387,14 @@ def fix_table_structure():
                 id SERIAL PRIMARY KEY,
                 user_id INTEGER NOT NULL,
                 content_type VARCHAR(100) NOT NULL,
-                cancelled_at TIMESTAMP NOT NULL
+                cancelled_at TIMESTAMP NOT NULL,
+                subscription_status VARCHAR(50),
+                current_period_start TIMESTAMP,
+                current_period_end TIMESTAMP,
+                trial_start TIMESTAMP,
+                trial_end TIMESTAMP,
+                stripe_subscription_id VARCHAR(255),
+                FOREIGN KEY (user_id) REFERENCES users (id)
             )
         ''')
         
@@ -780,6 +795,368 @@ def subscribe():
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/debug/subscription_periods')
+def debug_subscription_periods():
+    """契約期間管理テーブルの内容を確認"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # subscription_periodsテーブルの内容を取得
+        c.execute('''
+            SELECT 
+                sp.id,
+                sp.user_id,
+                u.email,
+                sp.stripe_subscription_id,
+                sp.subscription_status,
+                sp.current_period_start,
+                sp.current_period_end,
+                sp.trial_start,
+                sp.trial_end,
+                sp.updated_at
+            FROM subscription_periods sp
+            JOIN users u ON sp.user_id = u.id
+            ORDER BY sp.updated_at DESC
+        ''')
+        
+        periods = []
+        for row in c.fetchall():
+            periods.append({
+                'id': row[0],
+                'user_id': row[1],
+                'email': row[2],
+                'stripe_subscription_id': row[3],
+                'subscription_status': row[4],
+                'current_period_start': row[5],
+                'current_period_end': row[6],
+                'trial_start': row[7],
+                'trial_end': row[8],
+                'updated_at': row[9]
+            })
+        
+        # テーブル構造も確認
+        c.execute("""
+            SELECT column_name, data_type, is_nullable 
+            FROM information_schema.columns 
+            WHERE table_name = 'subscription_periods' 
+            ORDER BY ordinal_position
+        """)
+        
+        columns = []
+        for row in c.fetchall():
+            columns.append({
+                'column': row[0],
+                'type': row[1],
+                'nullable': row[2]
+            })
+        
+        conn.close()
+        
+        return jsonify({
+            'status': 'ok',
+            'subscription_periods': periods,
+            'table_structure': columns,
+            'count': len(periods)
+        })
+        
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
+
+@app.route('/debug/sync_subscription/<int:user_id>')
+def debug_sync_subscription(user_id):
+    """指定ユーザーの契約期間情報をStripeから同期"""
+    try:
+        from services.subscription_period_service import SubscriptionPeriodService
+        
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute('SELECT stripe_subscription_id FROM users WHERE id = %s', (user_id,))
+        result = c.fetchone()
+        conn.close()
+        
+        if not result or not result[0]:
+            return jsonify({'status': 'error', 'message': 'サブスクリプションIDが見つかりません'})
+        
+        stripe_subscription_id = result[0]
+        period_service = SubscriptionPeriodService()
+        success = period_service.sync_subscription_period(user_id, stripe_subscription_id)
+        
+        if success:
+            # 同期後の情報を取得
+            subscription_info = period_service.get_subscription_info(user_id)
+            return jsonify({
+                'status': 'ok',
+                'message': '契約期間情報を同期しました',
+                'subscription_info': subscription_info
+            })
+        else:
+            return jsonify({'status': 'error', 'message': '同期に失敗しました'})
+            
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
+
+@app.route('/debug/cancellation_periods')
+def debug_cancellation_periods():
+    """cancellation_historyテーブルの契約期間情報を確認"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # cancellation_historyテーブルの内容を取得
+        c.execute('''
+            SELECT 
+                ch.id,
+                ch.user_id,
+                u.email,
+                ch.content_type,
+                ch.subscription_status,
+                ch.current_period_start,
+                ch.current_period_end,
+                ch.trial_start,
+                ch.trial_end,
+                ch.stripe_subscription_id,
+                ch.cancelled_at
+            FROM cancellation_history ch
+            JOIN users u ON ch.user_id = u.id
+            ORDER BY ch.cancelled_at DESC
+        ''')
+        
+        periods = []
+        for row in c.fetchall():
+            periods.append({
+                'id': row[0],
+                'user_id': row[1],
+                'email': row[2],
+                'content_type': row[3],
+                'subscription_status': row[4],
+                'current_period_start': row[5],
+                'current_period_end': row[6],
+                'trial_start': row[7],
+                'trial_end': row[8],
+                'stripe_subscription_id': row[9],
+                'cancelled_at': row[10]
+            })
+        
+        # テーブル構造も確認
+        c.execute("""
+            SELECT column_name, data_type, is_nullable 
+            FROM information_schema.columns 
+            WHERE table_name = 'cancellation_history' 
+            ORDER BY ordinal_position
+        """)
+        
+        columns = []
+        for row in c.fetchall():
+            columns.append({
+                'column': row[0],
+                'type': row[1],
+                'nullable': row[2]
+            })
+        
+        conn.close()
+        
+        return jsonify({
+            'status': 'ok',
+            'cancellation_periods': periods,
+            'table_structure': columns,
+            'count': len(periods)
+        })
+        
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
+
+@app.route('/debug/update_cancellation_period/<int:user_id>/<content_type>')
+def debug_update_cancellation_period(user_id, content_type):
+    """指定ユーザーの契約期間情報をcancellation_historyに更新"""
+    try:
+        from services.cancellation_period_service import CancellationPeriodService
+        
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute('SELECT stripe_subscription_id FROM users WHERE id = %s', (user_id,))
+        result = c.fetchone()
+        conn.close()
+        
+        if not result or not result[0]:
+            return jsonify({'status': 'error', 'message': 'サブスクリプションIDが見つかりません'})
+        
+        stripe_subscription_id = result[0]
+        period_service = CancellationPeriodService()
+        success = period_service.update_subscription_period(user_id, content_type, stripe_subscription_id)
+        
+        if success:
+            # 更新後の情報を取得
+            subscription_info = period_service.get_subscription_info(user_id, content_type)
+            return jsonify({
+                'status': 'ok',
+                'message': '契約期間情報を更新しました',
+                'subscription_info': subscription_info
+            })
+        else:
+            return jsonify({'status': 'error', 'message': '更新に失敗しました'})
+            
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
+
+@app.route('/debug/migrate_cancellation_history')
+def migrate_cancellation_history():
+    """cancellation_historyテーブルに契約期間管理用カラムを追加"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 現在のテーブル構造を確認
+        c.execute("""
+            SELECT column_name, data_type, is_nullable 
+            FROM information_schema.columns 
+            WHERE table_name = 'cancellation_history' 
+            ORDER BY ordinal_position
+        """)
+        
+        current_columns = []
+        for row in c.fetchall():
+            current_columns.append({
+                'column': row[0],
+                'type': row[1],
+                'nullable': row[2]
+            })
+        
+        # 必要なカラムを確認
+        required_columns = [
+            'subscription_status',
+            'current_period_start', 
+            'current_period_end',
+            'trial_start',
+            'trial_end',
+            'stripe_subscription_id'
+        ]
+        
+        existing_columns = [col['column'] for col in current_columns]
+        missing_columns = [col for col in required_columns if col not in existing_columns]
+        
+        if not missing_columns:
+            return jsonify({
+                'status': 'ok',
+                'message': 'すべてのカラムが既に存在します',
+                'current_columns': current_columns
+            })
+        
+        # 不足しているカラムを追加
+        for column in missing_columns:
+            if column == 'subscription_status':
+                c.execute("ALTER TABLE cancellation_history ADD COLUMN subscription_status VARCHAR(50)")
+            elif column == 'current_period_start':
+                c.execute("ALTER TABLE cancellation_history ADD COLUMN current_period_start TIMESTAMP")
+            elif column == 'current_period_end':
+                c.execute("ALTER TABLE cancellation_history ADD COLUMN current_period_end TIMESTAMP")
+            elif column == 'trial_start':
+                c.execute("ALTER TABLE cancellation_history ADD COLUMN trial_start TIMESTAMP")
+            elif column == 'trial_end':
+                c.execute("ALTER TABLE cancellation_history ADD COLUMN trial_end TIMESTAMP")
+            elif column == 'stripe_subscription_id':
+                c.execute("ALTER TABLE cancellation_history ADD COLUMN stripe_subscription_id VARCHAR(255)")
+        
+        conn.commit()
+        
+        # 更新後のテーブル構造を確認
+        c.execute("""
+            SELECT column_name, data_type, is_nullable 
+            FROM information_schema.columns 
+            WHERE table_name = 'cancellation_history' 
+            ORDER BY ordinal_position
+        """)
+        
+        new_columns = []
+        for row in c.fetchall():
+            new_columns.append({
+                'column': row[0],
+                'type': row[1],
+                'nullable': row[2]
+            })
+        
+        conn.close()
+        
+        return jsonify({
+            'status': 'ok',
+            'message': f'カラムを追加しました: {missing_columns}',
+            'old_structure': current_columns,
+            'new_structure': new_columns,
+            'added_columns': missing_columns
+        })
+        
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
+
+@app.route('/debug/update_existing_cancellation/<int:user_id>/<content_type>')
+def update_existing_cancellation(user_id, content_type):
+    """既存のcancellation_historyレコードに契約期間情報を更新"""
+    try:
+        from services.cancellation_period_service import CancellationPeriodService
+        
+        # ユーザーのサブスクリプションIDを取得
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute('SELECT stripe_subscription_id FROM users WHERE id = %s', (user_id,))
+        result = c.fetchone()
+        conn.close()
+        
+        if not result or not result[0]:
+            return jsonify({'status': 'error', 'message': 'サブスクリプションIDが見つかりません'})
+        
+        stripe_subscription_id = result[0]
+        
+        # 契約期間情報を更新
+        period_service = CancellationPeriodService()
+        success = period_service.update_subscription_period(user_id, content_type, stripe_subscription_id)
+        
+        if success:
+            # 更新後の情報を取得
+            subscription_info = period_service.get_subscription_info(user_id, content_type)
+            
+            # 更新後のテーブル内容も確認
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute('''
+                SELECT 
+                    id, user_id, content_type, cancelled_at,
+                    subscription_status, current_period_start, current_period_end,
+                    trial_start, trial_end, stripe_subscription_id
+                FROM cancellation_history 
+                WHERE user_id = %s AND content_type = %s
+            ''', (user_id, content_type))
+            
+            updated_record = c.fetchone()
+            conn.close()
+            
+            if updated_record:
+                record_info = {
+                    'id': updated_record[0],
+                    'user_id': updated_record[1],
+                    'content_type': updated_record[2],
+                    'cancelled_at': updated_record[3],
+                    'subscription_status': updated_record[4],
+                    'current_period_start': updated_record[5],
+                    'current_period_end': updated_record[6],
+                    'trial_start': updated_record[7],
+                    'trial_end': updated_record[8],
+                    'stripe_subscription_id': updated_record[9]
+                }
+            else:
+                record_info = None
+            
+            return jsonify({
+                'status': 'ok',
+                'message': '既存レコードを更新しました',
+                'subscription_info': subscription_info,
+                'updated_record': record_info
+            })
+        else:
+            return jsonify({'status': 'error', 'message': '更新に失敗しました'})
+            
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 5000))) 

@@ -10,6 +10,7 @@ from services.cancellation_service import record_cancellation
 from services.stripe_service import check_subscription_status
 import re
 import datetime
+from services.subscription_period_service import SubscriptionPeriodService
 
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
 
@@ -2033,106 +2034,30 @@ def process_pending_charges(user_id_db, stripe_subscription_id):
 
 def check_user_access_with_period(user_id, content_type):
     """
-    契約期間を考慮したユーザーアクセスチェック
+    契約期間を考慮したユーザーアクセスチェック（cancellation_history使用）
     """
     try:
-        conn = get_db_connection()
-        c = conn.cursor()
+        from services.cancellation_period_service import CancellationPeriodService
         
-        # 1. usage_logsでコンテンツ追加履歴を確認
-        c.execute('''
-            SELECT u.stripe_subscription_id 
-            FROM usage_logs ul
-            JOIN users u ON ul.user_id = u.id
-            WHERE ul.user_id = %s AND ul.content_type = %s
-        ''', (user_id, content_type))
+        # cancellation_historyテーブルでチェック
+        period_service = CancellationPeriodService()
+        is_accessible, message = period_service.check_user_access_local(user_id, content_type)
         
-        result = c.fetchone()
-        if not result:
-            return False, "コンテンツが追加されていません"
-        
-        stripe_subscription_id = result[0]
-        if not stripe_subscription_id:
-            return False, "サブスクリプション情報がありません"
-        
-        conn.close()
-        
-        # 2. Stripe APIでサブスクリプション状況を確認
-        import stripe
-        import time
-        from datetime import datetime
-        
-        stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
-        
-        try:
-            subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+        # ローカルデータがない場合はStripe APIで同期を試行
+        if not is_accessible and "コンテンツが追加されていません" not in message:
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute('SELECT stripe_subscription_id FROM users WHERE id = %s', (user_id,))
+            result = c.fetchone()
+            conn.close()
             
-            # 3. 契約期間とステータスをチェック
-            current_time = int(time.time())
-            
-            # 請求が始まっているかチェック
-            if subscription.status == 'active':
-                # アクティブなサブスクリプション - 利用可能
-                return True, "アクティブなサブスクリプション"
-            elif subscription.status == 'past_due':
-                # 支払い遅延中だが利用可能（請求は始まっている）
-                return True, "支払い遅延中だが利用可能"
-            elif subscription.status == 'canceled':
-                # キャンセル済みでも期間内なら利用可能（請求は始まっている）
-                if subscription.current_period_end > current_time:
-                    return True, "キャンセル済みだが期間内"
-                else:
-                    return False, "契約期間が終了"
-            elif subscription.status == 'trialing':
-                # トライアル期間中 - 請求が始まっていないので利用不可
-                return False, "トライアル期間中（請求が始まっていません）"
-            elif subscription.status == 'incomplete':
-                # 支払い未完了 - 利用不可
-                return False, "支払いが完了していません"
-            elif subscription.status == 'incomplete_expired':
-                # 支払い期限切れ - 利用不可
-                return False, "支払い期限が切れています"
-            elif subscription.status == 'unpaid':
-                # 未払い - 利用不可
-                return False, "支払いが未完了です"
-            else:
-                # その他の無効なステータス
-                return False, f"サブスクリプションが無効（ステータス: {subscription.status}）"
-                
-        except stripe.error.StripeError as e:
-            print(f"Stripe API エラー: {e}")
-            return False, "Stripe API エラーが発生しました"
-            
-    except Exception as e:
-        print(f"データベースエラー: {e}")
-        return False, "データベースエラーが発生しました"
-
-def safe_authenticate_and_check_with_period(line_user_id, content_type):
-    """
-    メールアドレス認証と契約期間ベースの利用制限チェック（安全版）
-    """
-    try:
-        # 1. メールアドレス認証
-        conn = get_db_connection()
-        c = conn.cursor()
-        
-        # メールアドレス認証のロジック（実装が必要）
-        # ここでは仮の実装として、line_user_idでユーザーを検索
-        c.execute('SELECT id, email FROM users WHERE line_user_id = %s', (line_user_id,))
-        user_result = c.fetchone()
-        
-        if not user_result:
-            return False, "ユーザーが見つかりません"
-        
-        user_id, email = user_result
-        conn.close()
-        
-        # 2. 契約期間ベースの利用制限チェック
-        is_accessible, message = check_user_access_with_period(user_id, content_type)
+            if result and result[0]:
+                # Stripe APIで同期して再チェック
+                period_service.update_subscription_period(user_id, content_type, result[0])
+                is_accessible, message = period_service.check_user_access_local(user_id, content_type)
         
         return is_accessible, message
         
     except Exception as e:
-        print(f"認証・チェックエラー: {e}")
-        # エラー時は制限しない（サービス継続）
-        return True, "エラーが発生しましたが、サービスを継続します"
+        print(f"データベースエラー: {e}")
+        return False, "データベースエラーが発生しました"
