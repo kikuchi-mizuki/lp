@@ -3,9 +3,9 @@ import os, json, hmac, hashlib, base64
 from services.line_service import send_line_message
 from services.line_service import (
     handle_add_content, handle_content_selection,
-    handle_content_confirmation, handle_status_check, handle_cancel_request,
+    handle_content_confirmation, handle_cancel_request,
     handle_cancel_selection, handle_subscription_cancel, handle_cancel_menu,
-    get_welcome_message, get_not_registered_message
+    get_welcome_message, get_not_registered_message, handle_status_check
 )
 from utils.message_templates import get_menu_message, get_help_message, get_default_message
 from utils.db import get_db_connection

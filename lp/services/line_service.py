@@ -1424,3 +1424,102 @@ def check_user_access_with_period(user_id, content_type):
     except Exception as e:
         print(f"データベースエラー: {e}")
         return False, "データベースエラーが発生しました"
+
+def handle_status_check(reply_token, user_id_db):
+    """
+    ユーザーの利用状況を確認してLINEメッセージで返す
+    """
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # ユーザー情報を取得
+        c.execute('SELECT stripe_subscription_id, email FROM users WHERE id = %s', (user_id_db,))
+        user = c.fetchone()
+        
+        if not user:
+            send_line_message(reply_token, [{"type": "text", "text": "ユーザー情報が見つかりません。"}])
+            return
+        
+        stripe_subscription_id = user[0]
+        email = user[1]
+        
+        # 利用状況を取得
+        c.execute('''
+            SELECT content_type, created_at, is_free, pending_charge 
+            FROM usage_logs 
+            WHERE user_id = %s 
+            ORDER BY created_at DESC
+        ''', (user_id_db,))
+        usage_logs = c.fetchall()
+        
+        # サブスクリプション状況を確認
+        subscription_status = "無効"
+        if stripe_subscription_id:
+            try:
+                subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+                if subscription.status == 'active':
+                    subscription_status = "有効"
+                elif subscription.status == 'trialing':
+                    subscription_status = "トライアル中"
+                elif subscription.status == 'canceled':
+                    subscription_status = "解約済み"
+                elif subscription.status == 'past_due':
+                    subscription_status = "支払い遅延"
+            except Exception as e:
+                print(f'[DEBUG] Stripe API エラー: {e}')
+                subscription_status = "確認エラー"
+        
+        # メッセージを構築
+        status_message = f"📊 利用状況\n\n"
+        status_message += f"📧 メールアドレス: {email}\n"
+        status_message += f"💳 サブスクリプション: {subscription_status}\n\n"
+        
+        if usage_logs:
+            status_message += "📋 利用コンテンツ:\n"
+            content_count = {}
+            for log in usage_logs:
+                content_type = log[0]
+                created_at = log[1]
+                is_free = log[2]
+                pending_charge = log[3]
+                
+                if content_type not in content_count:
+                    content_count[content_type] = {
+                        'total': 0,
+                        'free': 0,
+                        'paid': 0,
+                        'pending': 0
+                    }
+                
+                content_count[content_type]['total'] += 1
+                if is_free:
+                    content_count[content_type]['free'] += 1
+                elif pending_charge:
+                    content_count[content_type]['pending'] += 1
+                else:
+                    content_count[content_type]['paid'] += 1
+            
+            for content_type, counts in content_count.items():
+                status_message += f"• {content_type}: {counts['total']}回利用"
+                if counts['free'] > 0:
+                    status_message += f" (無料: {counts['free']}回)"
+                if counts['paid'] > 0:
+                    status_message += f" (有料: {counts['paid']}回)"
+                if counts['pending'] > 0:
+                    status_message += f" (未課金: {counts['pending']}回)"
+                status_message += "\n"
+        else:
+            status_message += "📋 利用コンテンツ: まだ利用していません\n"
+        
+        status_message += "\n💡 ヘルプが必要な場合は「ヘルプ」と入力してください。"
+        
+        send_line_message(reply_token, [{"type": "text", "text": status_message}])
+        
+    except Exception as e:
+        print(f'[DEBUG] 利用状況確認エラー: {e}')
+        error_message = "利用状況の確認中にエラーが発生しました。しばらく時間をおいて再度お試しください。"
+        send_line_message(reply_token, [{"type": "text", "text": error_message}])
+    finally:
+        if 'conn' in locals():
+            conn.close()
