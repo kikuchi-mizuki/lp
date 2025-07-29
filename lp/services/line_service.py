@@ -169,21 +169,18 @@ def send_welcome_with_buttons(reply_token):
             try:
                 error_detail = response.json()
                 print(f'[DEBUG] LINE API エラー詳細JSON: {error_detail}')
-            except:
+                if 'message' in error_detail:
+                    if 'reply token' in error_detail['message'].lower():
+                        print(f'[DEBUG] replyTokenエラー: {error_detail["message"]}')
+                        # replyTokenエラーの場合は、再試行せずにエラーとして処理
+                        raise Exception(f'replyTokenエラー: {error_detail["message"]}')
+            except Exception as parse_error:
+                if 'replyTokenエラー' in str(parse_error):
+                    raise parse_error
                 print(f'[DEBUG] LINE API エラー詳細（JSON解析失敗）: {response.text}')
             
-            # 400エラーの場合は、よりシンプルなメッセージを試す
-            simple_data = {
-                'replyToken': reply_token,
-                'messages': [
-                    {
-                        "type": "text",
-                        "text": "ようこそ！AIコレクションズへ\n\n「追加」と入力してコンテンツを追加してください。"
-                    }
-                ]
-            }
-            print(f'[DEBUG] シンプルメッセージで再試行: {simple_data}')
-            response = requests.post('https://api.line.me/v2/bot/message/reply', headers=headers, json=simple_data, timeout=10)
+            # 400エラーだがreplyTokenエラーでない場合は、エラーとして処理
+            print(f'[DEBUG] 400エラーが発生しましたが、replyTokenは既に使用済みのため再試行しません')
         
         response.raise_for_status()
         print(f'[DEBUG] LINE API送信成功: status_code={response.status_code}')

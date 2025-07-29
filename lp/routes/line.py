@@ -499,11 +499,9 @@ def line_webhook():
                         print(f'[DEBUG] ウェルカムメッセージ送信エラー: {e}')
                         import traceback
                         traceback.print_exc()
-                        # エラーが発生した場合は簡単なテキストメッセージを送信
-                        print(f'[DEBUG] 代替メッセージ送信開始: user_id={user_id}')
-                        send_line_message(event['replyToken'], [{"type": "text", "text": "ようこそ！AIコレクションズへ\n\n「追加」と入力してコンテンツを追加してください。"}])
+                        # エラーが発生した場合は、replyTokenは既に使用済みなので送信しない
+                        print(f'[DEBUG] replyToken使用済みのため代替メッセージ送信をスキップ: user_id={user_id}')
                         set_user_state(user_id, 'welcome_sent')
-                        print(f'[DEBUG] 代替メッセージ送信完了: user_id={user_id}')
                 else:
                     # 未登録ユーザーの場合
                     print(f'[DEBUG] 未登録ユーザー: user_id={user_id}')
@@ -586,8 +584,8 @@ def line_webhook():
                             print(f'[DEBUG] 初回メッセージ時の案内文送信エラー: {e}')
                             import traceback
                             traceback.print_exc()
-                            # エラーが発生した場合は簡単なテキストメッセージを送信
-                            send_line_message(event['replyToken'], [{"type": "text", "text": "ようこそ！AIコレクションズへ\n\n「追加」と入力してコンテンツを追加してください。"}])
+                            # エラーが発生した場合は、replyTokenは既に使用済みなので送信しない
+                            print(f'[DEBUG] replyToken使用済みのため代替メッセージ送信をスキップ: user_id={user_id}')
                             set_user_state(user_id, 'welcome_sent')
                     else:
                         print(f'[DEBUG] 未紐付けユーザーも見つからない')
