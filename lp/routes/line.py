@@ -714,12 +714,52 @@ def line_webhook():
                     if text.lower() in ['はい', 'yes', 'y']:
                         # 確認状態からコンテンツ番号を取得
                         content_number = state.split('_')[1]
-                        handle_content_confirmation(event['replyToken'], user_id_db, stripe_subscription_id, content_number, True)
+                        
+                        # コンテンツ情報を取得
+                        content_info = {
+                            '1': {
+                                'name': 'AI予定秘書',
+                                'price': 1500,
+                                "description": '日程調整のストレスから解放される、スケジュール管理の相棒',
+                                'usage': 'Googleカレンダーと連携し、LINEで予定の追加・確認・空き時間の提案まで。調整のやりとりに追われる時間を、もっとクリエイティブに使えるように。',
+                                'url': 'https://lp-production-9e2c.up.railway.app/schedule',
+                                'line_url': 'https://line.me/R/ti/p/@ai_schedule_secretary'
+                            },
+                            '2': {
+                                'name': 'AI経理秘書',
+                                'price': 1500,
+                                "description": '打合せ後すぐ送れる、スマートな請求書作成アシスタント',
+                                'usage': 'LINEで項目を送るだけで、見積書や請求書を即作成。営業から事務処理までを一気通貫でスムーズに。',
+                                'url': 'https://lp-production-9e2c.up.railway.app/accounting',
+                                'line_url': 'https://line.me/R/ti/p/@ai_accounting_secretary'
+                            },
+                            '3': {
+                                'name': 'AIタスクコンシェルジュ',
+                                'price': 1500,
+                                "description": '今日やるべきことを、ベストなタイミングで',
+                                'usage': '登録したタスクを空き時間に自動で配置し、理想的な1日をAIが提案。「やりたいのにできない」を、「自然にこなせる」毎日に。',
+                                'url': 'https://lp-production-9e2c.up.railway.app/task',
+                                'line_url': 'https://line.me/R/ti/p/@ai_task_concierge'
+                            }
+                        }
+                        
+                        if content_number in content_info:
+                            content = content_info[content_number]
+                            # コンテンツを追加
+                            result = handle_content_confirmation(user_id_db, content, user_id)
+                            if result['status'] == 'success':
+                                success_message = f"✅ {content['name']}を追加しました！\n\n{content['description']}\n\n{content['url']}"
+                                send_line_message(event['replyToken'], [{"type": "text", "text": success_message}])
+                            else:
+                                error_message = f"❌ コンテンツの追加に失敗しました: {result['message']}"
+                                send_line_message(event['replyToken'], [{"type": "text", "text": error_message}])
+                        else:
+                            send_line_message(event['replyToken'], [{"type": "text", "text": "無効なコンテンツ番号です。"}])
+                        
                         set_user_state(user_id, 'welcome_sent')
                     elif text.lower() in ['いいえ', 'no', 'n']:
-                        # 確認状態からコンテンツ番号を取得
-                        content_number = state.split('_')[1]
-                        handle_content_confirmation(event['replyToken'], user_id_db, stripe_subscription_id, content_number, False)
+                        # キャンセル処理
+                        send_line_message(event['replyToken'], [{"type": "text", "text": "コンテンツの追加をキャンセルしました。\n\n「追加」と入力して他のコンテンツを追加できます。"}])
                         set_user_state(user_id, 'welcome_sent')
                     elif text == 'メニュー':
                         set_user_state(user_id, 'welcome_sent')
