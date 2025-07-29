@@ -146,7 +146,7 @@ def get_restricted_message():
         "template": {
             "type": "buttons",
             "title": "AIコレクションズ",
-            "text": "決済済みユーザーのみご利用いただけます。\n\n公式LINEにご登録ください。",
+            "text": "決済済みユーザーのみご利用いただけます。\n\nご登録済みの方は、登録時のメールアドレスを送信してください。",
             "thumbnailImageUrl": "https://ai-collections.herokuapp.com/static/images/logo.png",
             "imageAspectRatio": "rectangle",
             "imageSize": "cover",
