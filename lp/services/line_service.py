@@ -22,36 +22,71 @@ def send_line_message(reply_token, messages):
     import os
     import traceback
     LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
+    
+    if not LINE_CHANNEL_ACCESS_TOKEN:
+        print('❌ LINE_CHANNEL_ACCESS_TOKENが設定されていません')
+        return
+    
     headers = {
         'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}',
         'Content-Type': 'application/json'
     }
+    
     # 単一メッセージの場合はリスト化
     if not isinstance(messages, list):
         messages = [messages]
-    # actionsが5つ以上のボタンテンプレートがあれば4つまでに制限
+    
+    # メッセージの検証と修正
+    validated_messages = []
     for msg in messages:
-        if msg.get('type') == 'template' and 'template' in msg:
+        if msg.get('type') == 'text':
+            # テキストメッセージの文字数制限（2000文字）
+            text = msg.get('text', '')
+            if len(text) > 2000:
+                print(f'[WARN] テキストが長すぎます（{len(text)}文字）。2000文字に制限します。')
+                msg['text'] = text[:1997] + '...'
+        elif msg.get('type') == 'template' and 'template' in msg:
             tmpl = msg['template']
-            if tmpl.get('type') == 'buttons' and 'actions' in tmpl and len(tmpl['actions']) > 4:
-                print('[WARN] actionsが5つ以上のため4つまでに自動制限します')
-                tmpl['actions'] = tmpl['actions'][:4]
+            if tmpl.get('type') == 'buttons':
+                # actionsが5つ以上のボタンテンプレートがあれば4つまでに制限
+                if 'actions' in tmpl and len(tmpl['actions']) > 4:
+                    print('[WARN] actionsが5つ以上のため4つまでに自動制限します')
+                    tmpl['actions'] = tmpl['actions'][:4]
+                # テキストの文字数制限（120文字）
+                if 'text' in tmpl and len(tmpl['text']) > 120:
+                    print(f'[WARN] ボタンテンプレートのテキストが長すぎます（{len(tmpl["text"])}文字）。120文字に制限します。')
+                    tmpl['text'] = tmpl['text'][:117] + '...'
+        
+        validated_messages.append(msg)
+    
     data = {
         'replyToken': reply_token,
-        'messages': messages
+        'messages': validated_messages
     }
-    print('[DEBUG] LINE送信内容:', data)  # 送信内容をprint
+    
+    print('[DEBUG] LINE送信内容:', data)
+    
     try:
-        response = requests.post('https://api.line.me/v2/bot/message/reply', headers=headers, json=data)
+        response = requests.post('https://api.line.me/v2/bot/message/reply', headers=headers, json=data, timeout=10)
         response.raise_for_status()
+        print(f'[DEBUG] LINE API送信成功: status_code={response.status_code}')
+    except requests.exceptions.Timeout:
+        print('❌ LINE API タイムアウトエラー')
+        with open('error.log', 'a', encoding='utf-8') as f:
+            f.write('LINE API タイムアウトエラー\n')
     except Exception as e:
         print(f'LINEメッセージ送信エラー: {e}')
         if hasattr(e, 'response') and e.response is not None:
             print(f'LINE API エラー詳細: {e.response.text}')
+            print(f'LINE API レスポンスヘッダー: {e.response.headers}')
+            print(f'LINE API リクエストデータ: {data}')
         traceback.print_exc()
         # エラー詳細をerror.logにも追記
         with open('error.log', 'a', encoding='utf-8') as f:
             f.write('LINEメッセージ送信エラー: ' + str(e) + '\n')
+            if hasattr(e, 'response') and e.response is not None:
+                f.write(f'LINE API エラー詳細: {e.response.text}\n')
+                f.write(f'LINE API リクエストデータ: {data}\n')
             f.write(traceback.format_exc() + '\n')
 
 def send_welcome_with_buttons(reply_token):
@@ -68,7 +103,7 @@ def send_welcome_with_buttons(reply_token):
         'messages': [
             {
                 "type": "text",
-                "text": "ようこそ！AIコレクションズへ\n\nAIコレクションズサービスをご利用いただき、ありがとうございます。\n\n📋 サービス内容：\n• AI予定秘書：スケジュール管理\n• AI経理秘書：見積書・請求書作成\n• AIタスクコンシェルジュ：タスク管理\n\n💰 料金体系：\n• 月額基本料金：3,900円（1週間無料）\n• 追加コンテンツ：1個目無料、2個目以降1,500円/件（トライアル期間中は無料）\n\n下のボタンからお選びください。"
+                "text": "ようこそ！AIコレクションズへ\n\n📋 サービス内容：\n• AI予定秘書：スケジュール管理\n• AI経理秘書：見積書・請求書作成\n• AIタスクコンシェルジュ：タスク管理\n\n💰 料金：月額3,900円（1週間無料）\n追加コンテンツ：1個目無料、2個目以降1,500円\n\n下のボタンからお選びください。"
             },
             {
                 "type": "template",
@@ -131,7 +166,7 @@ def send_welcome_with_buttons_push(user_id):
         'messages': [
             {
                 "type": "text",
-                "text": "ようこそ！AIコレクションズへ\n\nAIコレクションズサービスをご利用いただき、ありがとうございます。\n\n📋 サービス内容：\n• AI予定秘書：スケジュール管理\n• AI経理秘書：見積書・請求書作成\n• AIタスクコンシェルジュ：タスク管理\n\n💰 料金体系：\n• 月額基本料金：3,900円（1週間無料）\n• 追加コンテンツ：1個目無料、2個目以降1,500円/件（トライアル期間中は無料）\n\n下のボタンからお選びください。"
+                "text": "ようこそ！AIコレクションズへ\n\n📋 サービス内容：\n• AI予定秘書：スケジュール管理\n• AI経理秘書：見積書・請求書作成\n• AIタスクコンシェルジュ：タスク管理\n\n💰 料金：月額3,900円（1週間無料）\n追加コンテンツ：1個目無料、2個目以降1,500円\n\n下のボタンからお選びください。"
             },
             {
                 "type": "template",
