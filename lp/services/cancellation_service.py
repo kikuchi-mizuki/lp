@@ -17,8 +17,8 @@ def record_cancellation(user_id, content_type):
         c = conn.cursor()
         
         c.execute('''
-            INSERT INTO cancellation_history (user_id, content_type)
-            VALUES (%s, %s)
+            INSERT INTO cancellation_history (user_id, content_type, cancelled_at)
+            VALUES (%s, %s, CURRENT_TIMESTAMP)
         ''', (user_id, content_type))
         
         conn.commit()
