@@ -806,6 +806,29 @@ def debug_webhook_status():
     except Exception as e:
         return jsonify({'error': str(e)})
 
+@app.route('/debug/update_line_user_id/<email>/<new_line_user_id>')
+def debug_update_line_user_id(email, new_line_user_id):
+    """デバッグ用：LINEユーザーIDを手動で更新"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 既存のLINEユーザーIDをクリア
+        c.execute('UPDATE users SET line_user_id = NULL WHERE email = %s', (email,))
+        
+        # 新しいLINEユーザーIDで更新
+        c.execute('UPDATE users SET line_user_id = %s WHERE email = %s', (new_line_user_id, email))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': f'LINEユーザーIDを更新しました: email={email}, new_line_user_id={new_line_user_id}'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
 @app.route('/debug/subscription/<subscription_id>')
 def debug_subscription(subscription_id):
     """デバッグ用：サブスクリプション詳細表示"""
