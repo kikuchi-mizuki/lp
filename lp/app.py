@@ -307,13 +307,22 @@ def add_test_data():
         conn = get_db_connection()
         c = conn.cursor()
         
+        # テーブル構造を確認
+        c.execute("""
+            SELECT column_name, data_type 
+            FROM information_schema.columns 
+            WHERE table_name = 'cancellation_history' 
+            ORDER BY ordinal_position
+        """)
+        columns = c.fetchall()
+        
         # テスト用のusage_logを追加
         c.execute('''
             INSERT INTO usage_logs (user_id, usage_quantity, content_type, is_free, created_at)
             VALUES (1, 1, 'AI予定秘書', true, CURRENT_TIMESTAMP)
         ''')
         
-        # テスト用のcancellation_historyを追加
+        # テスト用のcancellation_historyを追加（正しいデータ型で）
         c.execute('''
             INSERT INTO cancellation_history (user_id, content_type, cancelled_at)
             VALUES (1, 'AI予定秘書', CURRENT_TIMESTAMP)
@@ -324,7 +333,8 @@ def add_test_data():
         
         return jsonify({
             'status': 'ok',
-            'message': 'テストデータを追加しました'
+            'message': 'テストデータを追加しました',
+            'table_structure': [{'column': col[0], 'type': col[1]} for col in columns]
         })
     except Exception as e:
         return jsonify({
