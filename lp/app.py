@@ -58,6 +58,12 @@ def init_db():
                 content_type VARCHAR(100) NOT NULL,
                 is_free BOOLEAN DEFAULT FALSE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                subscription_status VARCHAR(50),
+                current_period_start TIMESTAMP,
+                current_period_end TIMESTAMP,
+                trial_start TIMESTAMP,
+                trial_end TIMESTAMP,
+                stripe_subscription_id VARCHAR(255),
                 FOREIGN KEY (user_id) REFERENCES users (id)
             )
         ''')
@@ -115,6 +121,12 @@ def init_db():
                 content_type TEXT NOT NULL,
                 is_free BOOLEAN DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                subscription_status TEXT,
+                current_period_start TIMESTAMP,
+                current_period_end TIMESTAMP,
+                trial_start TIMESTAMP,
+                trial_end TIMESTAMP,
+                stripe_subscription_id TEXT,
                 FOREIGN KEY (user_id) REFERENCES users (id)
             )
         ''')
@@ -1154,6 +1166,75 @@ def update_existing_cancellation(user_id, content_type):
             })
         else:
             return jsonify({'status': 'error', 'message': '更新に失敗しました'})
+            
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
+
+@app.route('/debug/create_content_period/<int:user_id>/<content_type>')
+def debug_create_content_period(user_id, content_type):
+    """指定ユーザーのコンテンツ追加時に契約期間情報を保存"""
+    try:
+        from services.cancellation_period_service import CancellationPeriodService
+        
+        # ユーザーのサブスクリプションIDを取得
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute('SELECT stripe_subscription_id FROM users WHERE id = %s', (user_id,))
+        result = c.fetchone()
+        conn.close()
+        
+        if not result or not result[0]:
+            return jsonify({'status': 'error', 'message': 'サブスクリプションIDが見つかりません'})
+        
+        stripe_subscription_id = result[0]
+        
+        # 契約期間情報を保存
+        period_service = CancellationPeriodService()
+        success = period_service.create_content_period_record(user_id, content_type, stripe_subscription_id)
+        
+        if success:
+            # 保存後の情報を取得
+            subscription_info = period_service.get_subscription_info(user_id, content_type)
+            
+            # 保存後のテーブル内容も確認
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute('''
+                SELECT 
+                    id, user_id, content_type, cancelled_at,
+                    subscription_status, current_period_start, current_period_end,
+                    trial_start, trial_end, stripe_subscription_id
+                FROM cancellation_history 
+                WHERE user_id = %s AND content_type = %s
+            ''', (user_id, content_type))
+            
+            saved_record = c.fetchone()
+            conn.close()
+            
+            if saved_record:
+                record_info = {
+                    'id': saved_record[0],
+                    'user_id': saved_record[1],
+                    'content_type': saved_record[2],
+                    'cancelled_at': saved_record[3],
+                    'subscription_status': saved_record[4],
+                    'current_period_start': saved_record[5],
+                    'current_period_end': saved_record[6],
+                    'trial_start': saved_record[7],
+                    'trial_end': saved_record[8],
+                    'stripe_subscription_id': saved_record[9]
+                }
+            else:
+                record_info = None
+            
+            return jsonify({
+                'status': 'ok',
+                'message': 'コンテンツ期間情報を保存しました',
+                'subscription_info': subscription_info,
+                'saved_record': record_info
+            })
+        else:
+            return jsonify({'status': 'error', 'message': '保存に失敗しました'})
             
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)})
