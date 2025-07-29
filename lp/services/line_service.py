@@ -357,7 +357,7 @@ def handle_add_content(reply_token, user_id_db, stripe_subscription_id):
                 }
                 send_line_message(reply_token, [payment_message])
                 return
-            elif subscription_status['cancel_at_period_end']:
+            elif subscription_status.get('cancel_at_period_end', False):
                 # 期間終了時に解約予定
                 payment_message = {
                     "type": "template",
@@ -467,12 +467,8 @@ def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, co
         # 全コンテンツの合計数を取得
         conn_count = get_db_connection()
         c_count = conn_count.cursor()
-        # データベースタイプに応じてプレースホルダーを選択
-        from utils.db import get_db_type
-        db_type = get_db_type()
-        placeholder = '%s' if db_type == 'postgresql' else '?'
-        
-        c_count.execute(f'SELECT COUNT(*) FROM usage_logs WHERE user_id = {placeholder}', (user_id_db,))
+        # PostgreSQL用のプレースホルダーを使用
+        c_count.execute('SELECT COUNT(*) FROM usage_logs WHERE user_id = %s', (user_id_db,))
         total_usage_count = c_count.fetchone()[0]
         
         # デバッグ用：実際のusage_logsを確認
@@ -481,7 +477,7 @@ def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, co
         print(f'[DEBUG] 全usage_logs: {all_logs}')
         
         # 同じコンテンツの追加回数を確認
-        c_count.execute(f'SELECT COUNT(*) FROM usage_logs WHERE user_id = {placeholder} AND content_type = {placeholder}', (user_id_db, content['name']))
+        c_count.execute('SELECT COUNT(*) FROM usage_logs WHERE user_id = %s AND content_type = %s', (user_id_db, content['name']))
         same_content_count = c_count.fetchone()[0]
         conn_count.close()
         
@@ -581,26 +577,22 @@ def handle_content_confirmation(user_id_db, content, line_user_id):
         conn = get_db_connection()
         c = conn.cursor()
         
-        # データベースタイプに応じてプレースホルダーを選択
-        from utils.db import get_db_type
-        db_type = get_db_type()
-        placeholder = '%s' if db_type == 'postgresql' else '?'
-        
+        # PostgreSQL用のプレースホルダーを使用
         # 現在のコンテンツ数を取得
-        c.execute(f'SELECT COUNT(*) FROM usage_logs WHERE user_id = {placeholder}', (user_id_db,))
+        c.execute('SELECT COUNT(*) FROM usage_logs WHERE user_id = %s', (user_id_db,))
         current_count = c.fetchone()[0]
         
         # 料金判定（1個目は無料）
         is_free = current_count == 0
         
         # usage_logsに記録
-        c.execute(f'''
+        c.execute('''
             INSERT INTO usage_logs (user_id, content_type, is_free, created_at)
-            VALUES ({placeholder}, {placeholder}, {placeholder}, CURRENT_TIMESTAMP)
+            VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
         ''', (user_id_db, content['name'], is_free))
         
         # ユーザーのサブスクリプションIDを取得
-        c.execute(f'SELECT stripe_subscription_id FROM users WHERE id = {placeholder}', (user_id_db,))
+        c.execute('SELECT stripe_subscription_id FROM users WHERE id = %s', (user_id_db,))
         subscription_result = c.fetchone()
         
         if subscription_result and subscription_result[0]:
@@ -611,11 +603,11 @@ def handle_content_confirmation(user_id_db, content, line_user_id):
                 subscription = stripe.Subscription.retrieve(stripe_subscription_id)
                 
                 # subscription_periodsテーブルに保存（content_typeカラムなし）
-                c.execute(f'''
+                c.execute('''
                     INSERT INTO subscription_periods 
                     (user_id, stripe_subscription_id, subscription_status, 
                      current_period_start, current_period_end, trial_start, trial_end)
-                    VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
                 ''', (
                     user_id_db,
                     stripe_subscription_id,
@@ -631,10 +623,10 @@ def handle_content_confirmation(user_id_db, content, line_user_id):
             except Exception as e:
                 print(f'[DEBUG] Stripe API エラー: {e}')
                 # Stripe APIエラーの場合でも基本的な情報を保存（content_typeカラムなし）
-                c.execute(f'''
+                c.execute('''
                     INSERT INTO subscription_periods 
                     (user_id, stripe_subscription_id, subscription_status)
-                    VALUES ({placeholder}, {placeholder}, {placeholder})
+                    VALUES (%s, %s, %s)
                 ''', (user_id_db, stripe_subscription_id, 'unknown'))
             
             # 契約期間情報をcancellation_historyにも保存
@@ -1126,7 +1118,7 @@ def handle_cancel_menu(reply_token, user_id_db, stripe_subscription_id):
                 }
                 send_line_message(reply_token, [payment_message])
                 return
-            elif subscription_status['cancel_at_period_end']:
+            elif subscription_status.get('cancel_at_period_end', False):
                 # 期間終了時に解約予定
                 payment_message = {
                     "type": "template",
