@@ -779,25 +779,26 @@ def line_webhook():
                             # コンテンツを追加
                             result = handle_content_confirmation(user_id_db, content, user_id)
                             if result['status'] == 'success':
-                                success_message = f"✅ {content['name']}を追加しました！\n\n{content['description']}\n\n{content['url']}"
+                                # より親しみやすく、わかりやすい完了メッセージ
+                                success_message = f"🎉 {content['name']}を追加しました！\n\n✨ {content['description']}\n\n🔗 アクセスURL：\n{content['url']}\n\n💡 使い方：\n{content['usage']}\n\n📱 何かお手伝いできることはありますか？\n• 「追加」：他のコンテンツを追加\n• 「状態」：利用状況を確認\n• 「メニュー」：メインメニューに戻る\n• 「ヘルプ」：使い方を確認"
                                 send_line_message(event['replyToken'], [{"type": "text", "text": success_message}])
                             else:
-                                error_message = f"❌ コンテンツの追加に失敗しました: {result['message']}"
+                                error_message = f"❌ コンテンツの追加に失敗しました: {result['message']}\n\n📱 「メニュー」と入力すると、メインメニューに戻れます。"
                                 send_line_message(event['replyToken'], [{"type": "text", "text": error_message}])
                         else:
-                            send_line_message(event['replyToken'], [{"type": "text", "text": "無効なコンテンツ番号です。"}])
+                            send_line_message(event['replyToken'], [{"type": "text", "text": "無効なコンテンツ番号です。\n\n📱 「メニュー」と入力すると、メインメニューに戻れます。"}])
                         
                         set_user_state(user_id, 'welcome_sent')
                     elif text.lower() in ['いいえ', 'no', 'n']:
                         # キャンセル処理
-                        send_line_message(event['replyToken'], [{"type": "text", "text": "コンテンツの追加をキャンセルしました。\n\n「追加」と入力して他のコンテンツを追加できます。"}])
+                        send_line_message(event['replyToken'], [{"type": "text", "text": "コンテンツの追加をキャンセルしました。\n\n📱 何かお手伝いできることはありますか？\n• 「追加」：他のコンテンツを追加\n• 「状態」：利用状況を確認\n• 「メニュー」：メインメニューに戻る\n• 「ヘルプ」：使い方を確認"}])
                         set_user_state(user_id, 'welcome_sent')
                     elif text == 'メニュー':
                         set_user_state(user_id, 'welcome_sent')
                         send_line_message(event['replyToken'], [get_menu_message()])
                     else:
                         # 無効な入力の場合は確認を促す
-                        send_line_message(event['replyToken'], [{"type": "text", "text": "「はい」または「いいえ」で回答してください。\n\nまたは「メニュー」でメインメニューに戻ります。"}])
+                        send_line_message(event['replyToken'], [{"type": "text", "text": "「はい」または「いいえ」で回答してください。\n\n📱 または「メニュー」でメインメニューに戻ります。"}])
                 elif '@' in text and '.' in text and len(text) < 100:
                     import unicodedata
                     def normalize_email(email):

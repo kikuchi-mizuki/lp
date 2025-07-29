@@ -145,13 +145,13 @@ def send_welcome_with_buttons(reply_token):
         'Content-Type': 'application/json'
     }
     
-    # シンプルなテキストメッセージのみでテスト
+    # より親しみやすく、わかりやすい案内文
     data = {
         'replyToken': reply_token,
         'messages': [
             {
                 "type": "text",
-                "text": "ようこそ！AIコレクションズへ\n\n📋 サービス内容：\n• AI予定秘書：スケジュール管理\n• AI経理秘書：見積書・請求書作成\n• AIタスクコンシェルジュ：タスク管理\n\n💰 料金：月額3,900円（1週間無料）\n追加コンテンツ：1個目無料、2個目以降1,500円\n\n「追加」と入力してコンテンツを追加してください。"
+                "text": "🎉 ようこそ！AIコレクションズへ\n\n✨ あなたのビジネスをサポートする3つのAIサービス：\n\n📅 AI予定秘書\n• スケジュール管理を自動化\n• 会議調整を効率化\n\n💰 AI経理秘書\n• 見積書・請求書を自動作成\n• 経理作業を大幅短縮\n\n📝 AIタスクコンシェルジュ\n• タスク管理を最適化\n• 優先順位を自動設定\n\n💡 まずは「追加」と入力して、使ってみたいサービスを選んでください！\n\n📋 料金：月額3,900円（1週間無料トライアル）\n🎁 追加コンテンツ：1個目は無料、2個目以降は1,500円"
             }
         ]
     }
@@ -211,7 +211,7 @@ def send_welcome_with_buttons_push(user_id):
         'messages': [
             {
                 "type": "text",
-                "text": "ようこそ！AIコレクションズへ\n\n📋 サービス内容：\n• AI予定秘書：スケジュール管理\n• AI経理秘書：見積書・請求書作成\n• AIタスクコンシェルジュ：タスク管理\n\n💰 料金：月額3,900円（1週間無料）\n追加コンテンツ：1個目無料、2個目以降1,500円\n\n下のボタンからお選びください。"
+                "text": "🎉 ようこそ！AIコレクションズへ\n\n✨ あなたのビジネスをサポートする3つのAIサービス：\n\n📅 AI予定秘書\n• スケジュール管理を自動化\n• 会議調整を効率化\n\n💰 AI経理秘書\n• 見積書・請求書を自動作成\n• 経理作業を大幅短縮\n\n📝 AIタスクコンシェルジュ\n• タスク管理を最適化\n• 優先順位を自動設定\n\n💡 まずは「追加」と入力して、使ってみたいサービスを選んでください！\n\n📋 料金：月額3,900円（1週間無料トライアル）\n🎁 追加コンテンツ：1個目は無料、2個目以降は1,500円"
             },
             {
                 "type": "template",
@@ -246,20 +246,17 @@ def send_welcome_with_buttons_push(user_id):
             }
         ]
     }
+    
     try:
-        print(f'[DEBUG] LINE Push API送信開始: data={data}')
-        response = requests.post('https://api.line.me/v2/bot/message/push', headers=headers, json=data)
+        response = requests.post('https://api.line.me/v2/bot/message/push', headers=headers, json=data, timeout=10)
         response.raise_for_status()
-        print(f'[DEBUG] LINE Push API送信成功: status_code={response.status_code}')
-        return True
+        print(f'[DEBUG] LINE pushメッセージ送信成功: status_code={response.status_code}')
     except Exception as e:
-        print(f'LINE Push テンプレートメッセージ送信エラー: {e}')
+        print(f'LINE pushメッセージ送信エラー: {e}')
+        if hasattr(e, 'response') and e.response is not None:
+            print(f'LINE API エラー詳細: {e.response.text}')
         import traceback
         traceback.print_exc()
-        with open('error.log', 'a', encoding='utf-8') as f:
-            f.write('LINE Push テンプレートメッセージ送信エラー: ' + str(e) + '\n')
-            f.write(traceback.format_exc() + '\n')
-        return False
 
 def create_rich_menu():
     rich_menu = {
@@ -1629,7 +1626,10 @@ def handle_status_check(reply_token, user_id_db):
         else:
             status_message += "📋 利用コンテンツ: まだ利用していません\n"
         
-        status_message += "\n💡 ヘルプが必要な場合は「ヘルプ」と入力してください。"
+        # 一通りの流れが終わった後の案内を追加
+        status_message += "\n💡 何かお手伝いできることはありますか？\n"
+        status_message += "📱 「メニュー」と入力すると、メインメニューに戻れます。\n"
+        status_message += "❓ 使い方がわからない場合は「ヘルプ」と入力してください。"
         
         send_line_message(reply_token, [{"type": "text", "text": status_message}])
         
