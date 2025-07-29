@@ -418,40 +418,63 @@ def test_cancellation():
     try:
         from services.cancellation_service import record_cancellation
         
-        # テスト用の解約記録
-        record_cancellation(1, 'AI経理秘書')
-        
-        # 解約履歴を確認
+        # 現在のユーザーデータを確認
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute('''
-            SELECT ch.id, ch.user_id, ch.content_type, ch.cancelled_at,
-                   u.email, u.line_user_id
-            FROM cancellation_history ch
-            LEFT JOIN users u ON ch.user_id = u.id
-            WHERE ch.content_type = 'AI経理秘書'
-            ORDER BY ch.cancelled_at DESC
-        ''')
-        
-        cancellations = []
+        c.execute('SELECT id, email, line_user_id FROM users ORDER BY id')
+        users = []
         for row in c.fetchall():
-            cancellations.append({
+            users.append({
                 'id': row[0],
-                'user_id': row[1],
-                'content_type': row[2],
-                'cancelled_at': row[3],
-                'user_email': row[4],
-                'line_user_id': row[5]
+                'email': row[1],
+                'line_user_id': row[2]
             })
         
-        conn.close()
-        
-        return jsonify({
-            'status': 'ok',
-            'message': '解約処理テスト完了',
-            'cancellations': cancellations,
-            'count': len(cancellations)
-        })
+        # 最初のユーザーIDを使用してテスト
+        if users:
+            test_user_id = users[0]['id']
+            print(f'[DEBUG] テスト用ユーザーID: {test_user_id}')
+            
+            # テスト用の解約記録
+            record_cancellation(test_user_id, 'AI経理秘書')
+            
+            # 解約履歴を確認
+            c.execute('''
+                SELECT ch.id, ch.user_id, ch.content_type, ch.cancelled_at,
+                       u.email, u.line_user_id
+                FROM cancellation_history ch
+                LEFT JOIN users u ON ch.user_id = u.id
+                WHERE ch.content_type = 'AI経理秘書'
+                ORDER BY ch.cancelled_at DESC
+            ''')
+            
+            cancellations = []
+            for row in c.fetchall():
+                cancellations.append({
+                    'id': row[0],
+                    'user_id': row[1],
+                    'content_type': row[2],
+                    'cancelled_at': row[3],
+                    'user_email': row[4],
+                    'line_user_id': row[5]
+                })
+            
+            conn.close()
+            
+            return jsonify({
+                'status': 'ok',
+                'message': '解約処理テスト完了',
+                'users': users,
+                'test_user_id': test_user_id,
+                'cancellations': cancellations,
+                'count': len(cancellations)
+            })
+        else:
+            conn.close()
+            return jsonify({
+                'status': 'error',
+                'message': 'ユーザーデータが見つかりません'
+            })
     except Exception as e:
         return jsonify({
             'status': 'error',
