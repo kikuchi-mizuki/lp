@@ -181,6 +181,17 @@ def debug_database():
         from utils.db import get_db_type
         db_type = get_db_type()
         
+        # データベース接続情報を取得
+        if db_type == 'postgresql':
+            c.execute("SELECT current_database(), current_user, inet_server_addr(), inet_server_port()")
+            db_info = c.fetchone()
+            db_name, db_user, db_host, db_port = db_info
+        else:
+            db_name = "sqlite"
+            db_user = "local"
+            db_host = "localhost"
+            db_port = "N/A"
+        
         # テーブル一覧を取得
         if db_type == 'postgresql':
             c.execute("""
@@ -213,6 +224,10 @@ def debug_database():
         return jsonify({
             'status': 'ok',
             'database_type': db_type,
+            'database_name': db_name,
+            'database_user': db_user,
+            'database_host': db_host,
+            'database_port': db_port,
             'database_url': DATABASE_URL[:20] + '...' if len(DATABASE_URL) > 20 else DATABASE_URL,
             'tables': tables,
             'table_counts': table_counts
