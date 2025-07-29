@@ -755,6 +755,57 @@ def debug_users():
     except Exception as e:
         return jsonify({'error': str(e)})
 
+@app.route('/debug/webhook_status')
+def debug_webhook_status():
+    """LINE Webhookの設定状況を確認"""
+    try:
+        import os
+        import requests
+        
+        channel_access_token = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
+        channel_secret = os.getenv('LINE_CHANNEL_SECRET')
+        
+        if not channel_access_token or not channel_secret:
+            return jsonify({
+                'error': 'LINE環境変数が設定されていません',
+                'channel_access_token': bool(channel_access_token),
+                'channel_secret': bool(channel_secret)
+            })
+        
+        # LINE Messaging APIの情報を取得
+        headers = {
+            'Authorization': f'Bearer {channel_access_token}'
+        }
+        
+        try:
+            # プロフィール情報を取得してトークンの有効性を確認
+            response = requests.get('https://api.line.me/v2/bot/profile/U231cdb3fc0687f3abc7bcaba5214dfff', headers=headers)
+            
+            return jsonify({
+                'webhook_url': 'https://lp-production-9e2c.up.railway.app/line/webhook',
+                'channel_access_token_set': bool(channel_access_token),
+                'channel_secret_set': bool(channel_secret),
+                'line_api_test': {
+                    'status_code': response.status_code,
+                    'success': response.status_code == 200,
+                    'response': response.json() if response.status_code == 200 else response.text
+                },
+                'environment': {
+                    'railway_url': 'https://lp-production-9e2c.up.railway.app',
+                    'webhook_endpoint': '/line/webhook'
+                }
+            })
+        except Exception as e:
+            return jsonify({
+                'error': f'LINE API接続エラー: {str(e)}',
+                'webhook_url': 'https://lp-production-9e2c.up.railway.app/line/webhook',
+                'channel_access_token_set': bool(channel_access_token),
+                'channel_secret_set': bool(channel_secret)
+            })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
 @app.route('/debug/subscription/<subscription_id>')
 def debug_subscription(subscription_id):
     """デバッグ用：サブスクリプション詳細表示"""
