@@ -21,11 +21,37 @@ def send_line_message(reply_token, messages):
     import requests
     import os
     import traceback
+    import time
+    
     LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
     
     if not LINE_CHANNEL_ACCESS_TOKEN:
         print('❌ LINE_CHANNEL_ACCESS_TOKENが設定されていません')
         return
+    
+    # replyTokenの重複使用チェック
+    if hasattr(send_line_message, 'used_tokens'):
+        if reply_token in send_line_message.used_tokens:
+            print(f'[WARN] replyTokenが既に使用済みです: {reply_token}')
+            return
+    else:
+        send_line_message.used_tokens = set()
+    
+    # replyTokenを記録
+    send_line_message.used_tokens.add(reply_token)
+    
+    # 古いトークンをクリア（30秒以上前のもの）
+    current_time = time.time()
+    if hasattr(send_line_message, 'token_times'):
+        expired_tokens = [token for token, timestamp in send_line_message.token_times.items() 
+                         if current_time - timestamp > 30]
+        for token in expired_tokens:
+            send_line_message.used_tokens.discard(token)
+            del send_line_message.token_times[token]
+    else:
+        send_line_message.token_times = {}
+    
+    send_line_message.token_times[reply_token] = current_time
     
     headers = {
         'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}',
@@ -68,6 +94,21 @@ def send_line_message(reply_token, messages):
     
     try:
         response = requests.post('https://api.line.me/v2/bot/message/reply', headers=headers, json=data, timeout=10)
+        
+        if response.status_code == 400:
+            print(f'[DEBUG] LINE API 400エラー詳細: {response.text}')
+            try:
+                error_detail = response.json()
+                if 'message' in error_detail:
+                    if 'reply token' in error_detail['message'].lower():
+                        print(f'[DEBUG] replyTokenエラー: {error_detail["message"]}')
+                        # replyTokenエラーの場合は、トークンを削除して再試行を許可
+                        send_line_message.used_tokens.discard(reply_token)
+                        if reply_token in send_line_message.token_times:
+                            del send_line_message.token_times[reply_token]
+            except:
+                pass
+        
         response.raise_for_status()
         print(f'[DEBUG] LINE API送信成功: status_code={response.status_code}')
     except requests.exceptions.Timeout:
@@ -121,6 +162,16 @@ def send_welcome_with_buttons(reply_token):
         
         if response.status_code == 400:
             print(f'[DEBUG] LINE API 400エラー詳細: {response.text}')
+            print(f'[DEBUG] LINE API レスポンスヘッダー: {response.headers}')
+            print(f'[DEBUG] LINE API リクエストデータ: {data}')
+            
+            # 400エラーの詳細を解析
+            try:
+                error_detail = response.json()
+                print(f'[DEBUG] LINE API エラー詳細JSON: {error_detail}')
+            except:
+                print(f'[DEBUG] LINE API エラー詳細（JSON解析失敗）: {response.text}')
+            
             # 400エラーの場合は、よりシンプルなメッセージを試す
             simple_data = {
                 'replyToken': reply_token,
