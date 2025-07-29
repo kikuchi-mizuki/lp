@@ -194,6 +194,63 @@ def error_log():
     except Exception as e:
         return f"エラーログ読み込みエラー: {e}"
 
+@app.route('/debug/user/<line_user_id>')
+def debug_user(line_user_id):
+    """ユーザーの決済状況をデバッグするエンドポイント"""
+    try:
+        from services.user_service import is_paid_user
+        from services.stripe_service import check_subscription_status
+        from utils.db import get_db_connection
+        
+        result = {
+            'line_user_id': line_user_id,
+            'database_check': {},
+            'payment_check': {},
+            'stripe_check': {}
+        }
+        
+        # データベースからユーザー情報を直接取得
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute('''
+            SELECT id, email, stripe_customer_id, stripe_subscription_id, line_user_id, created_at, updated_at
+            FROM users 
+            WHERE line_user_id = %s
+        ''', (line_user_id,))
+        
+        db_result = c.fetchone()
+        if db_result:
+            user_id, email, stripe_customer_id, stripe_subscription_id, line_user_id_db, created_at, updated_at = db_result
+            result['database_check'] = {
+                'found': True,
+                'user_id': user_id,
+                'email': email,
+                'stripe_customer_id': stripe_customer_id,
+                'stripe_subscription_id': stripe_subscription_id,
+                'line_user_id': line_user_id_db,
+                'created_at': str(created_at),
+                'updated_at': str(updated_at)
+            }
+        else:
+            result['database_check'] = {'found': False}
+        
+        conn.close()
+        
+        # is_paid_user関数の結果
+        payment_check = is_paid_user(line_user_id)
+        result['payment_check'] = payment_check
+        
+        # Stripeサブスクリプションの状態を直接確認
+        if result['database_check'].get('found') and result['database_check'].get('stripe_subscription_id'):
+            stripe_subscription_id = result['database_check']['stripe_subscription_id']
+            subscription_status = check_subscription_status(stripe_subscription_id)
+            result['stripe_check'] = subscription_status
+        
+        return result
+        
+    except Exception as e:
+        return {'error': str(e)}
+
 @app.route('/health')
 def health_check():
     """アプリケーションの起動確認用エンドポイント"""

@@ -30,7 +30,8 @@ def check_subscription_status(stripe_subscription_id):
         
         # 有効な状態かチェック
         # trialing（試用期間）とactive（有効）の場合は有効とする
-        is_active = status in ['active', 'trialing']
+        # ただし、cancel_at_period_endがTrueの場合は解約予定なので無効とする
+        is_active = status in ['active', 'trialing'] and not cancel_at_period_end
         
         return {
             'is_active': is_active,
