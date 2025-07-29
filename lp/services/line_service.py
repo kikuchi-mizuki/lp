@@ -5,11 +5,11 @@ import os
 import stripe
 import traceback
 import time
+from datetime import datetime
 from utils.db import get_db_connection
 from services.cancellation_service import record_cancellation
 from services.stripe_service import check_subscription_status
 import re
-import datetime
 from services.subscription_period_service import SubscriptionPeriodService
 
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
@@ -581,29 +581,66 @@ def handle_content_confirmation(user_id_db, content, line_user_id):
         conn = get_db_connection()
         c = conn.cursor()
         
+        # データベースタイプに応じてプレースホルダーを選択
+        from utils.db import get_db_type
+        db_type = get_db_type()
+        placeholder = '%s' if db_type == 'postgresql' else '?'
+        
         # 現在のコンテンツ数を取得
-        c.execute('SELECT COUNT(*) FROM usage_logs WHERE user_id = %s', (user_id_db,))
+        c.execute(f'SELECT COUNT(*) FROM usage_logs WHERE user_id = {placeholder}', (user_id_db,))
         current_count = c.fetchone()[0]
         
         # 料金判定（1個目は無料）
         is_free = current_count == 0
         
         # usage_logsに記録
-        c.execute('''
+        c.execute(f'''
             INSERT INTO usage_logs (user_id, content_type, is_free, created_at)
-            VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
+            VALUES ({placeholder}, {placeholder}, {placeholder}, CURRENT_TIMESTAMP)
         ''', (user_id_db, content['name'], is_free))
         
-        # 契約期間情報をcancellation_historyに保存
-        from services.cancellation_period_service import CancellationPeriodService
-        period_service = CancellationPeriodService()
-        
         # ユーザーのサブスクリプションIDを取得
-        c.execute('SELECT stripe_subscription_id FROM users WHERE id = %s', (user_id_db,))
+        c.execute(f'SELECT stripe_subscription_id FROM users WHERE id = {placeholder}', (user_id_db,))
         subscription_result = c.fetchone()
         
         if subscription_result and subscription_result[0]:
             stripe_subscription_id = subscription_result[0]
+            
+            # Stripe APIでサブスクリプション情報を取得
+            try:
+                subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+                
+                # subscription_periodsテーブルに保存
+                c.execute(f'''
+                    INSERT INTO subscription_periods 
+                    (user_id, content_type, stripe_subscription_id, subscription_status, 
+                     current_period_start, current_period_end, trial_start, trial_end)
+                    VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
+                ''', (
+                    user_id_db,
+                    content['name'],
+                    stripe_subscription_id,
+                    subscription.status,
+                    datetime.fromtimestamp(subscription.current_period_start) if subscription.current_period_start else None,
+                    datetime.fromtimestamp(subscription.current_period_end) if subscription.current_period_end else None,
+                    datetime.fromtimestamp(subscription.trial_start) if subscription.trial_start else None,
+                    datetime.fromtimestamp(subscription.trial_end) if subscription.trial_end else None
+                ))
+                
+                print(f'[DEBUG] subscription_periodsに保存: user_id={user_id_db}, content={content["name"]}')
+                
+            except Exception as e:
+                print(f'[DEBUG] Stripe API エラー: {e}')
+                # Stripe APIエラーの場合でも基本的な情報を保存
+                c.execute(f'''
+                    INSERT INTO subscription_periods 
+                    (user_id, content_type, stripe_subscription_id, subscription_status)
+                    VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder})
+                ''', (user_id_db, content['name'], stripe_subscription_id, 'unknown'))
+            
+            # 契約期間情報をcancellation_historyにも保存
+            from services.cancellation_period_service import CancellationPeriodService
+            period_service = CancellationPeriodService()
             period_service.create_content_period_record(user_id_db, content['name'], stripe_subscription_id)
         
         conn.commit()
