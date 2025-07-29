@@ -824,6 +824,12 @@ def handle_content_confirmation(reply_token, user_id_db, stripe_subscription_id,
             INSERT INTO usage_logs (user_id, usage_quantity, stripe_usage_record_id, is_free, content_type, pending_charge)
             VALUES (%s, %s, %s, %s, %s, %s)
         ''', (user_id_db, 1, None, is_free, content['name'], not is_free))
+        
+        # 解約履歴を削除（同じコンテンツを再度追加する場合）
+        c.execute('DELETE FROM cancellation_history WHERE user_id = %s AND content_type = %s', (user_id_db, content['name']))
+        if c.rowcount > 0:
+            print(f'[DEBUG] 解約履歴削除: user_id={user_id_db}, content_type={content["name"]}, deleted_count={c.rowcount}')
+        
         conn.commit()
         conn.close()
         print(f'[DEBUG] DB登録成功: user_id={user_id_db}, content={content["name"]}, is_free={is_free}')
