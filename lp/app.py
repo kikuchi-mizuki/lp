@@ -353,6 +353,65 @@ def add_test_data():
             'message': str(e)
         })
 
+@app.route('/debug/fix_table_structure')
+def fix_table_structure():
+    """テーブル構造を修正するエンドポイント"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 現在のテーブル構造を確認
+        c.execute("""
+            SELECT column_name, data_type, ordinal_position
+            FROM information_schema.columns 
+            WHERE table_name = 'cancellation_history' 
+            ORDER BY ordinal_position
+        """)
+        current_columns = c.fetchall()
+        
+        # テーブルを削除して再作成
+        c.execute("DROP TABLE IF EXISTS cancellation_history")
+        
+        # 正しい構造でテーブルを作成
+        c.execute('''
+            CREATE TABLE cancellation_history (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                content_type VARCHAR(100) NOT NULL,
+                cancelled_at TIMESTAMP NOT NULL
+            )
+        ''')
+        
+        # 新しいテーブル構造を確認
+        c.execute("""
+            SELECT column_name, data_type, ordinal_position
+            FROM information_schema.columns 
+            WHERE table_name = 'cancellation_history' 
+            ORDER BY ordinal_position
+        """)
+        new_columns = c.fetchall()
+        
+        # テストデータを追加
+        c.execute('''
+            INSERT INTO cancellation_history (user_id, content_type, cancelled_at)
+            VALUES (1, 'AI予定秘書', CURRENT_TIMESTAMP)
+        ''')
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'status': 'ok',
+            'message': 'テーブル構造を修正しました',
+            'old_structure': [{'column': col[0], 'type': col[1], 'position': col[2]} for col in current_columns],
+            'new_structure': [{'column': col[0], 'type': col[1], 'position': col[2]} for col in new_columns]
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        })
+
 @app.route('/wait_for_registration')
 def wait_for_registration():
     return render_template('wait_for_registration.html')
