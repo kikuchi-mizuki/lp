@@ -75,6 +75,7 @@ def is_paid_user(line_user_id):
             'redirect_url': str
         }
     """
+    print(f'[DEBUG] is_paid_user開始: line_user_id={line_user_id}')
     try:
         conn = get_db_connection()
         c = conn.cursor()
@@ -87,9 +88,11 @@ def is_paid_user(line_user_id):
         ''', (line_user_id,))
         
         result = c.fetchone()
+        print(f'[DEBUG] データベース検索結果: line_user_id={line_user_id}, result={result}')
         conn.close()
         
         if not result:
+            print(f'[DEBUG] ユーザーが見つかりません: line_user_id={line_user_id}')
             return {
                 'is_paid': False,
                 'subscription_status': 'not_registered',
@@ -98,11 +101,14 @@ def is_paid_user(line_user_id):
             }
         
         user_id, stripe_subscription_id = result
+        print(f'[DEBUG] ユーザー情報取得: user_id={user_id}, stripe_subscription_id={stripe_subscription_id}')
         
         # Stripeサブスクリプションの状態をチェック
         subscription_status = check_subscription_status(stripe_subscription_id)
+        print(f'[DEBUG] Stripeサブスクリプション状態: stripe_subscription_id={stripe_subscription_id}, status={subscription_status}')
         
         if not subscription_status.get('is_active'):
+            print(f'[DEBUG] サブスクリプションが無効: stripe_subscription_id={stripe_subscription_id}, status={subscription_status.get("status")}')
             return {
                 'is_paid': False,
                 'subscription_status': subscription_status.get('status', 'inactive'),
@@ -111,6 +117,7 @@ def is_paid_user(line_user_id):
             }
         
         # 有効なサブスクリプション
+        print(f'[DEBUG] 有効なサブスクリプション: line_user_id={line_user_id}, status={subscription_status.get("status")}')
         return {
             'is_paid': True,
             'subscription_status': subscription_status.get('status', 'active'),
@@ -120,6 +127,8 @@ def is_paid_user(line_user_id):
             
     except Exception as e:
         print(f'[ERROR] 決済状況チェックエラー: {e}')
+        import traceback
+        traceback.print_exc()
         return {
             'is_paid': False,
             'subscription_status': 'error',

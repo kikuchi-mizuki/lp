@@ -533,9 +533,12 @@ def line_webhook():
                 user_id = event['source']['userId']
                 text = event['message']['text']
                 print(f'[DEBUG] テキストメッセージ受信: user_id={user_id}, text={text}')
+                print(f'[DEBUG] イベント全体: {json.dumps(event, ensure_ascii=False, indent=2)}')
                 
                 # 決済状況をチェック
                 payment_check = is_paid_user(user_id)
+                print(f'[DEBUG] 決済状況チェック結果: user_id={user_id}, is_paid={payment_check["is_paid"]}, status={payment_check["subscription_status"]}, message={payment_check.get("message", "N/A")}')
+                
                 if not payment_check['is_paid']:
                     print(f'[DEBUG] 未決済ユーザー: user_id={user_id}, status={payment_check["subscription_status"]}')
                     # 制限メッセージを送信
