@@ -11,6 +11,7 @@ from services.cancellation_service import record_cancellation
 from services.stripe_service import check_subscription_status
 import re
 from services.subscription_period_service import SubscriptionPeriodService
+import json
 
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
 
@@ -648,108 +649,121 @@ def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, co
         print(f'コンテンツ選択エラー: {e}')
         send_line_message(reply_token, [{"type": "text", "text": "❌ エラーが発生しました。しばらく時間をおいて再度お試しください。"}])
 
-def handle_content_confirmation(user_id_db, content, line_user_id):
-    """コンテンツ追加確認処理"""
+def handle_content_confirmation(user_id, content_type):
+    """コンテンツ確認処理"""
     try:
         conn = get_db_connection()
         c = conn.cursor()
         
-        # PostgreSQL用のプレースホルダーを使用
-        # 現在のコンテンツ数を取得
-        c.execute('SELECT COUNT(*) FROM usage_logs WHERE user_id = %s', (user_id_db,))
-        current_count = c.fetchone()[0]
-        
-        # 料金判定（1個目は無料）
-        is_free = current_count == 0
-        
-        # usage_logsに記録
+        # ユーザーの現在のサブスクリプション情報を取得
         c.execute('''
-            INSERT INTO usage_logs (user_id, content_type, is_free, created_at)
-            VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
-        ''', (user_id_db, content['name'], is_free))
+            SELECT stripe_subscription_id, current_period_start, current_period_end
+            FROM subscription_periods
+            WHERE user_id = %s AND status = 'active'
+            ORDER BY created_at DESC
+            LIMIT 1
+        ''', (user_id,))
         
-        # ユーザーのサブスクリプションIDを取得
-        c.execute('SELECT stripe_subscription_id FROM users WHERE id = %s', (user_id_db,))
-        subscription_result = c.fetchone()
+        subscription_info = c.fetchone()
         
-        if subscription_result and subscription_result[0]:
-            stripe_subscription_id = subscription_result[0]
+        if not subscription_info:
+            conn.close()
+            return {
+                'success': False,
+                'error': 'アクティブなサブスクリプションが見つかりません'
+            }
+        
+        stripe_subscription_id, current_period_start, current_period_end = subscription_info
+        
+        # Stripeからサブスクリプション情報を取得
+        try:
+            subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+        except stripe.error.StripeError as e:
+            conn.close()
+            return {
+                'success': False,
+                'error': f'Stripeサブスクリプション取得エラー: {str(e)}'
+            }
+        
+        # サブスクリプション期間を更新（重複を避けるためUPSERT使用）
+        try:
+            c.execute('''
+                INSERT INTO subscription_periods (
+                    user_id, stripe_subscription_id, status,
+                    current_period_start, current_period_end,
+                    trial_start, trial_end, created_at, updated_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (stripe_subscription_id) DO UPDATE SET
+                    status = EXCLUDED.status,
+                    current_period_start = EXCLUDED.current_period_start,
+                    current_period_end = EXCLUDED.current_period_end,
+                    trial_start = EXCLUDED.trial_start,
+                    trial_end = EXCLUDED.trial_end,
+                    updated_at = EXCLUDED.updated_at
+            ''', (
+                user_id,
+                subscription.id,
+                subscription.status,
+                datetime.fromtimestamp(subscription.current_period_start),
+                datetime.fromtimestamp(subscription.current_period_end),
+                datetime.fromtimestamp(subscription.trial_start) if subscription.trial_start else None,
+                datetime.fromtimestamp(subscription.trial_end) if subscription.trial_end else None,
+                datetime.now(),
+                datetime.now()
+            ))
             
-            # Stripe APIでサブスクリプション情報を取得
-            try:
-                subscription = stripe.Subscription.retrieve(stripe_subscription_id)
-                
-                # subscription_periodsテーブルに保存（content_typeカラムなし）
-                c.execute('''
-                    INSERT INTO subscription_periods 
-                    (user_id, stripe_subscription_id, subscription_status, 
-                     current_period_start, current_period_end, trial_start, trial_end)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                ''', (
-                    user_id_db,
-                    stripe_subscription_id,
-                    subscription.status,
-                    datetime.fromtimestamp(subscription.current_period_start) if subscription.current_period_start else None,
-                    datetime.fromtimestamp(subscription.current_period_end) if subscription.current_period_end else None,
-                    datetime.fromtimestamp(subscription.trial_start) if subscription.trial_start else None,
-                    datetime.fromtimestamp(subscription.trial_end) if subscription.trial_end else None
-                ))
-                
-                print(f'[DEBUG] subscription_periodsに保存: user_id={user_id_db}, content={content["name"]}')
-                
-            except Exception as e:
-                print(f'[DEBUG] Stripe API エラー: {e}')
-                # Stripe APIエラーの場合でも基本的な情報を保存（content_typeカラムなし）
-                c.execute('''
-                    INSERT INTO subscription_periods 
-                    (user_id, stripe_subscription_id, subscription_status)
-                    VALUES (%s, %s, %s)
-                ''', (user_id_db, stripe_subscription_id, 'unknown'))
+            conn.commit()
             
-            # 契約期間情報をcancellation_historyにも保存
-            from services.cancellation_period_service import CancellationPeriodService
-            period_service = CancellationPeriodService()
-            period_service.create_content_period_record(user_id_db, content['name'], stripe_subscription_id)
+        except Exception as e:
+            conn.rollback()
+            conn.close()
+            return {
+                'success': False,
+                'error': f'サブスクリプション期間更新エラー: {str(e)}'
+            }
         
-        conn.commit()
+        # コンテンツ確認ログを記録
+        try:
+            c.execute('''
+                INSERT INTO usage_logs (
+                    user_id, content_type, action, details, created_at
+                ) VALUES (%s, %s, %s, %s, %s)
+            ''', (
+                user_id,
+                content_type,
+                'content_confirmation',
+                json.dumps({
+                    'subscription_id': subscription.id,
+                    'status': subscription.status,
+                    'trial_end': subscription.trial_end
+                }),
+                datetime.now()
+            ))
+            
+            conn.commit()
+            
+        except Exception as e:
+            conn.rollback()
+            conn.close()
+            return {
+                'success': False,
+                'error': f'使用ログ記録エラー: {str(e)}'
+            }
+        
         conn.close()
         
-        # 料金メッセージを構築
-        if is_free:
-            price_message = "料金：無料（1個目）"
-        else:
-            price_message = "料金：¥1,500"
-        
-        # 確認メッセージを送信
-        confirm_message = f"""
-{content['name']}を追加しますか？
-
-{price_message}
-
-追加すると、LINEから{content['description']}
-"""
-        
         return {
-            "status": "success",
-            "message": confirm_message,
-            "is_free": is_free,
-            "current_count": current_count + 1
+            'success': True,
+            'message': 'コンテンツ確認が完了しました',
+            'subscription_status': subscription.status,
+            'trial_end': subscription.trial_end
         }
         
     except Exception as e:
-        print(f'[ERROR] コンテンツ確認処理エラー: {e}')
-        import traceback
-        traceback.print_exc()
-        
-        # データベース接続が開いている場合はロールバックして閉じる
-        try:
-            if 'conn' in locals() and conn:
-                conn.rollback()
-                conn.close()
-        except:
-            pass
-        
-        return {"status": "error", "message": f"エラーが発生しました: {e}"}
+        return {
+            'success': False,
+            'error': f'コンテンツ確認処理エラー: {str(e)}'
+        }
 
 def handle_cancel_request(reply_token, user_id_db, stripe_subscription_id):
     try:

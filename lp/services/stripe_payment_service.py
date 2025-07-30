@@ -41,22 +41,28 @@ class StripePaymentService:
             conn = get_db_connection()
             c = conn.cursor()
             
-            c.execute('''
-                INSERT INTO company_payments (
-                    company_id, stripe_customer_id, stripe_subscription_id,
-                    payment_status, subscription_status, current_period_start,
-                    current_period_end, trial_start, trial_end
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (company_id) DO UPDATE SET
-                    stripe_customer_id = EXCLUDED.stripe_customer_id,
-                    updated_at = CURRENT_TIMESTAMP
-            ''', (
-                company_id, customer.id, None, 'pending', 'inactive',
-                None, None, None, None
-            ))
-            
-            conn.commit()
-            conn.close()
+            try:
+                c.execute('''
+                    INSERT INTO company_payments (
+                        company_id, stripe_customer_id, stripe_subscription_id,
+                        payment_status, subscription_status, current_period_start,
+                        current_period_end, trial_start, trial_end
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (company_id) DO UPDATE SET
+                        stripe_customer_id = EXCLUDED.stripe_customer_id,
+                        updated_at = CURRENT_TIMESTAMP
+                ''', (
+                    company_id, customer.id, None, 'pending', 'inactive',
+                    None, None, None, None
+                ))
+                
+                conn.commit()
+                
+            except Exception as e:
+                conn.rollback()
+                raise e
+            finally:
+                conn.close()
             
             return {
                 'success': True,
