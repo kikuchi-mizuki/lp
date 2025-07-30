@@ -25,6 +25,7 @@ from routes.scheduler import scheduler_bp
 from routes.backup import backup_bp
 from routes.dashboard import dashboard_bp
 from routes.monitoring import monitoring_bp
+from routes.reminder import reminder_bp
 from utils.db import get_db_connection
 import time
 
@@ -197,6 +198,7 @@ app.register_blueprint(scheduler_bp)
 app.register_blueprint(backup_bp)
 app.register_blueprint(dashboard_bp)
 app.register_blueprint(monitoring_bp)
+app.register_blueprint(reminder_bp)
 
 @app.route('/')
 def index():
