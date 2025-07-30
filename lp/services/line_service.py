@@ -689,11 +689,12 @@ def handle_content_confirmation(user_id, content_type):
         try:
             c.execute('''
                 INSERT INTO subscription_periods (
-                    user_id, stripe_subscription_id, status,
+                    user_id, stripe_subscription_id, subscription_status, status,
                     current_period_start, current_period_end,
                     trial_start, trial_end, created_at, updated_at
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (stripe_subscription_id) DO UPDATE SET
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (user_id, stripe_subscription_id) DO UPDATE SET
+                    subscription_status = EXCLUDED.subscription_status,
                     status = EXCLUDED.status,
                     current_period_start = EXCLUDED.current_period_start,
                     current_period_end = EXCLUDED.current_period_end,
@@ -704,6 +705,7 @@ def handle_content_confirmation(user_id, content_type):
                 user_id,
                 subscription.id,
                 subscription.status,
+                'active',
                 datetime.fromtimestamp(subscription.current_period_start),
                 datetime.fromtimestamp(subscription.current_period_end),
                 datetime.fromtimestamp(subscription.trial_start) if subscription.trial_start else None,
@@ -726,17 +728,14 @@ def handle_content_confirmation(user_id, content_type):
         try:
             c.execute('''
                 INSERT INTO usage_logs (
-                    user_id, content_type, action, details, created_at
-                ) VALUES (%s, %s, %s, %s, %s)
+                    user_id, content_type, usage_quantity, is_free, pending_charge, created_at
+                ) VALUES (%s, %s, %s, %s, %s, %s)
             ''', (
                 user_id,
                 content_type,
-                'content_confirmation',
-                json.dumps({
-                    'subscription_id': subscription.id,
-                    'status': subscription.status,
-                    'trial_end': subscription.trial_end
-                }),
+                1,  # usage_quantity
+                False,  # is_free
+                True,   # pending_charge
                 datetime.now()
             ))
             
