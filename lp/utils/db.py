@@ -8,6 +8,11 @@ DATABASE_URL = os.getenv('DATABASE_URL', 'database.db')
 def get_db_connection():
     """データベース接続を取得"""
     database_url = os.getenv('DATABASE_URL')
+    
+    # Railwayの外部接続URLを優先使用
+    if not database_url or (database_url and 'postgres.railway.internal' in database_url):
+        database_url = "postgresql://postgres:WZgnjZezoefHmxbwRjUbiPhajtwubmUs@gondola.proxy.rlwy.net:16797/railway"
+    
     if database_url and database_url.startswith('postgresql://'):
         # PostgreSQL接続
         return psycopg2.connect(database_url)
