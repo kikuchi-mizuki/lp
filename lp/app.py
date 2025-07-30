@@ -15,6 +15,7 @@ import io
 from utils.message_templates import get_default_message, get_menu_message, get_help_message
 from routes.line import line_bp
 from routes.stripe import stripe_bp
+from routes.company import company_bp
 from utils.db import get_db_connection
 import time
 
@@ -177,10 +178,16 @@ init_db()
 app = Flask(__name__, static_folder='static', static_url_path='/static')
 app.register_blueprint(line_bp)
 app.register_blueprint(stripe_bp)
+app.register_blueprint(company_bp)
 
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/company-dashboard')
+def company_dashboard():
+    """企業管理ダッシュボード"""
+    return render_template('company_dashboard.html')
 
 @app.route('/error_log')
 def error_log():
