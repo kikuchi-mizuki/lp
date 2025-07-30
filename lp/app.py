@@ -22,6 +22,7 @@ from routes.content_management import content_management_bp
 from routes.cancellation import cancellation_bp
 from routes.notification import notification_bp
 from routes.scheduler import scheduler_bp
+from routes.backup import backup_bp
 from utils.db import get_db_connection
 import time
 
@@ -191,6 +192,7 @@ app.register_blueprint(content_management_bp)
 app.register_blueprint(cancellation_bp)
 app.register_blueprint(notification_bp)
 app.register_blueprint(scheduler_bp)
+app.register_blueprint(backup_bp)
 
 @app.route('/')
 def index():
