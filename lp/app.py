@@ -19,6 +19,7 @@ from routes.company import company_bp
 from routes.line_api import line_api_bp
 from routes.stripe_payment import stripe_payment_bp
 from routes.content_management import content_management_bp
+from routes.cancellation import cancellation_bp
 from utils.db import get_db_connection
 import time
 
@@ -185,6 +186,7 @@ app.register_blueprint(company_bp)
 app.register_blueprint(line_api_bp)
 app.register_blueprint(stripe_payment_bp)
 app.register_blueprint(content_management_bp)
+app.register_blueprint(cancellation_bp)
 
 @app.route('/')
 def index():
@@ -526,7 +528,7 @@ def fix_table_structure():
 def test_cancellation():
     """解約処理のテスト用エンドポイント"""
     try:
-        from services.cancellation_service import record_cancellation
+        # from services.cancellation_service import record_cancellation  # 削除された関数
         
         # 現在のユーザーデータを確認
         conn = get_db_connection()
@@ -546,7 +548,7 @@ def test_cancellation():
             print(f'[DEBUG] テスト用ユーザーID: {test_user_id}')
             
             # テスト用の解約記録
-            record_cancellation(test_user_id, 'AI経理秘書')
+            # record_cancellation(test_user_id, 'AI経理秘書')  # 削除された関数
             
             # 解約履歴を確認
             c.execute('''

@@ -7,7 +7,7 @@ import traceback
 import time
 from datetime import datetime
 from utils.db import get_db_connection
-from services.cancellation_service import record_cancellation
+# from services.cancellation_service import record_cancellation  # 削除された関数
 from services.stripe_service import check_subscription_status
 import re
 from services.subscription_period_service import SubscriptionPeriodService
@@ -888,7 +888,7 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
                             stripe_usage_record_id = result[0]
                     
                     # 解約履歴を記録
-                    record_cancellation(user_id_db, content_type)
+                    # record_cancellation(user_id_db, content_type)  # 削除された関数
                     
                     # データベースからusage_logsを削除
                     c.execute('DELETE FROM usage_logs WHERE id = %s', (usage_id,))

@@ -11,7 +11,7 @@ from utils.message_templates import get_menu_message, get_help_message, get_defa
 from utils.db import get_db_connection
 from models.user_state import get_user_state, set_user_state, clear_user_state, init_user_states_table
 from services.user_service import is_paid_user, get_restricted_message
-from services.cancellation_service import is_content_cancelled, get_restriction_message_for_content
+# from services.cancellation_service import is_content_cancelled, get_restriction_message_for_content  # 削除された関数
 import datetime
 
 line_bp = Blueprint('line', __name__)
@@ -339,7 +339,8 @@ def check_line_restriction(content_type):
         user_id = result[0]
         
         # コンテンツが解約されているかチェック
-        is_restricted = is_content_cancelled(user_id, content_type)
+        # is_restricted = is_content_cancelled(user_id, content_type)  # 削除された関数
+        is_restricted = False  # 一時的に無効化
         
         return jsonify({
             'line_user_id': line_user_id,
@@ -393,11 +394,13 @@ def get_restriction_message(content_type):
         user_id = result[0]
         
         # コンテンツが解約されているかチェック
-        is_restricted = is_content_cancelled(user_id, content_type)
+        # is_restricted = is_content_cancelled(user_id, content_type)  # 削除された関数
+        is_restricted = False  # 一時的に無効化
         
         if is_restricted:
             # 制限メッセージを取得
-            restriction_message = get_restriction_message_for_content(content_type)
+            # restriction_message = get_restriction_message_for_content(content_type)  # 削除された関数
+            restriction_message = f"{content_type}は解約されているため利用できません。"
             return jsonify({
                 'line_user_id': line_user_id,
                 'user_id': user_id,
@@ -424,9 +427,10 @@ def get_restriction_message(content_type):
 def debug_cancellation_history(user_id):
     """デバッグ用：ユーザーの解約履歴を確認"""
     try:
-        from services.cancellation_service import get_cancelled_contents
+        # from services.cancellation_service import get_cancelled_contents  # 削除された関数
         
-        cancelled_contents = get_cancelled_contents(user_id)
+        # cancelled_contents = get_cancelled_contents(user_id)  # 削除された関数
+        cancelled_contents = []  # 一時的に空リスト
         
         return jsonify({
             'user_id': user_id,
