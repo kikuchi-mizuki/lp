@@ -16,6 +16,9 @@ from utils.message_templates import get_default_message, get_menu_message, get_h
 from routes.line import line_bp
 from routes.stripe import stripe_bp
 from routes.company import company_bp
+from routes.line_api import line_api_bp
+from routes.stripe_payment import stripe_payment_bp
+from routes.content_management import content_management_bp
 from utils.db import get_db_connection
 import time
 
@@ -179,6 +182,9 @@ app = Flask(__name__, static_folder='static', static_url_path='/static')
 app.register_blueprint(line_bp)
 app.register_blueprint(stripe_bp)
 app.register_blueprint(company_bp)
+app.register_blueprint(line_api_bp)
+app.register_blueprint(stripe_payment_bp)
+app.register_blueprint(content_management_bp)
 
 @app.route('/')
 def index():
