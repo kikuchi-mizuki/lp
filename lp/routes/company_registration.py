@@ -61,6 +61,67 @@ def register_company():
             'error': f'企業登録エラー: {str(e)}'
         }), 500
 
+@company_registration_bp.route('/company-registration/auto-save', methods=['POST'])
+def auto_save_company():
+    """企業情報の自動保存（リアルタイム）"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': 'データが提供されていません'
+            }), 400
+        
+        # 必須フィールドのチェック
+        required_fields = [
+            'company_name', 'contact_email', 'line_channel_id',
+            'line_access_token', 'line_channel_secret'
+        ]
+        
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({
+                    'success': False,
+                    'error': f'必須フィールド "{field}" が不足しています'
+                }), 400
+        
+        # LINEチャネルIDの重複チェック
+        line_channel_id = data['line_channel_id']
+        duplicate_check = company_registration_service.check_line_channel_id_exists(line_channel_id)
+        
+        if duplicate_check['exists']:
+            return jsonify({
+                'success': False,
+                'error': f'LINEチャネルID "{line_channel_id}" は既に企業 "{duplicate_check["company_name"]}" で使用されています'
+            }), 400
+        
+        # 企業情報を自動保存（UPSERT）
+        result = company_registration_service.auto_save_company(data)
+        
+        if result['success']:
+            return jsonify({
+                'success': True,
+                'message': '企業情報が自動保存されました',
+                'data': {
+                    'company_id': result['company_id'],
+                    'line_account_id': result['line_account_id'],
+                    'company_code': result.get('company_code', ''),
+                    'railway_result': result.get('railway_result'),
+                    'is_new': result.get('is_new', False)
+                }
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'error': result['error']
+            }), 400
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'自動保存エラー: {str(e)}'
+        }), 500
+
 @company_registration_bp.route('/company-registration/check-line-channel/<line_channel_id>', methods=['GET'])
 def check_line_channel_id(line_channel_id):
     """LINEチャネルIDの重複チェック"""

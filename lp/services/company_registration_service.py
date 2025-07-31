@@ -736,5 +736,182 @@ class CompanyRegistrationService:
         timestamp = str(int(time.time()))[-6:]
         return f"{clean_name[:8]}{timestamp}"
 
+    def auto_save_company(self, data):
+        """企業情報を自動保存（UPSERT）"""
+        try:
+            print(f"=== 企業 {data['company_name']} の自動保存開始 ===")
+            
+            conn = get_db_connection()
+            c = conn.cursor()
+            
+            # 企業コードを生成
+            company_code = self.generate_company_code(data['company_name'])
+            
+            # 既存の企業を検索（企業名とメールアドレスで）
+            c.execute('''
+                SELECT id FROM companies 
+                WHERE company_name = %s AND contact_email = %s
+            ''', (data['company_name'], data['contact_email']))
+            
+            existing_company = c.fetchone()
+            is_new = False
+            
+            if existing_company:
+                # 既存企業を更新
+                company_id = existing_company[0]
+                print(f"既存企業を更新: 企業ID {company_id}")
+                
+                # 企業情報を更新
+                c.execute('''
+                    UPDATE companies SET
+                        company_code = %s, contact_phone = %s,
+                        updated_at = %s
+                    WHERE id = %s
+                ''', (
+                    company_code,
+                    data.get('contact_phone', ''),
+                    datetime.now(),
+                    company_id
+                ))
+                
+                # LINEアカウント情報を更新
+                c.execute('''
+                    UPDATE company_line_accounts SET
+                        line_channel_id = %s, line_channel_access_token = %s,
+                        line_channel_secret = %s, line_basic_id = %s,
+                        webhook_url = %s, updated_at = %s
+                    WHERE company_id = %s
+                ''', (
+                    data['line_channel_id'],
+                    data['line_access_token'],
+                    data['line_channel_secret'],
+                    data.get('line_basic_id', ''),
+                    f"https://{self.base_domain}/webhook/{company_id}",
+                    datetime.now(),
+                    company_id
+                ))
+                
+            else:
+                # 新規企業を作成
+                is_new = True
+                print(f"新規企業を作成")
+                
+                # 企業情報を保存
+                c.execute('''
+                    INSERT INTO companies (
+                        company_name, company_code, email, contact_email, contact_phone,
+                        status, created_at, updated_at
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id
+                ''', (
+                    data['company_name'],
+                    company_code,
+                    data['contact_email'],
+                    data['contact_email'],
+                    data.get('contact_phone', ''),
+                    'active',
+                    datetime.now(),
+                    datetime.now()
+                ))
+                
+                company_id = c.fetchone()[0]
+                
+                # LINEアカウント情報を保存
+                line_data = {
+                    'line_channel_id': data['line_channel_id'],
+                    'line_channel_access_token': data['line_access_token'],
+                    'line_channel_secret': data['line_channel_secret'],
+                    'line_basic_id': data.get('line_basic_id', ''),
+                    'webhook_url': f"https://{self.base_domain}/webhook/{company_id}",
+                    'qr_code_url': f"https://qr.liqr.com/{data['line_channel_id']}"
+                }
+                
+                c.execute('''
+                    INSERT INTO company_line_accounts (
+                        company_id, line_channel_id, line_channel_access_token,
+                        line_channel_secret, line_basic_id, line_qr_code_url,
+                        webhook_url, status
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id
+                ''', (
+                    company_id,
+                    line_data['line_channel_id'],
+                    line_data['line_channel_access_token'],
+                    line_data['line_channel_secret'],
+                    line_data['line_basic_id'],
+                    line_data['qr_code_url'],
+                    line_data['webhook_url'],
+                    'active'
+                ))
+                
+                line_account_id = c.fetchone()[0]
+            
+            # Railwayプロジェクトの自動複製（新規企業の場合のみ）
+            railway_result = None
+            if is_new and data.get('content_type') == 'AI予定秘書':
+                print(f"🚀 AI予定秘書プロジェクト自動複製開始")
+                
+                line_credentials = {
+                    'line_channel_id': data['line_channel_id'],
+                    'line_channel_access_token': data['line_access_token'],
+                    'line_channel_secret': data['line_channel_secret'],
+                    'company_id': company_id,
+                    'company_name': data['company_name']
+                }
+                
+                railway_result = self.clone_ai_schedule_project(company_id, data['company_name'], line_credentials)
+                
+                if railway_result['success']:
+                    # Railwayデプロイ情報をデータベースに保存
+                    c.execute('''
+                        INSERT INTO company_deployments (
+                            company_id, railway_project_id, railway_url, deployment_status,
+                            deployment_log, environment_variables, created_at
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    ''', (
+                        company_id,
+                        railway_result['project_id'],
+                        f"https://{railway_result['project_name']}.up.railway.app",
+                        'deploying',
+                        json.dumps(railway_result),
+                        json.dumps(line_credentials),
+                        datetime.now()
+                    ))
+                    
+                    print(f"✅ Railwayデプロイ情報をデータベースに保存")
+                else:
+                    print(f"⚠️ Railwayプロジェクト複製失敗: {railway_result['error']}")
+            
+            conn.commit()
+            conn.close()
+            
+            print(f"✅ 企業 {data['company_name']} の自動保存完了")
+            print(f"  - 企業ID: {company_id}")
+            print(f"  - 企業コード: {company_code}")
+            print(f"  - 新規作成: {is_new}")
+            
+            if railway_result and railway_result['success']:
+                print(f"  - RailwayプロジェクトID: {railway_result['project_id']}")
+                print(f"  - Railwayプロジェクト名: {railway_result['project_name']}")
+            
+            return {
+                'success': True,
+                'company_id': company_id,
+                'line_account_id': line_account_id if is_new else None,
+                'company_code': company_code,
+                'railway_result': railway_result,
+                'is_new': is_new
+            }
+            
+        except Exception as e:
+            print(f"❌ 自動保存エラー: {e}")
+            if 'conn' in locals():
+                conn.rollback()
+                conn.close()
+            return {
+                'success': False,
+                'error': f'自動保存エラー: {str(e)}'
+            }
+
 # サービスインスタンスを作成
 company_registration_service = CompanyRegistrationService() 

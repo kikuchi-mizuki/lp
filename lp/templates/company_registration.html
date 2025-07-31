@@ -131,6 +131,15 @@
                 <div class="step">3</div>
             </div>
 
+            <!-- 自動保存ステータス -->
+            <div id="autoSaveStatus" class="mb-3"></div>
+            
+            <!-- Railwayステータス -->
+            <div id="railwayStatus" class="mb-3"></div>
+            
+            <!-- 保存済み企業情報 -->
+            <div id="savedCompanyInfo" class="mb-3"></div>
+
             <!-- フォーム本体 -->
             <div class="form-body">
                 <!-- 情報カード -->
@@ -423,7 +432,209 @@
             if (contentType) {
                 document.getElementById('contentType').value = contentType;
             }
+
+            // リアルタイム自動保存機能
+            setupAutoSave();
+            showSavedCompanyInfo(); // ページロード時に保存済み情報を表示
         });
+
+        // リアルタイム自動保存機能
+        let autoSaveTimer = null;
+        let isAutoSaving = false;
+        let savedCompanyId = null;
+
+        // フォーム入力監視
+        function setupAutoSave() {
+            const form = document.getElementById('companyRegistrationForm');
+            const inputs = form.querySelectorAll('input, select, textarea');
+            
+            inputs.forEach(input => {
+                input.addEventListener('input', () => {
+                    clearTimeout(autoSaveTimer);
+                    autoSaveTimer = setTimeout(() => {
+                        autoSaveForm();
+                    }, 2000); // 2秒後に自動保存
+                });
+            });
+        }
+
+        // 自動保存実行
+        async function autoSaveForm() {
+            if (isAutoSaving) return;
+            
+            const form = document.getElementById('companyRegistrationForm');
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData);
+            
+            // 必須フィールドのチェック
+            const requiredFields = ['company_name', 'contact_email', 'line_channel_id', 'line_access_token', 'line_channel_secret'];
+            const missingFields = requiredFields.filter(field => !data[field]);
+            
+            if (missingFields.length > 0) {
+                console.log('必須フィールドが未入力のため自動保存をスキップ');
+                return;
+            }
+            
+            isAutoSaving = true;
+            showAutoSaveStatus('saving');
+            
+            try {
+                console.log('自動保存開始:', data);
+                
+                const response = await fetch('/api/v1/company-registration/auto-save', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    savedCompanyId = result.data.company_id;
+                    showAutoSaveStatus('saved');
+                    console.log('自動保存成功:', result);
+                    
+                    // Railwayプロジェクトの自動複製
+                    if (result.data.railway_result && result.data.railway_result.success) {
+                        showRailwayStatus('deploying');
+                        console.log('Railwayプロジェクト複製開始:', result.data.railway_result);
+                    }
+                    
+                } else {
+                    showAutoSaveStatus('error', result.error);
+                    console.error('自動保存エラー:', result.error);
+                }
+                
+            } catch (error) {
+                showAutoSaveStatus('error', error.message);
+                console.error('自動保存通信エラー:', error);
+            } finally {
+                isAutoSaving = false;
+            }
+        }
+
+        // 自動保存ステータス表示
+        function showAutoSaveStatus(status, message = '') {
+            const statusArea = document.getElementById('autoSaveStatus');
+            if (!statusArea) return;
+            
+            let statusText = '';
+            let statusClass = '';
+            
+            switch (status) {
+                case 'saving':
+                    statusText = '<i class="fas fa-spinner fa-spin"></i> 自動保存中...';
+                    statusClass = 'info';
+                    break;
+                case 'saved':
+                    statusText = '<i class="fas fa-check-circle"></i> 自動保存完了';
+                    statusClass = 'success';
+                    break;
+                case 'error':
+                    statusText = `<i class="fas fa-exclamation-triangle"></i> 自動保存エラー: ${message}`;
+                    statusClass = 'danger';
+                    break;
+            }
+            
+            statusArea.innerHTML = `
+                <div class="alert alert-${statusClass} alert-dismissible fade show" role="alert">
+                    ${statusText}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `;
+        }
+
+        // Railwayステータス表示
+        function showRailwayStatus(status, message = '') {
+            const railwayStatusArea = document.getElementById('railwayStatus');
+            if (!railwayStatusArea) return;
+            
+            let statusText = '';
+            let statusClass = '';
+            
+            switch (status) {
+                case 'deploying':
+                    statusText = '<i class="fas fa-rocket fa-spin"></i> Railwayプロジェクト複製中...';
+                    statusClass = 'info';
+                    break;
+                case 'success':
+                    statusText = '<i class="fas fa-check-circle"></i> Railwayプロジェクト複製完了';
+                    statusClass = 'success';
+                    break;
+                case 'error':
+                    statusText = `<i class="fas fa-exclamation-triangle"></i> Railway複製エラー: ${message}`;
+                    statusClass = 'danger';
+                    break;
+            }
+            
+            railwayStatusArea.innerHTML = `
+                <div class="alert alert-${statusClass} alert-dismissible fade show" role="alert">
+                    ${statusText}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `;
+        }
+
+        // 保存された企業情報の表示
+        function showSavedCompanyInfo() {
+            if (!savedCompanyId) return;
+            
+            const savedInfoArea = document.getElementById('savedCompanyInfo');
+            if (!savedInfoArea) return;
+            
+            savedInfoArea.innerHTML = `
+                <div class="card">
+                    <div class="card-header">
+                        <h6><i class="fas fa-save"></i> 保存済み企業情報</h6>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>企業ID:</strong> ${savedCompanyId}</p>
+                        <p><strong>ステータス:</strong> <span class="badge bg-success">保存済み</span></p>
+                        <button class="btn btn-primary btn-sm" onclick="viewCompanyDetails(${savedCompanyId})">
+                            <i class="fas fa-eye"></i> 詳細表示
+                        </button>
+                        <button class="btn btn-success btn-sm" onclick="deployLineBot(${savedCompanyId})">
+                            <i class="fas fa-rocket"></i> LINEボットデプロイ
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 企業詳細表示
+        function viewCompanyDetails(companyId) {
+            window.open(`/company-registration-success?company_id=${companyId}`, '_blank');
+        }
+
+        // LINEボットデプロイ
+        async function deployLineBot(companyId) {
+            try {
+                showRailwayStatus('deploying');
+                
+                const response = await fetch(`/api/v1/company-registration/${companyId}/deploy`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showRailwayStatus('success');
+                    console.log('LINEボットデプロイ成功:', result);
+                } else {
+                    showRailwayStatus('error', result.error);
+                    console.error('LINEボットデプロイエラー:', result.error);
+                }
+                
+            } catch (error) {
+                showRailwayStatus('error', error.message);
+                console.error('LINEボットデプロイ通信エラー:', error);
+            }
+        }
     </script>
 </body>
 </html> 
