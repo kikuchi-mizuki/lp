@@ -235,7 +235,8 @@ def company_registration_debug():
 @app.route('/company-registration-success')
 def company_registration_success():
     """企業登録成功ページ"""
-    return render_template('company_registration_success.html')
+    company_id = request.args.get('company_id')
+    return render_template('company_registration_success.html', company_id=company_id)
 
 @app.route('/company-dashboard')
 def company_dashboard():

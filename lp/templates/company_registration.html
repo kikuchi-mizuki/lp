@@ -354,7 +354,7 @@
                     
                     // 成功後の処理（リダイレクトなど）
                     setTimeout(() => {
-                        window.location.href = '/company-registration-success';
+                        window.location.href = `/company-registration-success?company_id=${result.data.company_id}`;
                     }, 2000);
                     
                 } else {

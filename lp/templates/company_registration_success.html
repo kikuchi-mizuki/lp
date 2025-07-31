@@ -228,11 +228,14 @@
         document.addEventListener('DOMContentLoaded', function() {
             // URLパラメータから情報を取得
             const urlParams = new URLSearchParams(window.location.search);
-            const companyId = urlParams.get('company_id');
+            const companyId = urlParams.get('company_id') || '{{ company_id }}';
             
-            if (companyId) {
+            if (companyId && companyId !== 'None') {
                 // 企業情報を取得して表示
                 loadCompanyInfo(companyId);
+            } else {
+                console.error('企業IDが見つかりません');
+                document.getElementById('companyName').textContent = '企業IDが指定されていません';
             }
             
             // ステップインジケーターを更新

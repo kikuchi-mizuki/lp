@@ -44,7 +44,9 @@ def register_company():
                 'message': '企業情報の登録が完了しました',
                 'data': {
                     'company_id': result['company_id'],
-                    'line_account_id': result['line_account_id']
+                    'line_account_id': result['line_account_id'],
+                    'company_code': result.get('company_code', ''),
+                    'railway_result': result.get('railway_result')
                 }
             }), 201
         else:
@@ -68,7 +70,7 @@ def get_company_registration(company_id):
         if result['success']:
             return jsonify({
                 'success': True,
-                'data': result['company']
+                'data': result['data']
             }), 200
         else:
             return jsonify({
@@ -117,12 +119,12 @@ def list_company_registrations():
     """企業登録一覧を取得"""
     try:
         status = request.args.get('status', 'active')
-        result = company_registration_service.list_company_registrations(status)
+        result = company_registration_service.list_company_registrations()
         
         if result['success']:
             return jsonify({
                 'success': True,
-                'data': result['companies']
+                'data': result['data']
             }), 200
         else:
             return jsonify({
