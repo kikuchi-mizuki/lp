@@ -783,8 +783,16 @@ def line_webhook():
                             # コンテンツを追加
                             result = handle_content_confirmation(user_id_db, content['name'])
                             if result['success']:
-                                # より親しみやすく、わかりやすい完了メッセージ
-                                success_message = f"🎉 {content['name']}を追加しました！\n\n✨ {content['description']}\n\n🔗 アクセスURL：\n{content['url']}\n\n💡 使い方：\n{content['usage']}\n\n📱 何かお手伝いできることはありますか？\n• 「追加」：他のコンテンツを追加\n• 「状態」：利用状況を確認\n• 「メニュー」：メインメニューに戻る\n• 「ヘルプ」：使い方を確認"
+                                # 企業登録フォームへのリンクを含むメッセージ
+                                registration_url = result.get('registration_url', '')
+                                
+                                if registration_url:
+                                    # 企業登録フォームへのリンク付きメッセージ
+                                    success_message = f"🎉 {content['name']}を追加しました！\n\n✨ {content['description']}\n\n🔗 アクセスURL：\n{content['url']}\n\n💡 使い方：\n{content['usage']}\n\n🏢 企業向けLINE公式アカウント設定：\n{registration_url}\n\n📱 何かお手伝いできることはありますか？\n• 「追加」：他のコンテンツを追加\n• 「状態」：利用状況を確認\n• 「メニュー」：メインメニューに戻る\n• 「ヘルプ」：使い方を確認"
+                                else:
+                                    # 従来のメッセージ（フォールバック）
+                                    success_message = f"🎉 {content['name']}を追加しました！\n\n✨ {content['description']}\n\n🔗 アクセスURL：\n{content['url']}\n\n💡 使い方：\n{content['usage']}\n\n📱 何かお手伝いできることはありますか？\n• 「追加」：他のコンテンツを追加\n• 「状態」：利用状況を確認\n• 「メニュー」：メインメニューに戻る\n• 「ヘルプ」：使い方を確認"
+                                
                                 send_line_message(event['replyToken'], [{"type": "text", "text": success_message}])
                             else:
                                 error_message = f"❌ コンテンツの追加に失敗しました: {result.get('error', '不明なエラー')}\n\n📱 「メニュー」と入力すると、メインメニューに戻れます。"

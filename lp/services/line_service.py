@@ -751,11 +751,16 @@ def handle_content_confirmation(user_id, content_type):
         
         conn.close()
         
+        # 企業登録フォームへのリンクを生成
+        base_url = os.getenv('BASE_URL', 'https://your-domain.com')
+        registration_url = f"{base_url}/company-registration?subscription_id={subscription.id}&content_type={content_type}"
+        
         return {
             'success': True,
             'message': 'コンテンツ確認が完了しました',
             'subscription_status': subscription.status,
-            'trial_end': subscription.trial_end
+            'trial_end': subscription.trial_end,
+            'registration_url': registration_url
         }
         
     except Exception as e:
