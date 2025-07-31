@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 from PIL import Image, ImageDraw, ImageFont
 import io
 from utils.message_templates import get_default_message, get_menu_message, get_help_message
+from utils.db import get_db_connection
 from routes.line import line_bp
 from routes.stripe import stripe_bp
 from routes.company import company_bp
