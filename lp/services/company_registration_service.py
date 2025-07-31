@@ -21,8 +21,214 @@ class CompanyRegistrationService:
     def __init__(self):
         self.railway_token = os.getenv('RAILWAY_TOKEN')
         self.railway_project_id = os.getenv('RAILWAY_PROJECT_ID')
-        self.base_domain = os.getenv('BASE_DOMAIN', 'your-domain.com')
+        self.base_domain = os.getenv('BASE_DOMAIN', 'lp-production-9e2c.up.railway.app')
+        self.ai_schedule_source_project_id = "3e9475ce-ff6a-4443-ab6c-4eb21b7f4017"  # AI予定秘書のソースプロジェクトID
         
+    def get_railway_headers(self):
+        """Railway API用のヘッダーを取得"""
+        return {
+            'Authorization': f'Bearer {self.railway_token}',
+            'Content-Type': 'application/json'
+        }
+    
+    def clone_ai_schedule_project(self, company_id, company_name, line_credentials):
+        """AI予定秘書プロジェクトを複製"""
+        try:
+            print(f"🔄 AI予定秘書プロジェクト複製開始: 企業 {company_name}")
+            
+            if not self.railway_token:
+                return {
+                    'success': False,
+                    'error': 'Railwayトークンが設定されていません'
+                }
+            
+            # 1. 新しいプロジェクト名を生成
+            new_project_name = f"ai-schedule-{company_name.replace(' ', '-')}-{int(time.time())}"
+            
+            # 2. 新しいプロジェクトを作成
+            url = "https://backboard.railway.app/graphql/v2"
+            headers = self.get_railway_headers()
+            
+            create_query = """
+            mutation CreateProject($name: String!, $description: String) {
+                projectCreate(input: { name: $name, description: $description }) {
+                    id
+                    name
+                    description
+                }
+            }
+            """
+            
+            variables = {
+                "name": new_project_name,
+                "description": f"AI予定秘書 - 企業: {company_name} - 企業ID: {company_id} - 複製日時: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            }
+            
+            payload = {
+                "query": create_query,
+                "variables": variables
+            }
+            
+            response = requests.post(url, headers=headers, json=payload, timeout=30)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if 'data' in data and data['data']['projectCreate']:
+                    new_project = data['data']['projectCreate']
+                    print(f"✅ 新しいプロジェクト作成完了: {new_project['id']}")
+                    
+                    # 3. LINE環境変数を設定
+                    if self.setup_line_environment_variables(new_project['id'], line_credentials):
+                        print("✅ LINE環境変数設定完了")
+                        
+                        # 4. プロジェクトをデプロイ
+                        deployment = self.deploy_project(new_project['id'])
+                        
+                        if deployment:
+                            print(f"✅ デプロイ開始完了: {deployment['id']}")
+                            
+                            return {
+                                'success': True,
+                                'project_id': new_project['id'],
+                                'project_name': new_project['name'],
+                                'deployment_id': deployment['id'],
+                                'message': 'AI予定秘書プロジェクトの複製とデプロイが完了しました'
+                            }
+                        else:
+                            return {
+                                'success': False,
+                                'error': 'プロジェクトデプロイに失敗しました'
+                            }
+                    else:
+                        return {
+                            'success': False,
+                            'error': 'LINE環境変数の設定に失敗しました'
+                        }
+                else:
+                    return {
+                        'success': False,
+                        'error': f'プロジェクト作成失敗: {data}'
+                    }
+            else:
+                return {
+                    'success': False,
+                    'error': f'Railway API エラー: {response.status_code}'
+                }
+                
+        except Exception as e:
+            print(f"❌ AI予定秘書プロジェクト複製エラー: {e}")
+            return {
+                'success': False,
+                'error': f'プロジェクト複製エラー: {str(e)}'
+            }
+    
+    def setup_line_environment_variables(self, project_id, line_credentials):
+        """LINE環境変数を設定"""
+        try:
+            print(f"🔧 LINE環境変数設定開始: プロジェクト {project_id}")
+            
+            url = "https://backboard.railway.app/graphql/v2"
+            headers = self.get_railway_headers()
+            
+            # LINE環境変数を設定
+            line_variables = {
+                'LINE_CHANNEL_ACCESS_TOKEN': line_credentials['line_channel_access_token'],
+                'LINE_CHANNEL_SECRET': line_credentials['line_channel_secret'],
+                'LINE_CHANNEL_ID': line_credentials['line_channel_id'],
+                'COMPANY_ID': str(line_credentials['company_id']),
+                'COMPANY_NAME': line_credentials['company_name'],
+                'BASE_URL': f"https://{self.base_domain}",
+                'DATABASE_URL': os.getenv('DATABASE_URL', ''),
+                'STRIPE_SECRET_KEY': os.getenv('STRIPE_SECRET_KEY', ''),
+                'STRIPE_PUBLISHABLE_KEY': os.getenv('STRIPE_PUBLISHABLE_KEY', '')
+            }
+            
+            success_count = 0
+            for var_name, var_value in line_variables.items():
+                if var_value:  # 空でない場合のみ設定
+                    set_query = """
+                    mutation SetVariable($projectId: String!, $name: String!, $value: String!) {
+                        variableCreate(input: { projectId: $projectId, name: $name, value: $value }) {
+                            id
+                            name
+                            value
+                        }
+                    }
+                    """
+                    
+                    variables = {
+                        "projectId": project_id,
+                        "name": var_name,
+                        "value": var_value
+                    }
+                    
+                    payload = {
+                        "query": set_query,
+                        "variables": variables
+                    }
+                    
+                    response = requests.post(url, headers=headers, json=payload, timeout=30)
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        if 'data' in data and data['data']['variableCreate']:
+                            print(f"✅ 環境変数設定完了: {var_name}")
+                            success_count += 1
+                        else:
+                            print(f"⚠️ 環境変数設定警告: {var_name} - {data}")
+                    else:
+                        print(f"❌ 環境変数設定エラー: {var_name} - {response.status_code}")
+            
+            print(f"✅ 環境変数設定完了: {success_count}/{len(line_variables)}")
+            return success_count > 0
+            
+        except Exception as e:
+            print(f"❌ LINE環境変数設定エラー: {e}")
+            return False
+    
+    def deploy_project(self, project_id):
+        """プロジェクトをデプロイ"""
+        try:
+            print(f"🚀 プロジェクトデプロイ開始: {project_id}")
+            
+            url = "https://backboard.railway.app/graphql/v2"
+            headers = self.get_railway_headers()
+            
+            deploy_query = """
+            mutation DeployProject($projectId: String!) {
+                projectDeploy(input: { projectId: $projectId }) {
+                    id
+                    status
+                    createdAt
+                }
+            }
+            """
+            
+            variables = {"projectId": project_id}
+            payload = {
+                "query": deploy_query,
+                "variables": variables
+            }
+            
+            response = requests.post(url, headers=headers, json=payload, timeout=30)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if 'data' in data and data['data']['projectDeploy']:
+                    deployment = data['data']['projectDeploy']
+                    print(f"✅ デプロイ開始完了: {deployment['id']}")
+                    return deployment
+                else:
+                    print(f"❌ デプロイ開始失敗: {data}")
+                    return None
+            else:
+                print(f"❌ Railway API エラー: {response.status_code}")
+                return None
+                
+        except Exception as e:
+            print(f"❌ プロジェクトデプロイエラー: {e}")
+            return None
+    
     def register_company(self, data):
         """企業情報を登録"""
         try:
@@ -101,6 +307,42 @@ class CompanyRegistrationService:
                     datetime.now()
                 ))
             
+            # 5. AI予定秘書プロジェクトを複製（コンテンツタイプがAI予定秘書の場合）
+            railway_result = None
+            if data.get('content_type') == 'AI予定秘書':
+                print(f"🚀 AI予定秘書プロジェクト複製開始")
+                
+                line_credentials = {
+                    'line_channel_id': data['line_channel_id'],
+                    'line_channel_access_token': data['line_access_token'],
+                    'line_channel_secret': data['line_channel_secret'],
+                    'company_id': company_id,
+                    'company_name': data['company_name']
+                }
+                
+                railway_result = self.clone_ai_schedule_project(company_id, data['company_name'], line_credentials)
+                
+                if railway_result['success']:
+                    # 6. Railwayデプロイ情報をデータベースに保存
+                    c.execute('''
+                        INSERT INTO company_deployments (
+                            company_id, railway_project_id, railway_url, deployment_status,
+                            deployment_log, environment_variables, created_at
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    ''', (
+                        company_id,
+                        railway_result['project_id'],
+                        f"https://{railway_result['project_name']}.up.railway.app",
+                        'deploying',
+                        json.dumps(railway_result),
+                        json.dumps(line_credentials),
+                        datetime.now()
+                    ))
+                    
+                    print(f"✅ Railwayデプロイ情報をデータベースに保存")
+                else:
+                    print(f"⚠️ Railwayプロジェクト複製失敗: {railway_result['error']}")
+            
             conn.commit()
             conn.close()
             
@@ -109,11 +351,16 @@ class CompanyRegistrationService:
             print(f"  - 企業コード: {company_code}")
             print(f"  - LINEアカウントID: {line_account_id}")
             
+            if railway_result and railway_result['success']:
+                print(f"  - RailwayプロジェクトID: {railway_result['project_id']}")
+                print(f"  - Railwayプロジェクト名: {railway_result['project_name']}")
+            
             return {
                 'success': True,
                 'company_id': company_id,
                 'line_account_id': line_account_id,
-                'company_code': company_code
+                'company_code': company_code,
+                'railway_result': railway_result
             }
             
         except Exception as e:
@@ -133,34 +380,45 @@ class CompanyRegistrationService:
             c = conn.cursor()
             
             c.execute('''
-                SELECT c.id, c.company_name, c.company_code, c.contact_email,
-                       c.contact_phone, c.status, c.created_at,
-                       cla.line_channel_id, cla.line_basic_id, cla.webhook_url,
-                       cla.line_qr_code_url, cla.status as line_status
+                SELECT 
+                    c.id, c.company_name, c.company_code, c.email, c.contact_email, 
+                    c.contact_phone, c.status, c.created_at, c.updated_at,
+                    cla.line_channel_id, cla.line_channel_access_token, cla.line_channel_secret,
+                    cla.line_basic_id, cla.line_qr_code_url, cla.webhook_url, cla.status as line_status,
+                    cd.railway_project_id, cd.railway_url, cd.deployment_status, cd.deployment_log
                 FROM companies c
                 LEFT JOIN company_line_accounts cla ON c.id = cla.company_id
+                LEFT JOIN company_deployments cd ON c.id = cd.company_id
                 WHERE c.id = %s
             ''', (company_id,))
             
-            company = c.fetchone()
+            result = c.fetchone()
             conn.close()
             
-            if company:
+            if result:
                 return {
                     'success': True,
-                    'company': {
-                        'id': company[0],
-                        'company_name': company[1],
-                        'company_code': company[2],
-                        'contact_email': company[3],
-                        'contact_phone': company[4],
-                        'status': company[5],
-                        'created_at': company[6],
-                        'line_channel_id': company[7],
-                        'line_basic_id': company[8],
-                        'webhook_url': company[9],
-                        'qr_code_url': company[10],
-                        'line_status': company[11]
+                    'data': {
+                        'company_id': result[0],
+                        'company_name': result[1],
+                        'company_code': result[2],
+                        'email': result[3],
+                        'contact_email': result[4],
+                        'contact_phone': result[5],
+                        'status': result[6],
+                        'created_at': str(result[7]),
+                        'updated_at': str(result[8]),
+                        'line_channel_id': result[9],
+                        'line_channel_access_token': result[10],
+                        'line_channel_secret': result[11],
+                        'line_basic_id': result[12],
+                        'line_qr_code_url': result[13],
+                        'webhook_url': result[14],
+                        'line_status': result[15],
+                        'railway_project_id': result[16],
+                        'railway_url': result[17],
+                        'deployment_status': result[18],
+                        'deployment_log': result[19]
                     }
                 }
             else:
@@ -175,122 +433,95 @@ class CompanyRegistrationService:
                 'error': f'企業情報取得エラー: {str(e)}'
             }
     
-    def update_company_registration(self, company_id, update_data):
+    def update_company_registration(self, company_id, data):
         """企業登録情報を更新"""
         try:
             conn = get_db_connection()
             c = conn.cursor()
             
-            # 企業情報の更新
-            if 'company_name' in update_data or 'contact_email' in update_data:
-                update_fields = []
-                update_values = []
-                
-                if 'company_name' in update_data:
-                    update_fields.append("company_name = %s")
-                    update_values.append(update_data['company_name'])
-                
-                if 'contact_email' in update_data:
-                    update_fields.append("contact_email = %s")
-                    update_values.append(update_data['contact_email'])
-                
-                if 'contact_phone' in update_data:
-                    update_fields.append("contact_phone = %s")
-                    update_values.append(update_data['contact_phone'])
-                
-                update_fields.append("updated_at = CURRENT_TIMESTAMP")
-                update_values.append(company_id)
-                
-                query = f'''
-                    UPDATE companies 
-                    SET {', '.join(update_fields)}
-                    WHERE id = %s
-                '''
-                
-                c.execute(query, update_values)
+            # 企業情報を更新
+            c.execute('''
+                UPDATE companies SET
+                    company_name = %s, contact_email = %s, contact_phone = %s,
+                    updated_at = %s
+                WHERE id = %s
+            ''', (
+                data['company_name'],
+                data['contact_email'],
+                data.get('contact_phone', ''),
+                datetime.now(),
+                company_id
+            ))
             
-            # LINEアカウント情報の更新
-            line_update_fields = []
-            line_update_values = []
-            
-            line_fields = [
-                'line_channel_id', 'line_access_token', 'line_channel_secret',
-                'line_basic_id', 'webhook_url', 'qr_code_url'
-            ]
-            
-            for field in line_fields:
-                if field in update_data:
-                    line_update_fields.append(f"{field} = %s")
-                    line_update_values.append(update_data[field])
-            
-            if line_update_fields:
-                line_update_fields.append("updated_at = CURRENT_TIMESTAMP")
-                line_update_values.append(company_id)
-                
-                line_query = f'''
-                    UPDATE company_line_accounts 
-                    SET {', '.join(line_update_fields)}
-                    WHERE company_id = %s
-                '''
-                
-                c.execute(line_query, line_update_values)
+            # LINEアカウント情報を更新
+            c.execute('''
+                UPDATE company_line_accounts SET
+                    line_channel_id = %s, line_channel_access_token = %s,
+                    line_channel_secret = %s, line_basic_id = %s,
+                    updated_at = %s
+                WHERE company_id = %s
+            ''', (
+                data['line_channel_id'],
+                data['line_access_token'],
+                data['line_channel_secret'],
+                data.get('line_basic_id', ''),
+                datetime.now(),
+                company_id
+            ))
             
             conn.commit()
             conn.close()
             
             return {
                 'success': True,
-                'message': '企業情報を更新しました'
+                'message': '企業情報の更新が完了しました'
             }
             
         except Exception as e:
-            if 'conn' in locals():
-                conn.rollback()
-                conn.close()
             return {
                 'success': False,
                 'error': f'企業情報更新エラー: {str(e)}'
             }
     
-    def list_company_registrations(self, status='active'):
+    def list_company_registrations(self):
         """企業登録一覧を取得"""
         try:
             conn = get_db_connection()
             c = conn.cursor()
             
-            query = '''
-                SELECT c.id, c.company_name, c.company_code, c.contact_email,
-                       c.status, c.created_at, cla.line_channel_id, cla.line_basic_id
+            c.execute('''
+                SELECT 
+                    c.id, c.company_name, c.company_code, c.contact_email,
+                    c.status, c.created_at,
+                    cla.line_channel_id, cla.status as line_status,
+                    cd.railway_project_id, cd.deployment_status
                 FROM companies c
                 LEFT JOIN company_line_accounts cla ON c.id = cla.company_id
-            '''
+                LEFT JOIN company_deployments cd ON c.id = cd.company_id
+                ORDER BY c.created_at DESC
+            ''')
             
-            params = []
-            if status:
-                query += ' WHERE c.status = %s'
-                params.append(status)
-            
-            query += ' ORDER BY c.created_at DESC'
-            
-            c.execute(query, params)
-            companies = c.fetchall()
+            results = c.fetchall()
             conn.close()
+            
+            companies = []
+            for result in results:
+                companies.append({
+                    'company_id': result[0],
+                    'company_name': result[1],
+                    'company_code': result[2],
+                    'contact_email': result[3],
+                    'status': result[4],
+                    'created_at': str(result[5]),
+                    'line_channel_id': result[6],
+                    'line_status': result[7],
+                    'railway_project_id': result[8],
+                    'deployment_status': result[9]
+                })
             
             return {
                 'success': True,
-                'companies': [
-                    {
-                        'id': company[0],
-                        'company_name': company[1],
-                        'company_code': company[2],
-                        'contact_email': company[3],
-                        'status': company[4],
-                        'created_at': company[5],
-                        'line_channel_id': company[6],
-                        'line_basic_id': company[7]
-                    }
-                    for company in companies
-                ]
+                'data': companies
             }
             
         except Exception as e:
@@ -300,154 +531,125 @@ class CompanyRegistrationService:
             }
     
     def deploy_company_line_bot(self, company_id):
-        """企業のLINEボットをRailwayにデプロイ"""
+        """企業LINEボットをデプロイ"""
         try:
-            print(f"=== 企業 {company_id} のLINEボットデプロイ開始 ===")
+            # 企業情報を取得
+            company_info = self.get_company_registration(company_id)
+            if not company_info['success']:
+                return company_info
             
-            # 1. 企業情報を取得
-            company_result = self.get_company_registration(company_id)
-            if not company_result['success']:
-                return company_result
+            company_data = company_info['data']
             
-            company = company_result['company']
-            
-            # 2. Railwayプロジェクトを作成
-            deployment_result = self.create_railway_project(company)
-            if not deployment_result['success']:
-                return deployment_result
-            
-            # 3. デプロイ状況をデータベースに保存
-            conn = get_db_connection()
-            c = conn.cursor()
-            
-            c.execute('''
-                INSERT INTO company_deployments (
-                    company_id, railway_project_id, railway_url, deployment_status,
-                    created_at, updated_at
-                ) VALUES (%s, %s, %s, %s, %s, %s)
-                RETURNING id
-            ''', (
-                company_id,
-                deployment_result['project_id'],
-                deployment_result['railway_url'],
-                'deploying',
-                datetime.now(),
-                datetime.now()
-            ))
-            
-            deployment_id = c.fetchone()[0]
-            conn.commit()
-            conn.close()
-            
-            print(f"✅ デプロイ開始完了")
-            print(f"  - デプロイID: {deployment_id}")
-            print(f"  - Railway URL: {deployment_result['railway_url']}")
-            
-            return {
-                'success': True,
-                'deployment_id': deployment_id,
-                'railway_url': deployment_result['railway_url'],
-                'project_id': deployment_result['project_id']
+            # LINE認証情報を準備
+            line_credentials = {
+                'line_channel_id': company_data['line_channel_id'],
+                'line_channel_access_token': company_data['line_channel_access_token'],
+                'line_channel_secret': company_data['line_channel_secret'],
+                'company_id': company_id,
+                'company_name': company_data['company_name']
             }
             
-        except Exception as e:
-            print(f"❌ デプロイエラー: {e}")
-            return {
-                'success': False,
-                'error': f'デプロイエラー: {str(e)}'
-            }
-    
-    def create_railway_project(self, company):
-        """Railwayプロジェクトを作成"""
-        try:
-            if not self.railway_token:
-                return {
-                    'success': False,
-                    'error': 'Railwayトークンが設定されていません'
-                }
+            # AI予定秘書プロジェクトを複製
+            railway_result = self.clone_ai_schedule_project(company_id, company_data['company_name'], line_credentials)
             
-            # Railway APIを使用してプロジェクトを作成
-            headers = {
-                'Authorization': f'Bearer {self.railway_token}',
-                'Content-Type': 'application/json'
-            }
-            
-            project_data = {
-                'name': f"{company['company_name']}-line-bot",
-                'description': f"{company['company_name']}のLINE公式アカウント"
-            }
-            
-            response = requests.post(
-                'https://railway.app/api/v2/projects',
-                headers=headers,
-                json=project_data,
-                timeout=30
-            )
-            
-            if response.status_code == 201:
-                project_info = response.json()
+            if railway_result['success']:
+                # デプロイ情報をデータベースに更新
+                conn = get_db_connection()
+                c = conn.cursor()
+                
+                c.execute('''
+                    INSERT INTO company_deployments (
+                        company_id, railway_project_id, railway_url, deployment_status,
+                        deployment_log, environment_variables, created_at
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (company_id) DO UPDATE SET
+                        railway_project_id = EXCLUDED.railway_project_id,
+                        railway_url = EXCLUDED.railway_url,
+                        deployment_status = EXCLUDED.deployment_status,
+                        deployment_log = EXCLUDED.deployment_log,
+                        environment_variables = EXCLUDED.environment_variables,
+                        updated_at = EXCLUDED.created_at
+                ''', (
+                    company_id,
+                    railway_result['project_id'],
+                    f"https://{railway_result['project_name']}.up.railway.app",
+                    'deploying',
+                    json.dumps(railway_result),
+                    json.dumps(line_credentials),
+                    datetime.now()
+                ))
+                
+                conn.commit()
+                conn.close()
+                
                 return {
                     'success': True,
-                    'project_id': project_info['id'],
-                    'railway_url': f"https://{project_info['name']}.railway.app"
+                    'message': 'LINEボットのデプロイが開始されました',
+                    'railway_result': railway_result
                 }
             else:
-                return {
-                    'success': False,
-                    'error': f'Railway API エラー: {response.status_code} - {response.text}'
-                }
+                return railway_result
                 
         except Exception as e:
             return {
                 'success': False,
-                'error': f'Railwayプロジェクト作成エラー: {str(e)}'
+                'error': f'LINEボットデプロイエラー: {str(e)}'
             }
     
     def get_deployment_status(self, company_id):
-        """デプロイ状況を確認"""
+        """デプロイメント状態を取得"""
         try:
             conn = get_db_connection()
             c = conn.cursor()
             
             c.execute('''
-                SELECT deployment_status, railway_url, created_at, updated_at
+                SELECT railway_project_id, railway_url, deployment_status, deployment_log
                 FROM company_deployments
                 WHERE company_id = %s
-                ORDER BY created_at DESC
-                LIMIT 1
             ''', (company_id,))
             
-            deployment = c.fetchone()
+            result = c.fetchone()
             conn.close()
             
-            if deployment:
+            if result:
                 return {
                     'success': True,
-                    'status': {
-                        'deployment_status': deployment[0],
-                        'railway_url': deployment[1],
-                        'created_at': deployment[2],
-                        'updated_at': deployment[3]
+                    'data': {
+                        'railway_project_id': result[0],
+                        'railway_url': result[1],
+                        'deployment_status': result[2],
+                        'deployment_log': result[3]
                     }
                 }
             else:
                 return {
                     'success': False,
-                    'error': 'デプロイ情報が見つかりません'
+                    'error': 'デプロイメント情報が見つかりません'
                 }
                 
         except Exception as e:
             return {
                 'success': False,
-                'error': f'デプロイ状況取得エラー: {str(e)}'
+                'error': f'デプロイメント状態取得エラー: {str(e)}'
             }
     
-    def test_line_connection(self, company_id, test_message):
+    def test_line_connection(self, company_id):
         """LINE接続をテスト"""
         try:
-            # LINE Messaging APIを使用してテストメッセージを送信
-            result = company_line_service.send_message_to_company(company_id, test_message)
-            return result
+            # 企業情報を取得
+            company_info = self.get_company_registration(company_id)
+            if not company_info['success']:
+                return company_info
+            
+            company_data = company_info['data']
+            
+            # LINE APIでテストメッセージを送信
+            test_result = company_line_service.send_message_to_company(
+                company_id,
+                "🧪 LINE接続テスト: 企業向けLINE公式アカウントの接続が正常に動作しています。"
+            )
+            
+            return test_result
             
         except Exception as e:
             return {
@@ -455,51 +657,44 @@ class CompanyRegistrationService:
                 'error': f'LINE接続テストエラー: {str(e)}'
             }
     
-    def validate_line_credentials(self, credentials):
+    def validate_line_credentials(self, line_credentials):
         """LINE認証情報を検証"""
         try:
+            # LINE APIでプロフィール取得をテスト
             headers = {
-                'Authorization': f'Bearer {credentials["line_access_token"]}',
+                'Authorization': f'Bearer {line_credentials["line_channel_access_token"]}',
                 'Content-Type': 'application/json'
             }
             
-            # LINE Messaging APIのプロフィール取得で認証をテスト
-            response = requests.get(
-                'https://api.line.me/v2/bot/profile/U1234567890abcdef',
-                headers=headers,
-                timeout=10
-            )
+            response = requests.get('https://api.line.me/v2/bot/profile/U1234567890abcdef', headers=headers, timeout=10)
             
             if response.status_code == 200:
                 return {
                     'success': True,
-                    'channel_info': {
-                        'channel_id': credentials['line_channel_id'],
-                        'basic_id': credentials.get('line_basic_id', ''),
-                        'status': 'valid'
-                    }
+                    'message': 'LINE認証情報が有効です'
+                }
+            elif response.status_code == 401:
+                return {
+                    'success': False,
+                    'error': 'LINE認証情報が無効です'
                 }
             else:
                 return {
                     'success': False,
-                    'error': f'LINE認証エラー: {response.status_code} - {response.text}'
+                    'error': f'LINE API エラー: {response.status_code}'
                 }
                 
         except Exception as e:
             return {
                 'success': False,
-                'error': f'認証情報検証エラー: {str(e)}'
+                'error': f'LINE認証情報検証エラー: {str(e)}'
             }
     
     def generate_company_code(self, company_name):
         """企業コードを生成"""
-        # 企業名からコードを生成
         clean_name = ''.join(c for c in company_name if c.isalnum()).upper()
         timestamp = str(int(time.time()))[-6:]
-        hash_object = hashlib.md5(company_name.encode())
-        hash_hex = hash_object.hexdigest()[:4].upper()
-        
-        return f"{clean_name[:8]}{timestamp}{hash_hex}"
+        return f"{clean_name[:8]}{timestamp}"
 
-# インスタンスを作成
+# サービスインスタンスを作成
 company_registration_service = CompanyRegistrationService() 
