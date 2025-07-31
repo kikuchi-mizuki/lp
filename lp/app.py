@@ -33,10 +33,6 @@ from routes.company_line_accounts import company_line_accounts_bp
 from routes.company_registration import company_registration_bp
 from routes.railway_setup import railway_setup_bp
 
-# ブループリントを登録
-app.register_blueprint(company_registration_bp)
-app.register_blueprint(railway_setup_bp)
-
 load_dotenv()
 
 stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
@@ -212,6 +208,7 @@ app.register_blueprint(dashboard_ui_bp)
 app.register_blueprint(automation_bp)
 app.register_blueprint(company_line_accounts_bp)
 app.register_blueprint(company_registration_bp)
+app.register_blueprint(railway_setup_bp)
 
 @app.route('/')
 def index():
