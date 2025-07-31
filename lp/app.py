@@ -30,6 +30,7 @@ from routes.security import security_bp
 from routes.dashboard_ui import dashboard_ui_bp
 from routes.automation import automation_bp
 from routes.company_line_accounts import company_line_accounts_bp
+from routes.company_registration import company_registration_bp
 from utils.db import get_db_connection
 import time
 
@@ -207,10 +208,25 @@ app.register_blueprint(security_bp)
 app.register_blueprint(dashboard_ui_bp)
 app.register_blueprint(automation_bp)
 app.register_blueprint(company_line_accounts_bp)
+app.register_blueprint(company_registration_bp)
 
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/company-registration')
+def company_registration_form():
+    """企業情報登録フォーム"""
+    subscription_id = request.args.get('subscription_id', '')
+    content_type = request.args.get('content_type', '')
+    return render_template('company_registration.html', 
+                         subscription_id=subscription_id, 
+                         content_type=content_type)
+
+@app.route('/company-registration-success')
+def company_registration_success():
+    """企業登録成功ページ"""
+    return render_template('company_registration_success.html')
 
 @app.route('/company-dashboard')
 def company_dashboard():

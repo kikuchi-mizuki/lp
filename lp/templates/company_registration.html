@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>企業情報登録 - LINEアカウント設定</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .registration-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            margin: 2rem auto;
+            max-width: 800px;
+        }
+        .form-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            border-radius: 20px 20px 0 0;
+            text-align: center;
+        }
+        .form-body {
+            padding: 2rem;
+        }
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        .form-label {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+        .form-control {
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 0.75rem 1rem;
+            transition: all 0.3s ease;
+        }
+        .form-control:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 10px;
+            padding: 0.75rem 2rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        .alert {
+            border-radius: 10px;
+            border: none;
+        }
+        .info-card {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 1rem;
+            border-radius: 10px;
+            margin-bottom: 1.5rem;
+        }
+        .step-indicator {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 2rem;
+        }
+        .step {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #e9ecef;
+            color: #6c757d;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin: 0 0.5rem;
+            position: relative;
+        }
+        .step.active {
+            background: #667eea;
+            color: white;
+        }
+        .step.completed {
+            background: #28a745;
+            color: white;
+        }
+        .step::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 100%;
+            width: 50px;
+            height: 2px;
+            background: #e9ecef;
+            transform: translateY(-50%);
+        }
+        .step:last-child::after {
+            display: none;
+        }
+        .step.completed::after {
+            background: #28a745;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="registration-container">
+            <!-- ヘッダー -->
+            <div class="form-header">
+                <h1><i class="fas fa-building"></i> 企業情報登録</h1>
+                <p class="mb-0">LINE公式アカウント設定のための情報を入力してください</p>
+            </div>
+
+            <!-- ステップインジケーター -->
+            <div class="step-indicator">
+                <div class="step active">1</div>
+                <div class="step">2</div>
+                <div class="step">3</div>
+            </div>
+
+            <!-- フォーム本体 -->
+            <div class="form-body">
+                <!-- 情報カード -->
+                <div class="info-card">
+                    <h5><i class="fas fa-info-circle"></i> 重要なお知らせ</h5>
+                    <p class="mb-0">
+                        決済完了後、LINE公式アカウントの設定情報を入力していただきます。
+                        入力された情報は安全に管理され、各コンテンツとの自動連携に使用されます。
+                    </p>
+                </div>
+
+                <!-- アラート表示エリア -->
+                <div id="alertArea"></div>
+
+                <!-- 企業情報フォーム -->
+                <form id="companyRegistrationForm">
+                    <input type="hidden" id="subscriptionId" name="subscription_id" value="{{ subscription_id }}">
+                    <input type="hidden" id="contentType" name="content_type" value="{{ content_type }}">
+                    
+                    <!-- 企業基本情報 -->
+                    <h4 class="mb-3"><i class="fas fa-building"></i> 企業基本情報</h4>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="companyName" class="form-label">
+                                    <i class="fas fa-building"></i> 企業名 <span class="text-danger">*</span>
+                                </label>
+                                <input type="text" class="form-control" id="companyName" name="company_name" 
+                                       placeholder="例: 株式会社サンプル" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="companyCode" class="form-label">
+                                    <i class="fas fa-code"></i> 企業コード
+                                </label>
+                                <input type="text" class="form-control" id="companyCode" name="company_code" 
+                                       placeholder="例: SAMPLE001" readonly>
+                                <small class="form-text text-muted">自動生成されます</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="contactEmail" class="form-label">
+                                    <i class="fas fa-envelope"></i> 連絡先メールアドレス <span class="text-danger">*</span>
+                                </label>
+                                <input type="email" class="form-control" id="contactEmail" name="contact_email" 
+                                       placeholder="例: contact@company.com" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="contactPhone" class="form-label">
+                                    <i class="fas fa-phone"></i> 連絡先電話番号
+                                </label>
+                                <input type="tel" class="form-control" id="contactPhone" name="contact_phone" 
+                                       placeholder="例: 03-1234-5678">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- LINE設定情報 -->
+                    <h4 class="mb-3 mt-4"><i class="fab fa-line"></i> LINE公式アカウント設定</h4>
+                    
+                    <div class="info-card">
+                        <h6><i class="fas fa-lightbulb"></i> LINE設定の手順</h6>
+                        <ol class="mb-0">
+                            <li>LINE Developers Console (https://developers.line.biz/) にアクセス</li>
+                            <li>新しいプロバイダーを作成（初回のみ）</li>
+                            <li>Messaging APIチャネルを作成</li>
+                            <li>チャネル情報を取得して下記に入力</li>
+                        </ol>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="lineChannelId" class="form-label">
+                                    <i class="fab fa-line"></i> LINEチャネルID <span class="text-danger">*</span>
+                                </label>
+                                <input type="text" class="form-control" id="lineChannelId" name="line_channel_id" 
+                                       placeholder="例: 1234567890" required>
+                                <small class="form-text text-muted">LINE Developers Consoleで確認できます</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="lineBasicId" class="form-label">
+                                    <i class="fas fa-at"></i> LINE基本ID
+                                </label>
+                                <input type="text" class="form-control" id="lineBasicId" name="line_basic_id" 
+                                       placeholder="例: @companyname">
+                                <small class="form-text text-muted">@から始まるID</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="lineAccessToken" class="form-label">
+                                    <i class="fas fa-key"></i> LINEチャネルアクセストークン <span class="text-danger">*</span>
+                                </label>
+                                <input type="password" class="form-control" id="lineAccessToken" name="line_access_token" 
+                                       placeholder="長い文字列のトークン" required>
+                                <small class="form-text text-muted">チャネル設定 > Messaging API設定で確認</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="lineChannelSecret" class="form-label">
+                                    <i class="fas fa-lock"></i> LINEチャネルシークレット <span class="text-danger">*</span>
+                                </label>
+                                <input type="password" class="form-control" id="lineChannelSecret" name="line_channel_secret" 
+                                       placeholder="長い文字列のシークレット" required>
+                                <small class="form-text text-muted">チャネル設定 > 基本設定で確認</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 追加設定 -->
+                    <h4 class="mb-3 mt-4"><i class="fas fa-cog"></i> 追加設定</h4>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="webhookUrl" class="form-label">
+                                    <i class="fas fa-link"></i> Webhook URL
+                                </label>
+                                <input type="url" class="form-control" id="webhookUrl" name="webhook_url" 
+                                       placeholder="https://your-domain.com/webhook" readonly>
+                                <small class="form-text text-muted">自動生成されます</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="qrCodeUrl" class="form-label">
+                                    <i class="fas fa-qrcode"></i> QRコードURL
+                                </label>
+                                <input type="url" class="form-control" id="qrCodeUrl" name="qr_code_url" 
+                                       placeholder="https://qr.liqr.com/..." readonly>
+                                <small class="form-text text-muted">自動生成されます</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 利用規約同意 -->
+                    <div class="form-group mt-4">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="agreeTerms" required>
+                            <label class="form-check-label" for="agreeTerms">
+                                <a href="/terms" target="_blank">利用規約</a>と
+                                <a href="/privacy" target="_blank">プライバシーポリシー</a>に同意します <span class="text-danger">*</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- 送信ボタン -->
+                    <div class="text-center mt-4">
+                        <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
+                            <i class="fas fa-paper-plane"></i> 企業情報を登録
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 企業コード自動生成
+        document.getElementById('companyName').addEventListener('input', function() {
+            const companyName = this.value;
+            if (companyName) {
+                const code = generateCompanyCode(companyName);
+                document.getElementById('companyCode').value = code;
+            }
+        });
+
+        function generateCompanyCode(companyName) {
+            // 企業名からコードを生成
+            const cleanName = companyName.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+            const timestamp = Date.now().toString().slice(-6);
+            return cleanName.slice(0, 8) + timestamp;
+        }
+
+        // フォーム送信処理
+        document.getElementById('companyRegistrationForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById('submitBtn');
+            const originalText = submitBtn.innerHTML;
+            
+            // ボタンを無効化
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 登録中...';
+            
+            try {
+                const formData = new FormData(this);
+                const data = Object.fromEntries(formData);
+                
+                const response = await fetch('/api/v1/company-registration', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showAlert('success', '企業情報の登録が完了しました！LINE公式アカウントの設定を開始します。');
+                    
+                    // ステップインジケーターを更新
+                    updateStepIndicator(2);
+                    
+                    // 成功後の処理（リダイレクトなど）
+                    setTimeout(() => {
+                        window.location.href = '/company-registration-success';
+                    }, 2000);
+                    
+                } else {
+                    showAlert('danger', `登録エラー: ${result.error}`);
+                }
+                
+            } catch (error) {
+                showAlert('danger', `通信エラー: ${error.message}`);
+            } finally {
+                // ボタンを復活
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            }
+        });
+
+        function showAlert(type, message) {
+            const alertArea = document.getElementById('alertArea');
+            alertArea.innerHTML = `
+                <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                    <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-triangle'}"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `;
+        }
+
+        function updateStepIndicator(step) {
+            const steps = document.querySelectorAll('.step');
+            steps.forEach((s, index) => {
+                if (index < step) {
+                    s.classList.add('completed');
+                    s.classList.remove('active');
+                } else if (index === step) {
+                    s.classList.add('active');
+                    s.classList.remove('completed');
+                } else {
+                    s.classList.remove('active', 'completed');
+                }
+            });
+        }
+
+        // 初期化
+        document.addEventListener('DOMContentLoaded', function() {
+            // URLパラメータから値を設定
+            const urlParams = new URLSearchParams(window.location.search);
+            const subscriptionId = urlParams.get('subscription_id');
+            const contentType = urlParams.get('content_type');
+            
+            if (subscriptionId) {
+                document.getElementById('subscriptionId').value = subscriptionId;
+            }
+            if (contentType) {
+                document.getElementById('contentType').value = contentType;
+            }
+        });
+    </script>
+</body>
+</html> 
