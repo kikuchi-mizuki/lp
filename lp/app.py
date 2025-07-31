@@ -223,6 +223,15 @@ def company_registration_form():
                          subscription_id=subscription_id, 
                          content_type=content_type)
 
+@app.route('/company-registration-debug')
+def company_registration_debug():
+    """企業情報登録フォーム（デバッグ用）"""
+    subscription_id = request.args.get('subscription_id', '')
+    content_type = request.args.get('content_type', '')
+    return render_template('company_registration_debug.html', 
+                         subscription_id=subscription_id, 
+                         content_type=content_type)
+
 @app.route('/company-registration-success')
 def company_registration_success():
     """企業登録成功ページ"""
