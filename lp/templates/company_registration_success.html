@@ -243,20 +243,42 @@
         });
 
         function loadCompanyInfo(companyId) {
+            console.log('企業情報取得開始:', companyId);
+            
             // 企業情報をAPIから取得
             fetch(`/api/v1/company-registration/${companyId}`)
-                .then(response => response.json())
+                .then(response => {
+                    console.log('APIレスポンス:', response.status, response.statusText);
+                    return response.json();
+                })
                 .then(data => {
+                    console.log('APIデータ:', data);
+                    
                     if (data.success) {
                         const company = data.data;
-                        document.getElementById('companyName').textContent = company.company_name;
-                        document.getElementById('companyCode').textContent = company.company_code;
-                        document.getElementById('channelId').textContent = company.line_channel_id;
-                        document.getElementById('webhookUrl').textContent = company.webhook_url;
+                        console.log('企業情報:', company);
+                        
+                        // 企業情報を表示
+                        document.getElementById('companyName').textContent = company.company_name || 'N/A';
+                        document.getElementById('companyCode').textContent = company.company_code || 'N/A';
+                        document.getElementById('channelId').textContent = company.line_channel_id || 'N/A';
+                        document.getElementById('webhookUrl').textContent = company.webhook_url || 'N/A';
+                        
+                        console.log('企業情報表示完了');
+                    } else {
+                        console.error('企業情報取得失敗:', data.error);
+                        document.getElementById('companyName').textContent = '取得エラー';
+                        document.getElementById('companyCode').textContent = '取得エラー';
+                        document.getElementById('channelId').textContent = '取得エラー';
+                        document.getElementById('webhookUrl').textContent = '取得エラー';
                     }
                 })
                 .catch(error => {
                     console.error('企業情報取得エラー:', error);
+                    document.getElementById('companyName').textContent = '通信エラー';
+                    document.getElementById('companyCode').textContent = '通信エラー';
+                    document.getElementById('channelId').textContent = '通信エラー';
+                    document.getElementById('webhookUrl').textContent = '通信エラー';
                 });
         }
 

@@ -71,8 +71,9 @@ class CompanyLineAccountService:
             # 5. QRコードURLを生成
             qr_code_url = f"https://qr.liqr.com/{channel_id}"
             
-            # 6. Webhook URLを設定
-            webhook_url = f"https://your-domain.com/webhook/{company_id}"
+            # Webhook URLを生成
+            base_domain = os.getenv('BASE_DOMAIN', 'lp-production-9e2c.up.railway.app')
+            webhook_url = f"https://{base_domain}/webhook/{company_id}"
             
             # 7. データベースに保存
             c.execute('''
