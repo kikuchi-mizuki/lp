@@ -31,8 +31,11 @@ from routes.dashboard_ui import dashboard_ui_bp
 from routes.automation import automation_bp
 from routes.company_line_accounts import company_line_accounts_bp
 from routes.company_registration import company_registration_bp
-from utils.db import get_db_connection
-import time
+from routes.railway_setup import railway_setup_bp
+
+# ブループリントを登録
+app.register_blueprint(company_registration_bp)
+app.register_blueprint(railway_setup_bp)
 
 load_dotenv()
 
