@@ -752,7 +752,7 @@ def handle_content_confirmation(user_id, content_type):
         conn.close()
         
         # 企業登録フォームへのリンクを生成
-        base_url = os.getenv('BASE_URL', 'https://your-domain.com')
+        base_url = os.getenv('BASE_URL', 'https://lp-production-9e2c.up.railway.app')
         registration_url = f"{base_url}/company-registration?subscription_id={subscription.id}&content_type={content_type}"
         
         return {
