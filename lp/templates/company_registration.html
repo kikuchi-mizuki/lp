@@ -336,6 +336,20 @@
                 const formData = new FormData(this);
                 const data = Object.fromEntries(formData);
                 
+                // LINEチャネルIDの重複チェック
+                const lineChannelId = data.line_channel_id;
+                if (lineChannelId) {
+                    console.log('LINEチャネルID重複チェック:', lineChannelId);
+                    
+                    const checkResponse = await fetch(`/api/v1/company-registration/check-line-channel/${lineChannelId}`);
+                    const checkResult = await checkResponse.json();
+                    
+                    if (checkResult.exists) {
+                        showAlert('danger', `LINEチャネルID "${lineChannelId}" は既に企業 "${checkResult.company_name}" で使用されています。別のLINEチャネルIDを使用してください。`);
+                        return;
+                    }
+                }
+                
                 const response = await fetch('/api/v1/company-registration', {
                     method: 'POST',
                     headers: {

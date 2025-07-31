@@ -229,10 +229,50 @@ class CompanyRegistrationService:
             print(f"❌ プロジェクトデプロイエラー: {e}")
             return None
     
+    def check_line_channel_id_exists(self, line_channel_id):
+        """LINEチャネルIDが既に存在するかチェック"""
+        try:
+            conn = get_db_connection()
+            c = conn.cursor()
+            
+            c.execute('''
+                SELECT cla.id, cla.company_id, c.company_name, cla.created_at
+                FROM company_line_accounts cla
+                JOIN companies c ON cla.company_id = c.id
+                WHERE cla.line_channel_id = %s
+            ''', (line_channel_id,))
+            
+            existing_record = c.fetchone()
+            conn.close()
+            
+            if existing_record:
+                return {
+                    'exists': True,
+                    'company_id': existing_record[1],
+                    'company_name': existing_record[2],
+                    'created_at': existing_record[3]
+                }
+            else:
+                return {'exists': False}
+                
+        except Exception as e:
+            print(f"❌ LINEチャネルID重複チェックエラー: {e}")
+            return {'exists': False, 'error': str(e)}
+    
     def register_company(self, data):
         """企業情報を登録"""
         try:
             print(f"=== 企業 {data['company_name']} の登録開始 ===")
+            
+            # LINEチャネルIDの重複チェック
+            line_channel_id = data['line_channel_id']
+            duplicate_check = self.check_line_channel_id_exists(line_channel_id)
+            
+            if duplicate_check['exists']:
+                return {
+                    'success': False,
+                    'error': f'LINEチャネルID "{line_channel_id}" は既に企業 "{duplicate_check["company_name"]}" (ID: {duplicate_check["company_id"]}) で使用されています。別のLINEチャネルIDを使用してください。'
+                }
             
             conn = get_db_connection()
             c = conn.cursor()

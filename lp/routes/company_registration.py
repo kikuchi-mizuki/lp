@@ -61,6 +61,32 @@ def register_company():
             'error': f'企業登録エラー: {str(e)}'
         }), 500
 
+@company_registration_bp.route('/company-registration/check-line-channel/<line_channel_id>', methods=['GET'])
+def check_line_channel_id(line_channel_id):
+    """LINEチャネルIDの重複チェック"""
+    try:
+        result = company_registration_service.check_line_channel_id_exists(line_channel_id)
+        
+        if result.get('error'):
+            return jsonify({
+                'success': False,
+                'error': result['error']
+            }), 500
+        
+        return jsonify({
+            'success': True,
+            'exists': result['exists'],
+            'company_name': result.get('company_name'),
+            'company_id': result.get('company_id'),
+            'created_at': str(result.get('created_at')) if result.get('created_at') else None
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'LINEチャネルID重複チェックエラー: {str(e)}'
+        }), 500
+
 @company_registration_bp.route('/company-registration/<int:company_id>', methods=['GET'])
 def get_company_registration(company_id):
     """企業登録情報を取得"""
