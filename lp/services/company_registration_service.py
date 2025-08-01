@@ -186,10 +186,67 @@ class CompanyRegistrationService:
             print(f"❌ LINE環境変数設定エラー: {e}")
             return False
     
+    def add_service_to_project(self, project_id):
+        """プロジェクトにサービスを追加"""
+        try:
+            print(f"🔧 プロジェクトにサービス追加開始: {project_id}")
+            
+            url = "https://backboard.railway.app/graphql/v2"
+            headers = self.get_railway_headers()
+            
+            # GitHubリポジトリからサービスを追加
+            add_service_query = """
+            mutation AddService($projectId: String!, $source: String!) {
+                serviceCreate(input: { 
+                    projectId: $projectId, 
+                    source: $source 
+                }) {
+                    id
+                    name
+                    status
+                }
+            }
+            """
+            
+            variables = {
+                "projectId": project_id,
+                "source": "https://github.com/kikuchi-mizuki/ai-schedule-bot"
+            }
+            
+            payload = {
+                "query": add_service_query,
+                "variables": variables
+            }
+            
+            response = requests.post(url, headers=headers, json=payload, timeout=30)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if 'data' in data and data['data']['serviceCreate']:
+                    service = data['data']['serviceCreate']
+                    print(f"✅ サービス追加完了: {service['name']} (ID: {service['id']})")
+                    return service
+                else:
+                    print(f"❌ サービス追加失敗: {data}")
+                    return None
+            else:
+                print(f"❌ Railway API エラー: {response.status_code}")
+                return None
+                
+        except Exception as e:
+            print(f"❌ サービス追加エラー: {e}")
+            return None
+    
     def deploy_project(self, project_id):
         """プロジェクトをデプロイ"""
         try:
             print(f"🚀 プロジェクトデプロイ開始: {project_id}")
+            
+            # まずサービスを追加
+            service = self.add_service_to_project(project_id)
+            if not service:
+                print("⚠️ サービス追加に失敗しました")
+                return None
             
             url = "https://backboard.railway.app/graphql/v2"
             headers = self.get_railway_headers()
