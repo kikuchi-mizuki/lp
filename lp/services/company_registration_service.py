@@ -77,33 +77,33 @@ class CompanyRegistrationService:
                     new_project = data['data']['projectCreate']
                     print(f"✅ 新しいプロジェクト作成完了: {new_project['id']}")
                     
-                    # 3. LINE環境変数を設定
-                    if self.setup_line_environment_variables(new_project['id'], line_credentials):
-                        print("✅ LINE環境変数設定完了")
-                        
-                        # 4. プロジェクトをデプロイ
+                    # 3. LINE環境変数を設定（スキップ可能）
+                    try:
+                        if self.setup_line_environment_variables(new_project['id'], line_credentials):
+                            print("✅ LINE環境変数設定完了")
+                        else:
+                            print("⚠️ LINE環境変数設定失敗（手動設定が必要）")
+                    except Exception as e:
+                        print(f"⚠️ LINE環境変数設定エラー（手動設定が必要）: {e}")
+                    
+                    # 4. プロジェクトをデプロイ（スキップ可能）
+                    try:
                         deployment = self.deploy_project(new_project['id'])
-                        
                         if deployment:
                             print(f"✅ デプロイ開始完了: {deployment['id']}")
-                            
-                            return {
-                                'success': True,
-                                'project_id': new_project['id'],
-                                'project_name': new_project['name'],
-                                'deployment_id': deployment['id'],
-                                'message': 'AI予定秘書プロジェクトの複製とデプロイが完了しました'
-                            }
                         else:
-                            return {
-                                'success': False,
-                                'error': 'プロジェクトデプロイに失敗しました'
-                            }
-                    else:
-                        return {
-                            'success': False,
-                            'error': 'LINE環境変数の設定に失敗しました'
-                        }
+                            print("⚠️ デプロイ開始失敗（手動デプロイが必要）")
+                    except Exception as e:
+                        print(f"⚠️ デプロイ開始エラー（手動デプロイが必要）: {e}")
+                    
+                    # プロジェクト作成が成功した場合は成功を返す
+                    return {
+                        'success': True,
+                        'project_id': new_project['id'],
+                        'project_name': new_project['name'],
+                        'deployment_id': deployment.get('id') if deployment else None,
+                        'message': 'AI予定秘書プロジェクトの作成が完了しました（環境変数とデプロイは手動設定が必要）'
+                    }
                 else:
                     return {
                         'success': False,
@@ -349,6 +349,7 @@ class CompanyRegistrationService:
             
             # 5. AI予定秘書プロジェクトを複製（コンテンツタイプがAI予定秘書の場合）
             railway_result = None
+            print(f"🔍 content_type確認: {data.get('content_type')}")
             if data.get('content_type') == 'AI予定秘書':
                 print(f"🚀 AI予定秘書プロジェクト複製開始")
                 
@@ -736,10 +737,71 @@ class CompanyRegistrationService:
         timestamp = str(int(time.time()))[-6:]
         return f"{clean_name[:8]}{timestamp}"
 
+    def auto_setup_railway_token(self):
+        """Railwayトークンを自動設定"""
+        try:
+            print("=== Railwayトークン自動設定 ===")
+            
+            # 既存のRailwayトークンを確認
+            railway_token = os.getenv('RAILWAY_TOKEN')
+            railway_project_id = os.getenv('RAILWAY_PROJECT_ID')
+            
+            if railway_token and railway_project_id:
+                print("✅ Railwayトークンは既に設定されています")
+                return {
+                    'success': True,
+                    'message': 'Railwayトークンは既に設定されています'
+                }
+            
+            # Railwayトークンを自動取得（環境変数から）
+            # 注意: 実際の運用では、セキュアな方法でトークンを管理する必要があります
+            default_token = os.getenv('DEFAULT_RAILWAY_TOKEN')
+            default_project_id = os.getenv('DEFAULT_RAILWAY_PROJECT_ID')
+            
+            if default_token and default_project_id:
+                # 環境変数に設定
+                os.environ['RAILWAY_TOKEN'] = default_token
+                os.environ['RAILWAY_PROJECT_ID'] = default_project_id
+                os.environ['BASE_DOMAIN'] = 'lp-production-9e2c.up.railway.app'
+                
+                print("✅ Railwayトークンを自動設定しました")
+                return {
+                    'success': True,
+                    'message': 'Railwayトークンを自動設定しました'
+                }
+            
+            # トークンが見つからない場合
+            print("❌ Railwayトークンが見つかりません")
+            print("以下の手順で手動設定してください:")
+            print("1. https://railway.app/dashboard にログイン")
+            print("2. Account Settings → API → Generate Token")
+            print("3. 環境変数に設定: RAILWAY_TOKEN=your_token")
+            
+            return {
+                'success': False,
+                'error': 'Railwayトークンが設定されていません'
+            }
+            
+        except Exception as e:
+            print(f"❌ Railwayトークン自動設定エラー: {e}")
+            return {
+                'success': False,
+                'error': f'Railwayトークン自動設定エラー: {str(e)}'
+            }
+
     def auto_save_company(self, data):
         """企業情報を自動保存（UPSERT）"""
         try:
             print(f"=== 企業 {data['company_name']} の自動保存開始 ===")
+            
+            # Railwayトークンの確認（毎回設定はしない）
+            railway_token = os.getenv('RAILWAY_TOKEN')
+            railway_project_id = os.getenv('RAILWAY_PROJECT_ID')
+            
+            if not railway_token or not railway_project_id:
+                print("⚠️ Railwayトークンが設定されていません")
+                print("Railwayプロジェクトの自動複製はスキップされます")
+                print("設定方法: python setup_railway_token_simple.py")
             
             conn = get_db_connection()
             c = conn.cursor()
@@ -846,9 +908,9 @@ class CompanyRegistrationService:
                 
                 line_account_id = c.fetchone()[0]
             
-            # Railwayプロジェクトの自動複製（新規企業の場合のみ）
+            # Railwayプロジェクトの自動複製（新規企業の場合のみ、トークンが設定されている場合）
             railway_result = None
-            if is_new and data.get('content_type') == 'AI予定秘書':
+            if is_new and data.get('content_type') == 'AI予定秘書' and railway_token and railway_project_id:
                 print(f"🚀 AI予定秘書プロジェクト自動複製開始")
                 
                 line_credentials = {
@@ -861,7 +923,7 @@ class CompanyRegistrationService:
                 
                 railway_result = self.clone_ai_schedule_project(company_id, data['company_name'], line_credentials)
                 
-                if railway_result['success']:
+                if railway_result and railway_result.get('success'):
                     # Railwayデプロイ情報をデータベースに保存
                     c.execute('''
                         INSERT INTO company_deployments (
@@ -880,7 +942,10 @@ class CompanyRegistrationService:
                     
                     print(f"✅ Railwayデプロイ情報をデータベースに保存")
                 else:
-                    print(f"⚠️ Railwayプロジェクト複製失敗: {railway_result['error']}")
+                    print(f"⚠️ Railwayプロジェクト複製失敗: {railway_result.get('error', 'Unknown error') if railway_result else 'No result'}")
+            elif is_new and data.get('content_type') == 'AI予定秘書':
+                print(f"⚠️ Railwayトークンが設定されていないため、プロジェクト自動複製をスキップしました")
+                print(f"   設定方法: python setup_railway_token_simple.py")
             
             conn.commit()
             conn.close()
