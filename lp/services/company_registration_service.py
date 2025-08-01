@@ -598,18 +598,15 @@ class CompanyRegistrationService:
                 conn = get_db_connection()
                 c = conn.cursor()
                 
+                # 既存のデプロイ情報を削除
+                c.execute('DELETE FROM company_deployments WHERE company_id = %s', (company_id,))
+                
+                # 新しいデプロイ情報を挿入
                 c.execute('''
                     INSERT INTO company_deployments (
                         company_id, railway_project_id, railway_url, deployment_status,
                         deployment_log, environment_variables, created_at
                     ) VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (company_id) DO UPDATE SET
-                        railway_project_id = EXCLUDED.railway_project_id,
-                        railway_url = EXCLUDED.railway_url,
-                        deployment_status = EXCLUDED.deployment_status,
-                        deployment_log = EXCLUDED.deployment_log,
-                        environment_variables = EXCLUDED.environment_variables,
-                        updated_at = EXCLUDED.created_at
                 ''', (
                     company_id,
                     railway_result['project_id'],
