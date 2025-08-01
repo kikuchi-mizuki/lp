@@ -210,7 +210,7 @@ class CompanyRegistrationService:
             
             variables = {
                 "projectId": project_id,
-                "source": "https://github.com/kikuchi-mizuki/ai-schedule-bot"
+                "source": "https://github.com/kikuchi-mizuki/task-bot"
             }
             
             payload = {
