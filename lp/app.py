@@ -1444,5 +1444,25 @@ def debug_create_content_period(user_id, content_type):
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)})
 
+@app.route('/debug/railway_env')
+def debug_railway_env():
+    """Railway環境変数を取得"""
+    try:
+        railway_token = os.getenv('RAILWAY_TOKEN')
+        railway_project_id = os.getenv('RAILWAY_PROJECT_ID')
+        base_domain = os.getenv('BASE_DOMAIN')
+        
+        return jsonify({
+            'RAILWAY_TOKEN': railway_token,
+            'RAILWAY_PROJECT_ID': railway_project_id,
+            'BASE_DOMAIN': base_domain,
+            'success': True
+        })
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'success': False
+        }), 500
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 5000))) 

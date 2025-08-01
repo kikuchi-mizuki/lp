@@ -623,6 +623,8 @@ class CompanyRegistrationService:
                 return {
                     'success': True,
                     'message': 'LINEボットのデプロイが開始されました',
+                    'deployment_id': railway_result.get('deployment_id'),
+                    'railway_url': f"https://{railway_result['project_name']}.up.railway.app",
                     'railway_result': railway_result
                 }
             else:
