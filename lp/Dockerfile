@@ -1,11 +1,15 @@
-FROM python:3.11-slim-bullseye
+FROM python:3.11-alpine
 
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
+# Install system dependencies with retry mechanism
+RUN apk update && \
+    apk add --no-cache \
     gcc \
-    && rm -rf /var/lib/apt/lists/*
+    musl-dev \
+    libffi-dev \
+    openssl-dev \
+    && rm -rf /var/cache/apk/*
 
 # Copy requirements first for better caching
 COPY requirements.txt .
@@ -18,7 +22,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 COPY . .
 
 # Create non-root user for security
-RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+RUN adduser -D -u 1000 appuser && chown -R appuser:appuser /app
 USER appuser
 
 # Set default port if not provided

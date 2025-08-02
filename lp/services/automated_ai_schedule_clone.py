@@ -215,11 +215,53 @@ jobs:
                 subprocess.run(['git', 'commit', '-m', 'Auto deploy AI Schedule clone'], check=True)
                 subprocess.run(['git', 'push', 'origin', 'main'], check=True)
                 print("✅ Gitプッシュ完了")
+                
+                # GitHub Actionsを手動実行
+                self.trigger_github_workflow(project_id)
             else:
                 print("ℹ️ 変更がないため、プッシュをスキップ")
+                # 変更がなくてもGitHub Actionsを実行
+                self.trigger_github_workflow(project_id)
         except Exception as e:
             print(f"⚠️ Git操作エラー: {e}")
             print("ℹ️ 手動でGitプッシュが必要です")
+            # エラーが発生してもGitHub Actionsを実行
+            self.trigger_github_workflow(project_id)
+    
+    def trigger_github_workflow(self, project_id):
+        """GitHub Actionsワークフローを手動実行"""
+        try:
+            # GitHub APIを使用してワークフローを実行
+            github_token = os.getenv('GITHUB_TOKEN')
+            if not github_token:
+                print("⚠️ GITHUB_TOKENが設定されていないため、手動でワークフローを実行してください")
+                print(f"📋 手動実行URL: https://github.com/kikuchi-mizuki/lp/actions/workflows/railway-deploy-{project_id}.yml")
+                return
+            
+            headers = {
+                'Authorization': f'token {github_token}',
+                'Accept': 'application/vnd.github.v3+json'
+            }
+            
+            workflow_data = {
+                'ref': 'main'
+            }
+            
+            response = requests.post(
+                f'https://api.github.com/repos/kikuchi-mizuki/lp/actions/workflows/railway-deploy-{project_id}.yml/dispatches',
+                headers=headers,
+                json=workflow_data
+            )
+            
+            if response.status_code == 204:
+                print("✅ GitHub Actionsワークフローを手動実行しました")
+            else:
+                print(f"⚠️ GitHub Actions実行失敗: {response.status_code}")
+                print(f"📋 手動実行URL: https://github.com/kikuchi-mizuki/lp/actions/workflows/railway-deploy-{project_id}.yml")
+                
+        except Exception as e:
+            print(f"⚠️ GitHub Actions実行エラー: {e}")
+            print(f"📋 手動実行URL: https://github.com/kikuchi-mizuki/lp/actions/workflows/railway-deploy-{project_id}.yml")
     
     def wait_for_deployment(self, project_id):
         """デプロイ完了を待機"""
