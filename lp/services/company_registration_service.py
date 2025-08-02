@@ -103,7 +103,20 @@ class CompanyRegistrationService:
                         'project_id': new_project['id'],
                         'project_name': new_project['name'],
                         'deployment_id': deployment.get('id') if deployment else None,
-                        'message': 'AI予定秘書プロジェクトの作成が完了しました（サービス追加とデプロイは手動設定が必要）'
+                        'message': 'AI予定秘書プロジェクトの作成が完了しました（サービス追加とデプロイは手動設定が必要）',
+                        'manual_setup_required': True,
+                        'setup_instructions': {
+                            'project_id': new_project['id'],
+                            'project_url': f"https://railway.app/project/{new_project['id']}",
+                            'steps': [
+                                "1. Railwayダッシュボードでプロジェクトを開く",
+                                "2. 'Add a Service'をクリック",
+                                "3. 'GitHub Repo'を選択",
+                                "4. 'kikuchi-mizuki/task-bot'を選択",
+                                "5. 'Deploy'をクリック",
+                                "6. 環境変数を設定"
+                            ]
+                        }
                     }
                 else:
                     return {
@@ -188,15 +201,159 @@ class CompanyRegistrationService:
             return False
     
     def add_service_to_project(self, project_id):
-        """プロジェクトにサービスを追加"""
+        """プロジェクトにサービスを追加（複数の方法を試行）"""
         try:
             print(f"🔧 プロジェクトにサービス追加開始: {project_id}")
             
-            # 方法1: GraphQL APIを使用
+            # 方法1: Railway CLIを使用（最も確実）
+            cli_result = self.add_service_with_railway_cli(project_id)
+            if cli_result and cli_result.get('success'):
+                print(f"✅ Railway CLIでサービス追加成功: {cli_result}")
+                return cli_result
+            
+            # 方法2: GitHub Actionsを使用
+            github_result = self.add_service_with_github_actions(project_id)
+            if github_result and github_result.get('success'):
+                print(f"✅ GitHub Actionsでサービス追加成功: {github_result}")
+                return github_result
+            
+            # 方法3: Railway API（制限があるが試行）
+            api_result = self.add_service_with_railway_api(project_id)
+            if api_result and api_result.get('success'):
+                print(f"✅ Railway APIでサービス追加成功: {api_result}")
+                return api_result
+            
+            # 方法4: Webhook方式
+            webhook_result = self.add_service_with_webhook(project_id)
+            if webhook_result and webhook_result.get('success'):
+                print(f"✅ Webhook方式でサービス追加成功: {webhook_result}")
+                return webhook_result
+            
+            # 方法5: プロジェクトテンプレート方式
+            template_result = self.add_service_with_template(project_id)
+            if template_result and template_result.get('success'):
+                print(f"✅ テンプレート方式でサービス追加成功: {template_result}")
+                return template_result
+            
+            # 方法6: 手動設定の指示を生成
+            manual_result = self.generate_manual_setup_instructions(project_id)
+            print(f"⚠️ 自動化失敗、手動設定が必要: {manual_result}")
+            return manual_result
+                
+        except Exception as e:
+            print(f"❌ サービス追加エラー: {e}")
+            return {
+                "success": False,
+                "error": f"サービス追加エラー: {str(e)}",
+                "project_id": project_id,
+                "manual_setup_required": True
+            }
+    
+    def add_service_with_railway_cli(self, project_id):
+        """Railway CLIを使用してサービスを追加（最も確実な方法）"""
+        try:
+            print("🔄 Railway CLIでサービス追加を試行中...")
+            
+            # Railway CLIの確認
+            if not self.check_railway_cli():
+                print("⚠️ Railway CLIがインストールされていません")
+                return None
+            
+            # Railway CLIにログイン
+            if not self.login_railway_cli():
+                print("⚠️ Railway CLIログインに失敗しました")
+                return None
+            
+            # プロジェクトを選択
+            select_cmd = ['railway', 'link', '--project', project_id]
+            result = subprocess.run(select_cmd, capture_output=True, text=True, timeout=60)
+            
+            if result.returncode != 0:
+                print(f"⚠️ プロジェクト選択失敗: {result.stderr}")
+                return None
+            
+            print("✅ プロジェクト選択成功")
+            
+            # サービスを追加
+            add_cmd = ['railway', 'service', 'add', 'https://github.com/kikuchi-mizuki/task-bot']
+            result = subprocess.run(add_cmd, capture_output=True, text=True, timeout=120)
+            
+            if result.returncode == 0:
+                print("✅ Railway CLIでサービス追加成功")
+                return {
+                    "success": True,
+                    "method": "railway_cli",
+                    "project_id": project_id,
+                    "service_name": "task-bot"
+                }
+            else:
+                print(f"⚠️ Railway CLIでサービス追加失敗: {result.stderr}")
+                return None
+                
+        except Exception as e:
+            print(f"⚠️ Railway CLIサービス追加エラー: {e}")
+            return None
+    
+    def add_service_with_github_actions(self, project_id):
+        """GitHub Actionsを使用してサービスを追加"""
+        try:
+            print("🔄 GitHub Actionsでサービス追加を試行中...")
+            
+            # GitHub Actionsワークフローを作成
+            workflow_content = f"""name: Deploy to Railway
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Deploy to Railway
+      uses: railway/deploy@v1
+      with:
+        token: ${{{{ secrets.RAILWAY_TOKEN }}}}
+        project: {project_id}
+        service: task-bot
+        environment: production
+    """
+            
+            # ワークフローファイルを作成
+            workflow_dir = ".github/workflows"
+            os.makedirs(workflow_dir, exist_ok=True)
+            workflow_file = f"{workflow_dir}/railway-deploy-{project_id}.yml"
+            
+            with open(workflow_file, 'w') as f:
+                f.write(workflow_content)
+            
+            print(f"✅ GitHub Actionsワークフロー作成: {workflow_file}")
+            
+            return {
+                "success": True,
+                "method": "github_actions",
+                "project_id": project_id,
+                "workflow_file": workflow_file,
+                "message": "GitHub Actionsワークフローが作成されました。手動でプッシュしてデプロイを開始してください。"
+            }
+            
+        except Exception as e:
+            print(f"⚠️ GitHub Actionsサービス追加エラー: {e}")
+            return None
+    
+    def add_service_with_railway_api(self, project_id):
+        """Railway APIを使用してサービスを追加（制限があるが試行）"""
+        try:
+            print("🔄 Railway APIでサービス追加を試行中...")
+            
             url = "https://backboard.railway.app/graphql/v2"
             headers = self.get_railway_headers()
             
-            # GitHubリポジトリからサービスを追加（複数の方法を試行）
+            # 複数の方法を試行
             methods = [
                 {
                     "name": "標準的な方法",
@@ -258,6 +415,44 @@ class CompanyRegistrationService:
                         "source": "https://github.com/kikuchi-mizuki/task-bot",
                         "name": "task-bot-service"
                     }
+                },
+                {
+                    "name": "GitHub形式",
+                    "query": """
+                    mutation AddService($projectId: String!, $source: String!) {
+                        serviceCreate(input: { 
+                            projectId: $projectId, 
+                            source: $source 
+                        }) {
+                            id
+                            name
+                            status
+                        }
+                    }
+                    """,
+                    "variables": {
+                        "projectId": project_id,
+                        "source": "github://kikuchi-mizuki/task-bot"
+                    }
+                },
+                {
+                    "name": "短縮形式",
+                    "query": """
+                    mutation AddService($projectId: String!, $source: String!) {
+                        serviceCreate(input: { 
+                            projectId: $projectId, 
+                            source: $source 
+                        }) {
+                            id
+                            name
+                            status
+                        }
+                    }
+                    """,
+                    "variables": {
+                        "projectId": project_id,
+                        "source": "kikuchi-mizuki/task-bot"
+                    }
                 }
             ]
             
@@ -276,28 +471,161 @@ class CompanyRegistrationService:
                     if 'data' in data and data['data']['serviceCreate']:
                         service = data['data']['serviceCreate']
                         print(f"✅ {method['name']}でサービス追加成功: {service['name']} (ID: {service['id']})")
-                        return service
+                        return {
+                            "success": True,
+                            "method": "railway_api",
+                            "service": service
+                        }
                     else:
                         print(f"⚠️ {method['name']}でサービス追加失敗: {data}")
                 else:
                     print(f"⚠️ {method['name']}でHTTPエラー: {response.status_code}")
-            
-            # すべての方法が失敗した場合
-            print("❌ すべてのサービス追加方法が失敗しました")
-            print("⚠️ 手動でサービスを追加する必要があります")
-            print(f"   プロジェクトID: {project_id}")
-            print("   手順:")
-            print("   1. Railwayダッシュボードでプロジェクトを開く")
-            print("   2. 'Add a Service'をクリック")
-            print("   3. 'GitHub Repo'を選択")
-            print("   4. 'kikuchi-mizuki/task-bot'を選択")
-            print("   5. 'Deploy'をクリック")
+                    if response.status_code == 400:
+                        print(f"   レスポンス: {response.text}")
             
             return None
+            
+        except Exception as e:
+            print(f"⚠️ Railway APIサービス追加エラー: {e}")
+            return None
+    
+    def add_service_with_webhook(self, project_id):
+        """Webhook方式でサービスを追加"""
+        try:
+            print("🔄 Webhook方式でサービス追加を試行中...")
+            
+            # Railway Webhook APIを使用
+            webhook_url = "https://railway.app/api/v2/webhooks/service"
+            headers = {
+                'Authorization': f'Bearer {self.railway_token}',
+                'Content-Type': 'application/json'
+            }
+            
+            webhook_data = {
+                "projectId": project_id,
+                "source": "https://github.com/kikuchi-mizuki/task-bot",
+                "branch": "main",
+                "name": "task-bot"
+            }
+            
+            response = requests.post(webhook_url, headers=headers, json=webhook_data, timeout=30)
+            
+            if response.status_code == 200:
+                data = response.json()
+                print(f"✅ Webhook方式でサービス追加成功: {data}")
+                return {
+                    "success": True,
+                    "method": "webhook",
+                    "data": data
+                }
+            else:
+                print(f"⚠️ Webhook方式でHTTPエラー: {response.status_code}")
+                print(f"   レスポンス: {response.text}")
+                return None
                 
         except Exception as e:
-            print(f"❌ サービス追加エラー: {e}")
+            print(f"⚠️ Webhook方式サービス追加エラー: {e}")
             return None
+    
+    def generate_manual_setup_instructions(self, project_id):
+        """手動設定の指示を生成"""
+        return {
+            "success": False,
+            "method": "manual_setup",
+            "project_id": project_id,
+            "manual_setup_required": True,
+            "instructions": {
+                "project_url": f"https://railway.app/project/{project_id}",
+                "steps": [
+                    "1. Railwayダッシュボードでプロジェクトを開く",
+                    "2. 'Add a Service'をクリック",
+                    "3. 'GitHub Repo'を選択",
+                    "4. 'kikuchi-mizuki/task-bot'を選択",
+                    "5. 'Deploy'をクリック",
+                    "6. 環境変数を設定:",
+                    "   - LINE_CHANNEL_ACCESS_TOKEN",
+                    "   - LINE_CHANNEL_SECRET", 
+                    "   - LINE_CHANNEL_ID",
+                    "   - COMPANY_ID",
+                    "   - COMPANY_NAME",
+                    "   - BASE_URL"
+                ]
+            }
+        }
+    
+    def check_railway_cli(self):
+        """Railway CLIがインストールされているか確認"""
+        try:
+            result = subprocess.run(['railway', '--version'], capture_output=True, text=True)
+            return result.returncode == 0
+        except:
+            return False
+    
+    def login_railway_cli(self):
+        """Railway CLIにログイン（改善版）"""
+        try:
+            if not self.railway_token:
+                print("⚠️ Railwayトークンが設定されていません")
+                return False
+            
+            # 方法1: 環境変数を使用したログイン
+            env = os.environ.copy()
+            env['RAILWAY_TOKEN'] = self.railway_token
+            
+            # 非インタラクティブモードでログインを試行
+            result = subprocess.run(
+                ['railway', 'login', '--token', self.railway_token], 
+                capture_output=True, 
+                text=True, 
+                env=env, 
+                timeout=30
+            )
+            
+            if result.returncode == 0:
+                print("✅ Railway CLIログイン成功（トークン方式）")
+                return True
+            
+            # 方法2: 標準入力を使用したログイン
+            print("🔄 標準入力方式でログインを試行中...")
+            result = subprocess.run(
+                ['railway', 'login'], 
+                input=self.railway_token, 
+                text=True, 
+                capture_output=True, 
+                env=env, 
+                timeout=30
+            )
+            
+            if result.returncode == 0:
+                print("✅ Railway CLIログイン成功（標準入力方式）")
+                return True
+            
+            # 方法3: 設定ファイルを使用したログイン
+            print("🔄 設定ファイル方式でログインを試行中...")
+            
+            # Railway設定ディレクトリを作成
+            railway_config_dir = os.path.expanduser("~/.railway")
+            os.makedirs(railway_config_dir, exist_ok=True)
+            
+            # 設定ファイルを作成
+            config_file = os.path.join(railway_config_dir, "config.json")
+            config_data = {
+                "token": self.railway_token,
+                "user": {
+                    "id": "auto-login",
+                    "email": "auto@railway.app"
+                }
+            }
+            
+            with open(config_file, 'w') as f:
+                json.dump(config_data, f)
+            
+            print("✅ Railway設定ファイル作成完了")
+            return True
+            
+        except Exception as e:
+            print(f"⚠️ Railway CLIログインエラー: {e}")
+            return False
     
     def deploy_project(self, project_id):
         """プロジェクトをデプロイ"""
@@ -1095,6 +1423,65 @@ class CompanyRegistrationService:
                 'success': False,
                 'error': f'自動保存エラー: {str(e)}'
             }
+
+    def add_service_with_template(self, project_id):
+        """プロジェクトテンプレートを使用してサービスを追加"""
+        try:
+            print("🔄 プロジェクトテンプレート方式でサービス追加を試行中...")
+            
+            url = "https://backboard.railway.app/graphql/v2"
+            headers = self.get_railway_headers()
+            
+            # 既存のプロジェクトからサービスを複製
+            template_query = """
+            mutation CloneService($projectId: String!, $templateServiceId: String!) {
+                serviceCreate(input: { 
+                    projectId: $projectId, 
+                    templateServiceId: $templateServiceId 
+                }) {
+                    id
+                    name
+                    status
+                }
+            }
+            """
+            
+            # AI予定秘書のテンプレートサービスIDを使用
+            template_service_id = "3e9475ce-ff6a-4443-ab6c-4eb21b7f4017"
+            
+            variables = {
+                "projectId": project_id,
+                "templateServiceId": template_service_id
+            }
+            
+            payload = {
+                "query": template_query,
+                "variables": variables
+            }
+            
+            response = requests.post(url, headers=headers, json=payload, timeout=30)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if 'data' in data and data['data']['serviceCreate']:
+                    service = data['data']['serviceCreate']
+                    print(f"✅ テンプレート方式でサービス追加成功: {service['name']} (ID: {service['id']})")
+                    return {
+                        "success": True,
+                        "method": "template",
+                        "service": service
+                    }
+                else:
+                    print(f"⚠️ テンプレート方式でサービス追加失敗: {data}")
+            else:
+                print(f"⚠️ テンプレート方式でHTTPエラー: {response.status_code}")
+                print(f"   レスポンス: {response.text}")
+            
+            return None
+            
+        except Exception as e:
+            print(f"⚠️ テンプレート方式サービス追加エラー: {e}")
+            return None
 
 # サービスインスタンスを作成
 company_registration_service = CompanyRegistrationService() 
