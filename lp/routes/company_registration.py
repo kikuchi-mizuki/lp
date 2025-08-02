@@ -5,338 +5,83 @@
 企業情報登録API
 """
 
-from flask import Blueprint, request, jsonify, render_template
-from services.company_registration_service import company_registration_service
-import json
+from flask import Blueprint, request, jsonify, render_template, redirect, url_for
+import os
+from services.company_registration_service import CompanyRegistrationService
+from services.automated_ai_schedule_clone import AutomatedAIScheduleClone
 
-company_registration_bp = Blueprint('company_registration', __name__, url_prefix='/api/v1')
+company_registration_bp = Blueprint('company_registration', __name__)
 
-@company_registration_bp.route('/company-registration', methods=['POST'])
+@company_registration_bp.route('/company/register', methods=['GET', 'POST'])
 def register_company():
-    """企業情報を登録"""
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({
-                'success': False,
-                'error': 'データが提供されていません'
-            }), 400
-        
-        # 必須フィールドのチェック
-        required_fields = [
-            'company_name', 'contact_email', 'line_channel_id',
-            'line_access_token', 'line_channel_secret'
-        ]
-        
-        for field in required_fields:
-            if not data.get(field):
+    if request.method == 'POST':
+        try:
+            # フォームデータを取得
+            company_name = request.form.get('company_name')
+            line_channel_id = request.form.get('line_channel_id', '')
+            line_access_token = request.form.get('line_access_token', '')
+            line_channel_secret = request.form.get('line_channel_secret', '')
+            
+            if not company_name:
+                return jsonify({'error': '企業名は必須です'}), 400
+            
+            # 完全自動化スクリプトを実行
+            print(f"🚀 AI予定秘書の完全自動複製を開始: {company_name}")
+            
+            cloner = AutomatedAIScheduleClone()
+            result = cloner.create_ai_schedule_clone(
+                company_name, line_channel_id, line_access_token, line_channel_secret
+            )
+            
+            if result['success']:
+                return jsonify({
+                    'success': True,
+                    'message': 'AI予定秘書の複製が完了しました！',
+                    'company_id': result['company_id'],
+                    'deployment_url': result['deployment_url'],
+                    'webhook_url': result['webhook_url']
+                })
+            else:
                 return jsonify({
                     'success': False,
-                    'error': f'必須フィールド "{field}" が不足しています'
-                }), 400
+                    'error': f'複製に失敗しました: {result["error"]}'
+                }), 500
+                
+        except Exception as e:
+            return jsonify({'error': f'エラーが発生しました: {str(e)}'}), 500
+    
+    return render_template('company_registration.html')
+
+@company_registration_bp.route('/company/register/status/<int:company_id>')
+def registration_status(company_id):
+    """登録状況を確認"""
+    try:
+        from utils.db import get_db_connection
         
-        # 企業情報を登録
-        result = company_registration_service.register_company(data)
+        conn = get_db_connection()
+        c = conn.cursor()
         
-        if result['success']:
+        c.execute('''
+            SELECT c.company_name, c.company_code, cla.webhook_url, cla.line_channel_id
+            FROM companies c
+            LEFT JOIN company_line_accounts cla ON c.id = cla.company_id
+            WHERE c.id = %s
+        ''', (company_id,))
+        
+        result = c.fetchone()
+        conn.close()
+        
+        if result:
+            company_name, company_code, webhook_url, line_channel_id = result
             return jsonify({
-                'success': True,
-                'message': '企業情報の登録が完了しました',
-                'data': {
-                    'company_id': result['company_id'],
-                    'line_account_id': result['line_account_id'],
-                    'company_code': result.get('company_code', ''),
-                    'railway_result': result.get('railway_result')
-                }
-            }), 201
+                'company_name': company_name,
+                'company_code': company_code,
+                'webhook_url': webhook_url,
+                'line_channel_id': line_channel_id,
+                'status': 'registered'
+            })
         else:
-            return jsonify({
-                'success': False,
-                'error': result['error']
-            }), 400
+            return jsonify({'error': '企業が見つかりません'}), 404
             
     except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': f'企業登録エラー: {str(e)}'
-        }), 500
-
-@company_registration_bp.route('/company-registration/auto-save', methods=['POST'])
-def auto_save_company():
-    """企業情報の自動保存（リアルタイム）"""
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({
-                'success': False,
-                'error': 'データが提供されていません'
-            }), 400
-        
-        # 必須フィールドのチェック
-        required_fields = [
-            'company_name', 'contact_email', 'line_channel_id',
-            'line_access_token', 'line_channel_secret'
-        ]
-        
-        for field in required_fields:
-            if not data.get(field):
-                return jsonify({
-                    'success': False,
-                    'error': f'必須フィールド "{field}" が不足しています'
-                }), 400
-        
-        # LINEチャネルIDの重複チェック
-        line_channel_id = data['line_channel_id']
-        duplicate_check = company_registration_service.check_line_channel_id_exists(line_channel_id)
-        
-        if duplicate_check['exists']:
-            return jsonify({
-                'success': False,
-                'error': f'LINEチャネルID "{line_channel_id}" は既に企業 "{duplicate_check["company_name"]}" で使用されています'
-            }), 400
-        
-        # 企業情報を自動保存（UPSERT）
-        result = company_registration_service.auto_save_company(data)
-        
-        if result['success']:
-            return jsonify({
-                'success': True,
-                'message': '企業情報が自動保存されました',
-                'data': {
-                    'company_id': result['company_id'],
-                    'line_account_id': result['line_account_id'],
-                    'company_code': result.get('company_code', ''),
-                    'railway_result': result.get('railway_result'),
-                    'is_new': result.get('is_new', False)
-                }
-            }), 200
-        else:
-            return jsonify({
-                'success': False,
-                'error': result['error']
-            }), 400
-            
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': f'自動保存エラー: {str(e)}'
-        }), 500
-
-@company_registration_bp.route('/company-registration/check-line-channel/<line_channel_id>', methods=['GET'])
-def check_line_channel_id(line_channel_id):
-    """LINEチャネルIDの重複チェック"""
-    try:
-        result = company_registration_service.check_line_channel_id_exists(line_channel_id)
-        
-        if result.get('error'):
-            return jsonify({
-                'success': False,
-                'error': result['error']
-            }), 500
-        
-        return jsonify({
-            'success': True,
-            'exists': result['exists'],
-            'company_name': result.get('company_name'),
-            'company_id': result.get('company_id'),
-            'created_at': str(result.get('created_at')) if result.get('created_at') else None
-        }), 200
-        
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': f'LINEチャネルID重複チェックエラー: {str(e)}'
-        }), 500
-
-@company_registration_bp.route('/company-registration/<int:company_id>', methods=['GET'])
-def get_company_registration(company_id):
-    """企業登録情報を取得"""
-    try:
-        result = company_registration_service.get_company_registration(company_id)
-        
-        if result['success']:
-            return jsonify({
-                'success': True,
-                'data': result['data']
-            }), 200
-        else:
-            return jsonify({
-                'success': False,
-                'error': result['error']
-            }), 404
-            
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': f'企業情報取得エラー: {str(e)}'
-        }), 500
-
-@company_registration_bp.route('/company-registration/<int:company_id>', methods=['PUT'])
-def update_company_registration(company_id):
-    """企業登録情報を更新"""
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({
-                'success': False,
-                'error': '更新データがありません'
-            }), 400
-        
-        result = company_registration_service.update_company_registration(company_id, data)
-        
-        if result['success']:
-            return jsonify({
-                'success': True,
-                'message': '企業情報を更新しました'
-            }), 200
-        else:
-            return jsonify({
-                'success': False,
-                'error': result['error']
-            }), 400
-            
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': f'企業情報更新エラー: {str(e)}'
-        }), 500
-
-@company_registration_bp.route('/company-registration/list', methods=['GET'])
-def list_company_registrations():
-    """企業登録一覧を取得"""
-    try:
-        status = request.args.get('status', 'active')
-        result = company_registration_service.list_company_registrations()
-        
-        if result['success']:
-            return jsonify({
-                'success': True,
-                'data': result['data']
-            }), 200
-        else:
-            return jsonify({
-                'success': False,
-                'error': result['error']
-            }), 400
-            
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': f'企業一覧取得エラー: {str(e)}'
-        }), 500
-
-@company_registration_bp.route('/company-registration/<int:company_id>/deploy', methods=['POST'])
-def deploy_company_line_bot(company_id):
-    """企業のLINEボットをRailwayにデプロイ"""
-    try:
-        result = company_registration_service.deploy_company_line_bot(company_id)
-        
-        if result['success']:
-            return jsonify({
-                'success': True,
-                'message': 'LINEボットのデプロイを開始しました',
-                'data': {
-                    'deployment_id': result['deployment_id'],
-                    'railway_url': result['railway_url']
-                }
-            }), 200
-        else:
-            return jsonify({
-                'success': False,
-                'error': result['error']
-            }), 400
-            
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': f'デプロイエラー: {str(e)}'
-        }), 500
-
-@company_registration_bp.route('/company-registration/<int:company_id>/deployment-status', methods=['GET'])
-def get_deployment_status(company_id):
-    """デプロイ状況を確認"""
-    try:
-        result = company_registration_service.get_deployment_status(company_id)
-        
-        if result['success']:
-            return jsonify({
-                'success': True,
-                'data': result['status']
-            }), 200
-        else:
-            return jsonify({
-                'success': False,
-                'error': result['error']
-            }), 400
-            
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': f'デプロイ状況取得エラー: {str(e)}'
-        }), 500
-
-@company_registration_bp.route('/company-registration/<int:company_id>/test-line', methods=['POST'])
-def test_line_connection(company_id):
-    """LINE接続をテスト"""
-    try:
-        data = request.get_json() or {}
-        test_message = data.get('message', 'テストメッセージです')
-        
-        result = company_registration_service.test_line_connection(company_id, test_message)
-        
-        if result['success']:
-            return jsonify({
-                'success': True,
-                'message': 'LINE接続テストが成功しました'
-            }), 200
-        else:
-            return jsonify({
-                'success': False,
-                'error': result['error']
-            }), 400
-            
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': f'LINE接続テストエラー: {str(e)}'
-        }), 500
-
-@company_registration_bp.route('/company-registration/validate-line-credentials', methods=['POST'])
-def validate_line_credentials():
-    """LINE認証情報を検証"""
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({
-                'success': False,
-                'error': '認証情報が提供されていません'
-            }), 400
-        
-        result = company_registration_service.validate_line_credentials(data)
-        
-        if result['success']:
-            return jsonify({
-                'success': True,
-                'message': 'LINE認証情報が有効です',
-                'data': result['channel_info']
-            }), 200
-        else:
-            return jsonify({
-                'success': False,
-                'error': result['error']
-            }), 400
-            
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': f'認証情報検証エラー: {str(e)}'
-        }), 500
-
-@company_registration_bp.route('/company-registration/health', methods=['GET'])
-def health_check():
-    """ヘルスチェック"""
-    return jsonify({
-        'success': True,
-        'message': 'Company Registration API is running',
-        'status': 'healthy'
-    }), 200 
+        return jsonify({'error': f'エラーが発生しました: {str(e)}'}), 500 
