@@ -221,12 +221,17 @@ def index():
 
 @app.route('/company-registration')
 def company_registration_form():
-    """企業情報登録フォーム"""
+    """企業情報登録フォーム（旧ルート）"""
     subscription_id = request.args.get('subscription_id', '')
     content_type = request.args.get('content_type', '')
     return render_template('company_registration.html', 
                          subscription_id=subscription_id, 
                          content_type=content_type)
+
+@app.route('/ai-schedule-clone')
+def ai_schedule_clone_form():
+    """AI予定秘書複製フォーム（新ルート）"""
+    return render_template('company_registration.html')
 
 @app.route('/company-registration-debug')
 def company_registration_debug():

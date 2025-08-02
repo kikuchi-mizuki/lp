@@ -8,6 +8,7 @@ import os
 import time
 import requests
 import json
+import subprocess
 from utils.db import get_db_connection
 from services.company_registration_service import CompanyRegistrationService
 
@@ -84,6 +85,8 @@ class AutomatedAIScheduleClone:
             
         except Exception as e:
             print(f"❌ エラーが発生しました: {e}")
+            import traceback
+            traceback.print_exc()
             return {'success': False, 'error': str(e)}
     
     def save_company_to_database(self, company_name):
@@ -134,6 +137,10 @@ class AutomatedAIScheduleClone:
     def set_environment_variables(self, project_id, company_id, company_name, 
                                 line_channel_id, line_access_token, line_channel_secret):
         """環境変数を自動設定"""
+        if not self.railway_token:
+            print("⚠️ Railwayトークンが設定されていないため、手動設定が必要です")
+            return
+        
         # Railway APIを使用して環境変数を設定
         headers = {
             'Authorization': f'Bearer {self.railway_token}',
@@ -153,14 +160,17 @@ class AutomatedAIScheduleClone:
         
         for key, value in variables.items():
             if value:  # 空でない場合のみ設定
-                response = requests.post(
-                    f'https://railway.app/api/v2/projects/{project_id}/variables',
-                    headers=headers,
-                    json={'key': key, 'value': value}
-                )
-                
-                if response.status_code not in [200, 201]:
-                    print(f"⚠️ 環境変数 {key} の設定に失敗: {response.status_code}")
+                try:
+                    response = requests.post(
+                        f'https://railway.app/api/v2/projects/{project_id}/variables',
+                        headers=headers,
+                        json={'key': key, 'value': value}
+                    )
+                    
+                    if response.status_code not in [200, 201]:
+                        print(f"⚠️ 環境変数 {key} の設定に失敗: {response.status_code}")
+                except Exception as e:
+                    print(f"⚠️ 環境変数 {key} の設定エラー: {e}")
     
     def create_github_workflow(self, project_id):
         """GitHub Actionsワークフローを作成"""
@@ -196,12 +206,20 @@ jobs:
     
     def trigger_deployment(self, project_id):
         """デプロイを開始"""
-        # GitHubにプッシュしてデプロイを開始
-        os.system('git add .')
-        os.system('git commit -m "Auto deploy AI Schedule clone"')
-        os.system('git push origin main')
-        
-        print("✅ デプロイ開始完了")
+        try:
+            # Gitの状態を確認
+            result = subprocess.run(['git', 'status', '--porcelain'], capture_output=True, text=True)
+            if result.stdout.strip():
+                # 変更がある場合はコミット
+                subprocess.run(['git', 'add', '.'], check=True)
+                subprocess.run(['git', 'commit', '-m', 'Auto deploy AI Schedule clone'], check=True)
+                subprocess.run(['git', 'push', 'origin', 'main'], check=True)
+                print("✅ Gitプッシュ完了")
+            else:
+                print("ℹ️ 変更がないため、プッシュをスキップ")
+        except Exception as e:
+            print(f"⚠️ Git操作エラー: {e}")
+            print("ℹ️ 手動でGitプッシュが必要です")
     
     def wait_for_deployment(self, project_id):
         """デプロイ完了を待機"""
@@ -213,9 +231,10 @@ jobs:
             
             # デプロイ状況を確認
             try:
-                response = requests.get(f"https://ultimate-auto-{project_id[:8]}.up.railway.app/")
+                deployment_url = f"https://ultimate-auto-{project_id[:8]}.up.railway.app"
+                response = requests.get(f"{deployment_url}/", timeout=10)
                 if response.status_code == 200:
-                    return f"https://ultimate-auto-{project_id[:8]}.up.railway.app"
+                    return deployment_url
             except:
                 pass
             
@@ -281,7 +300,8 @@ jobs:
             response = requests.post(
                 webhook_url,
                 headers={'Content-Type': 'application/json'},
-                json=test_data
+                json=test_data,
+                timeout=10
             )
             
             if response.status_code in [200, 400]:  # 400は署名エラーだが、エンドポイントは動作している

@@ -21,7 +21,10 @@ COPY . .
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 USER appuser
 
+# Set default port if not provided
+ENV PORT=3000
+
 EXPOSE $PORT
 
-# Use environment variable for port
-CMD ["sh", "-c", "gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120 --preload"]
+# Use environment variable for port with fallback
+CMD ["sh", "-c", "gunicorn app:app --bind 0.0.0.0:${PORT:-3000} --workers 1 --timeout 120 --preload"]
