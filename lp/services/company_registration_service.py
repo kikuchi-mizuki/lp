@@ -87,6 +87,7 @@ class CompanyRegistrationService:
                         print(f"⚠️ LINE環境変数設定エラー（手動設定が必要）: {e}")
                     
                     # 4. プロジェクトをデプロイ（スキップ可能）
+                    deployment = None
                     try:
                         deployment = self.deploy_project(new_project['id'])
                         if deployment:
@@ -102,7 +103,7 @@ class CompanyRegistrationService:
                         'project_id': new_project['id'],
                         'project_name': new_project['name'],
                         'deployment_id': deployment.get('id') if deployment else None,
-                        'message': 'AI予定秘書プロジェクトの作成が完了しました（環境変数とデプロイは手動設定が必要）'
+                        'message': 'AI予定秘書プロジェクトの作成が完了しました（サービス追加とデプロイは手動設定が必要）'
                     }
                 else:
                     return {
@@ -191,47 +192,108 @@ class CompanyRegistrationService:
         try:
             print(f"🔧 プロジェクトにサービス追加開始: {project_id}")
             
+            # 方法1: GraphQL APIを使用
             url = "https://backboard.railway.app/graphql/v2"
             headers = self.get_railway_headers()
             
-            # GitHubリポジトリからサービスを追加
-            add_service_query = """
-            mutation AddService($projectId: String!, $source: String!) {
-                serviceCreate(input: { 
-                    projectId: $projectId, 
-                    source: $source 
-                }) {
-                    id
-                    name
-                    status
+            # GitHubリポジトリからサービスを追加（複数の方法を試行）
+            methods = [
+                {
+                    "name": "標準的な方法",
+                    "query": """
+                    mutation AddService($projectId: String!, $source: String!) {
+                        serviceCreate(input: { 
+                            projectId: $projectId, 
+                            source: $source 
+                        }) {
+                            id
+                            name
+                            status
+                        }
+                    }
+                    """,
+                    "variables": {
+                        "projectId": project_id,
+                        "source": "https://github.com/kikuchi-mizuki/task-bot"
+                    }
+                },
+                {
+                    "name": "ブランチ指定",
+                    "query": """
+                    mutation AddService($projectId: String!, $source: String!, $branch: String!) {
+                        serviceCreate(input: { 
+                            projectId: $projectId, 
+                            source: $source,
+                            branch: $branch
+                        }) {
+                            id
+                            name
+                            status
+                        }
+                    }
+                    """,
+                    "variables": {
+                        "projectId": project_id,
+                        "source": "https://github.com/kikuchi-mizuki/task-bot",
+                        "branch": "main"
+                    }
+                },
+                {
+                    "name": "サービス名指定",
+                    "query": """
+                    mutation AddService($projectId: String!, $source: String!, $name: String!) {
+                        serviceCreate(input: { 
+                            projectId: $projectId, 
+                            source: $source,
+                            name: $name
+                        }) {
+                            id
+                            name
+                            status
+                        }
+                    }
+                    """,
+                    "variables": {
+                        "projectId": project_id,
+                        "source": "https://github.com/kikuchi-mizuki/task-bot",
+                        "name": "task-bot-service"
+                    }
                 }
-            }
-            """
+            ]
             
-            variables = {
-                "projectId": project_id,
-                "source": "https://github.com/kikuchi-mizuki/task-bot"
-            }
-            
-            payload = {
-                "query": add_service_query,
-                "variables": variables
-            }
-            
-            response = requests.post(url, headers=headers, json=payload, timeout=30)
-            
-            if response.status_code == 200:
-                data = response.json()
-                if 'data' in data and data['data']['serviceCreate']:
-                    service = data['data']['serviceCreate']
-                    print(f"✅ サービス追加完了: {service['name']} (ID: {service['id']})")
-                    return service
+            for method in methods:
+                print(f"🔄 {method['name']}を試行中...")
+                
+                payload = {
+                    "query": method['query'],
+                    "variables": method['variables']
+                }
+                
+                response = requests.post(url, headers=headers, json=payload, timeout=30)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if 'data' in data and data['data']['serviceCreate']:
+                        service = data['data']['serviceCreate']
+                        print(f"✅ {method['name']}でサービス追加成功: {service['name']} (ID: {service['id']})")
+                        return service
+                    else:
+                        print(f"⚠️ {method['name']}でサービス追加失敗: {data}")
                 else:
-                    print(f"❌ サービス追加失敗: {data}")
-                    return None
-            else:
-                print(f"❌ Railway API エラー: {response.status_code}")
-                return None
+                    print(f"⚠️ {method['name']}でHTTPエラー: {response.status_code}")
+            
+            # すべての方法が失敗した場合
+            print("❌ すべてのサービス追加方法が失敗しました")
+            print("⚠️ 手動でサービスを追加する必要があります")
+            print(f"   プロジェクトID: {project_id}")
+            print("   手順:")
+            print("   1. Railwayダッシュボードでプロジェクトを開く")
+            print("   2. 'Add a Service'をクリック")
+            print("   3. 'GitHub Repo'を選択")
+            print("   4. 'kikuchi-mizuki/task-bot'を選択")
+            print("   5. 'Deploy'をクリック")
+            
+            return None
                 
         except Exception as e:
             print(f"❌ サービス追加エラー: {e}")
