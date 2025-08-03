@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-企業関連テーブル作成スクリプト（SQLite用）
+企業関連テーブル作成スクリプト（PostgreSQL用）
 """
 
 from utils.db import get_db_connection
 
 def create_company_tables():
-    """企業関連のテーブルを作成（SQLite用）"""
+    """企業関連のテーブルを作成（PostgreSQL用）"""
     conn = get_db_connection()
     c = conn.cursor()
     
@@ -14,9 +14,9 @@ def create_company_tables():
         # companiesテーブル
         c.execute('''
             CREATE TABLE IF NOT EXISTS companies (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                company_name TEXT NOT NULL,
-                company_code TEXT UNIQUE NOT NULL,
+                id SERIAL PRIMARY KEY,
+                company_name VARCHAR(255) NOT NULL,
+                company_code VARCHAR(255) UNIQUE NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -25,11 +25,11 @@ def create_company_tables():
         # company_line_accountsテーブル
         c.execute('''
             CREATE TABLE IF NOT EXISTS company_line_accounts (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id SERIAL PRIMARY KEY,
                 company_id INTEGER NOT NULL,
-                line_channel_id TEXT,
+                line_channel_id VARCHAR(255),
                 line_access_token TEXT,
-                line_channel_secret TEXT,
+                line_channel_secret VARCHAR(255),
                 webhook_url TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -40,12 +40,12 @@ def create_company_tables():
         # company_deploymentsテーブル
         c.execute('''
             CREATE TABLE IF NOT EXISTS company_deployments (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id SERIAL PRIMARY KEY,
                 company_id INTEGER NOT NULL,
-                railway_project_id TEXT,
-                railway_service_id TEXT,
+                railway_project_id VARCHAR(255),
+                railway_service_id VARCHAR(255),
                 deployment_url TEXT,
-                deployment_status TEXT DEFAULT 'pending',
+                deployment_status VARCHAR(50) DEFAULT 'pending',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (company_id) REFERENCES companies (id) ON DELETE CASCADE
