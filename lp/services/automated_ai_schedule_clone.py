@@ -149,7 +149,7 @@ class AutomatedAIScheduleClone:
             print("⚠️ Railwayトークンが設定されていないため、手動設定が必要です")
             return
         
-        # Railway APIを使用して環境変数を設定
+        # Railway GraphQL APIを使用して環境変数を設定
         headers = {
             'Authorization': f'Bearer {self.railway_token}',
             'Content-Type': 'application/json'
@@ -166,16 +166,43 @@ class AutomatedAIScheduleClone:
             'TIMEZONE': 'Asia/Tokyo'
         }
         
+        # GraphQL mutation for setting environment variables
+        mutation = """
+        mutation SetVariable($projectId: String!, $key: String!, $value: String!) {
+            variableCreate(input: { projectId: $projectId, key: $key, value: $value }) {
+                id
+                key
+                value
+            }
+        }
+        """
+        
         for key, value in variables.items():
             if value:  # 空でない場合のみ設定
                 try:
+                    payload = {
+                        "query": mutation,
+                        "variables": {
+                            "projectId": project_id,
+                            "key": key,
+                            "value": value
+                        }
+                    }
+                    
                     response = requests.post(
-                        f'https://railway.app/api/v2/projects/{project_id}/variables',
+                        'https://backboard.railway.app/graphql/v2',
                         headers=headers,
-                        json={'key': key, 'value': value}
+                        json=payload,
+                        timeout=30
                     )
                     
-                    if response.status_code not in [200, 201]:
+                    if response.status_code == 200:
+                        data = response.json()
+                        if 'data' in data and data['data']['variableCreate']:
+                            print(f"✅ 環境変数 {key} の設定成功")
+                        else:
+                            print(f"⚠️ 環境変数 {key} の設定に失敗: {data}")
+                    else:
                         print(f"⚠️ 環境変数 {key} の設定に失敗: {response.status_code}")
                 except Exception as e:
                     print(f"⚠️ 環境変数 {key} の設定エラー: {e}")
