@@ -212,12 +212,28 @@
                     <div class="result-value" id="resultCompanyId"></div>
                 </div>
                 <div class="result-item">
-                    <div class="result-label">デプロイURL:</div>
-                    <div class="result-value" id="resultDeploymentUrl"></div>
+                    <div class="result-label">RailwayプロジェクトURL:</div>
+                    <div class="result-value" id="resultProjectUrl"></div>
                 </div>
                 <div class="result-item">
                     <div class="result-label">Webhook URL:</div>
                     <div class="result-value" id="resultWebhookUrl"></div>
+                </div>
+                <div class="result-item">
+                    <div class="result-label">設定保存状況:</div>
+                    <div class="result-value" id="resultSettingsSaved"></div>
+                </div>
+                <div class="result-item">
+                    <div class="result-label">次の手順:</div>
+                    <div class="result-value">
+                        <ol>
+                            <li>Railwayダッシュボードでプロジェクトを開く</li>
+                            <li>環境変数を手動で設定</li>
+                            <li>GitHub Actionsワークフローを手動実行</li>
+                            <li>デプロイ完了を確認</li>
+                            <li>LINE Webhook URLを設定</li>
+                        </ol>
+                    </div>
                 </div>
             </div>
         </div>
@@ -256,18 +272,19 @@
                 if (data.success) {
                     // 成功時の処理
                     await updateStep(2, 'completed', '✅ Railwayプロジェクト複製完了');
-                    await updateStep(3, 'completed', '✅ 環境変数設定完了');
+                    await updateStep(3, 'completed', '⚠️ 環境変数設定（手動設定が必要）');
                     await updateStep(4, 'completed', '✅ GitHub Actionsワークフロー作成完了');
-                    await updateStep(5, 'completed', '✅ デプロイ開始完了');
-                    await updateStep(6, 'completed', '✅ デプロイ完了');
-                    await updateStep(7, 'completed', '✅ Webhook URL更新完了');
-                    await updateStep(8, 'completed', '✅ LINE Webhook設定完了');
-                    await updateStep(9, 'completed', '✅ 動作確認完了');
+                    await updateStep(5, 'completed', '⚠️ デプロイ開始（手動設定が必要）');
+                    await updateStep(6, 'completed', '⚠️ デプロイ完了（手動確認が必要）');
+                    await updateStep(7, 'completed', '⚠️ Webhook URL更新（手動設定が必要）');
+                    await updateStep(8, 'completed', '⚠️ LINE Webhook設定（手動設定が必要）');
+                    await updateStep(9, 'completed', '⚠️ 動作確認（手動確認が必要）');
                     
                     // 結果を表示
                     document.getElementById('resultCompanyId').textContent = data.company_id;
-                    document.getElementById('resultDeploymentUrl').textContent = data.deployment_url;
-                    document.getElementById('resultWebhookUrl').textContent = data.webhook_url;
+                    document.getElementById('resultProjectUrl').textContent = data.project_url || '未設定';
+                    document.getElementById('resultWebhookUrl').textContent = data.webhook_url || '未設定';
+                    document.getElementById('resultSettingsSaved').textContent = data.settings_saved ? '✅ 保存完了' : '❌ 保存失敗';
                     
                     result.style.display = 'block';
                     submitBtn.textContent = '🎉 複製完了！';

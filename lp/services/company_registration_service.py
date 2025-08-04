@@ -77,30 +77,30 @@ class CompanyRegistrationService:
                     new_project = data['data']['projectCreate']
                     print(f"✅ 新しいプロジェクト作成完了: {new_project['id']}")
                     
-                    # 3. LINE環境変数を設定（スキップ可能）
-                    try:
-                        # line_credentialsにcompany_idとcompany_nameを追加
-                        enhanced_line_credentials = line_credentials.copy()
-                        enhanced_line_credentials['company_id'] = company_id
-                        enhanced_line_credentials['company_name'] = company_name
-                        
-                        if self.setup_line_environment_variables(new_project['id'], enhanced_line_credentials):
-                            print("✅ LINE環境変数設定完了")
-                        else:
-                            print("⚠️ LINE環境変数設定失敗（手動設定が必要）")
-                    except Exception as e:
-                        print(f"⚠️ LINE環境変数設定エラー（手動設定が必要）: {e}")
+                    # 3. LINE環境変数設定（手動設定に移行）
+                    print("⚠️ Railway APIの権限問題により、環境変数は手動設定が必要です")
+                    print("📋 手動設定が必要な環境変数:")
+                    print(f"   PORT=3000")
+                    print(f"   COMPANY_ID={company_id}")
+                    print(f"   COMPANY_NAME={company_name}")
+                    print(f"   LINE_CHANNEL_ID={line_credentials.get('line_channel_id', '(未設定)')}")
+                    print(f"   LINE_CHANNEL_ACCESS_TOKEN={line_credentials.get('line_channel_access_token', '(未設定)')}")
+                    print(f"   LINE_CHANNEL_SECRET={line_credentials.get('line_channel_secret', '(未設定)')}")
+                    print(f"   FLASK_SECRET_KEY=your_flask_secret_key_here")
+                    print(f"   TIMEZONE=Asia/Tokyo")
+                    print(f"   DATABASE_URL=(既存の設定を使用)")
+                    print(f"   RAILWAY_TOKEN=(既存の設定を使用)")
+                    print("✅ 環境変数設定情報の表示完了")
                     
-                    # 4. プロジェクトをデプロイ（スキップ可能）
-                    deployment = None
-                    try:
-                        deployment = self.deploy_project(new_project['id'])
-                        if deployment:
-                            print(f"✅ デプロイ開始完了: {deployment['id']}")
-                        else:
-                            print("⚠️ デプロイ開始失敗（手動デプロイが必要）")
-                    except Exception as e:
-                        print(f"⚠️ デプロイ開始エラー（手動デプロイが必要）: {e}")
+                    # 4. プロジェクトデプロイ（手動設定に移行）
+                    print("⚠️ Railway APIの権限問題により、デプロイは手動設定が必要です")
+                    print("📋 手動デプロイ手順:")
+                    print("1. Railwayダッシュボードでプロジェクトを開く")
+                    print("2. 'Add a Service'をクリック")
+                    print("3. 'GitHub Repo'を選択")
+                    print("4. 'kikuchi-mizuki/task-bot'を選択")
+                    print("5. 'Deploy'をクリック")
+                    print("✅ 手動デプロイ手順の表示完了")
                     
                     # プロジェクト作成が成功した場合は成功を返す
                     return {
