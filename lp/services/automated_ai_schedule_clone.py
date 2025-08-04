@@ -101,16 +101,16 @@ class AutomatedAIScheduleClone:
         
         # 企業情報を保存
         c.execute('''
-            INSERT INTO companies (company_name, company_code, created_at, updated_at)
-            VALUES (%s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            INSERT INTO companies (company_name, company_code, email, created_at, updated_at)
+            VALUES (%s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
             RETURNING id
-        ''', (company_name, company_code))
+        ''', (company_name, company_code, f"{company_name}@example.com"))
         
         company_id = c.fetchone()[0]
         
         # LINEアカウント情報を保存
         c.execute('''
-            INSERT INTO company_line_accounts (company_id, line_channel_id, line_access_token, line_channel_secret, created_at, updated_at)
+            INSERT INTO company_line_accounts (company_id, line_channel_id, line_channel_access_token, line_channel_secret, created_at, updated_at)
             VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         ''', (company_id, '', '', ''))
         
