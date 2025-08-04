@@ -5,7 +5,7 @@ import os
 import stripe
 import traceback
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from utils.db import get_db_connection
 # from services.cancellation_service import record_cancellation  # 削除された関数
 from services.stripe_service import check_subscription_status
@@ -19,11 +19,6 @@ LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
 
 def send_line_message(reply_token, messages):
     """LINEメッセージ送信（複数メッセージ対応）"""
-    import requests
-    import os
-    import traceback
-    import time
-    
     LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
     
     if not LINE_CHANNEL_ACCESS_TOKEN:
@@ -133,8 +128,6 @@ def send_line_message(reply_token, messages):
 
 def send_welcome_with_buttons(reply_token):
     print(f'[DEBUG] send_welcome_with_buttons開始: reply_token={reply_token}')
-    import requests
-    import os
     LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
     
     if not LINE_CHANNEL_ACCESS_TOKEN:
@@ -189,7 +182,6 @@ def send_welcome_with_buttons(reply_token):
         print(f'LINEテンプレートメッセージ送信エラー: {e}')
         if hasattr(e, 'response') and e.response is not None:
             print(f'LINE API エラー詳細: {e.response.text}')
-        import traceback
         traceback.print_exc()
         with open('error.log', 'a', encoding='utf-8') as f:
             f.write('LINEテンプレートメッセージ送信エラー: ' + str(e) + '\n')
@@ -200,8 +192,6 @@ def send_welcome_with_buttons(reply_token):
 def send_welcome_with_buttons_push(user_id):
     """LINEユーザーIDに直接案内文を送信（pushメッセージ）"""
     print(f'[DEBUG] send_welcome_with_buttons_push開始: user_id={user_id}')
-    import requests
-    import os
     LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
     headers = {
         'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}',
@@ -256,7 +246,6 @@ def send_welcome_with_buttons_push(user_id):
         print(f'LINE pushメッセージ送信エラー: {e}')
         if hasattr(e, 'response') and e.response is not None:
             print(f'LINE API エラー詳細: {e.response.text}')
-        import traceback
         traceback.print_exc()
 
 def create_rich_menu():
@@ -837,12 +826,7 @@ def handle_cancel_request(reply_token, user_id_db, stripe_subscription_id):
 
 def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, selection_text):
     try:
-        # Stripeモジュールをインポート
-        import stripe
-        from dotenv import load_dotenv
-        import os
-        load_dotenv()
-        stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+        # Stripeの設定は既にapp.pyで行われているため、ここでは不要
         
         subscription = stripe.Subscription.retrieve(stripe_subscription_id)
         items = subscription['items']['data']
@@ -961,15 +945,11 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
             
             # push_messageで2通目のメッセージを送信
             if line_user_id:
-                import requests
-                import json
-                from dotenv import load_dotenv
-                import os
-                load_dotenv()
+
                 
                 headers = {
                     'Content-Type': 'application/json',
-                    'Authorization': f'Bearer {os.getenv("LINE_CHANNEL_ACCESS_TOKEN")}'
+                    'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}'
                 }
                 
                 push_data = {
@@ -1082,8 +1062,6 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
 def handle_subscription_cancel(reply_token, user_id_db, stripe_subscription_id):
     """サブスクリプション全体を解約"""
     try:
-        import datetime
-        
         # サブスクリプション状態をチェック
         subscription_status = check_subscription_status(stripe_subscription_id)
         is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
@@ -1105,7 +1083,7 @@ def handle_subscription_cancel(reply_token, user_id_db, stripe_subscription_id):
             cancel_message_text = "サブスクリプション全体の解約を受け付けました。\n\n請求期間終了まで全てのサービスをご利用いただけます。"
         
         # 1週間以内に追加された課金予定のコンテンツをキャンセル
-        one_week_ago = datetime.datetime.now() - datetime.timedelta(days=7)
+        one_week_ago = datetime.now() - timedelta(days=7)
         conn = get_db_connection()
         c = conn.cursor()
         
@@ -1122,12 +1100,6 @@ def handle_subscription_cancel(reply_token, user_id_db, stripe_subscription_id):
         for usage_id, content_type, created_at, stripe_usage_record_id in recent_pending:
             if stripe_usage_record_id:
                 try:
-                    import stripe
-                    from dotenv import load_dotenv
-                    import os
-                    load_dotenv()
-                    stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
-                    
                     print(f'[DEBUG] Stripe InvoiceItem削除開始: {stripe_usage_record_id}')
                     invoice_item = stripe.InvoiceItem.retrieve(stripe_usage_record_id)
                     invoice_item.delete()
@@ -1425,10 +1397,8 @@ def smart_number_extraction(text):
 def process_pending_charges(user_id_db, stripe_subscription_id):
     """1週間後に課金予定のコンテンツを実際に課金する"""
     try:
-        import datetime
-        
         # 1週間前の日時を計算
-        one_week_ago = datetime.datetime.now() - datetime.timedelta(days=7)
+        one_week_ago = datetime.now() - timedelta(days=7)
         
         # データベースから1週間前に追加された課金予定のコンテンツを取得
         conn = get_db_connection()
