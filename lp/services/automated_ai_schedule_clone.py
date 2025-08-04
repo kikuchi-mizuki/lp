@@ -28,10 +28,19 @@ class AutomatedAIScheduleClone:
             company_id = self.save_company_to_database(company_name, line_channel_id, line_access_token, line_channel_secret)
             print(f"✅ 企業ID {company_id} で保存完了")
             
-            # 2. Railwayプロジェクトを複製
+                    # 2. Railwayプロジェクトを複製
             print("\n🔄 ステップ2: Railwayプロジェクトを複製")
-            project_info = self.clone_railway_project(company_name, company_id, line_channel_id, line_access_token, line_channel_secret)
-            print(f"✅ プロジェクト複製完了: {project_info['project_name']}")
+            try:
+                project_info = self.clone_railway_project(company_name, company_id, line_channel_id, line_access_token, line_channel_secret)
+                print(f"✅ プロジェクト複製完了: {project_info['project_name']}")
+            except Exception as e:
+                print(f"⚠️ Railwayプロジェクト複製失敗（手動設定が必要）: {e}")
+                # 手動設定用のダミー情報を生成
+                project_info = {
+                    'project_id': 'manual-setup-required',
+                    'project_name': f'ai-schedule-{company_name}-manual',
+                    'project_url': '手動設定が必要です'
+                }
             
             # 3. 環境変数を自動設定（Railway APIの問題により手動設定に移行）
             print("\n⚙️ ステップ3: 環境変数設定")

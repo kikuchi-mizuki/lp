@@ -107,7 +107,7 @@ class CompanyRegistrationService:
                         'success': True,
                         'project_id': new_project['id'],
                         'project_name': new_project['name'],
-                        'deployment_id': deployment.get('id') if deployment else None,
+                        'deployment_id': None,
                         'message': 'AI予定秘書プロジェクトの作成が完了しました（サービス追加とデプロイは手動設定が必要）',
                         'manual_setup_required': True,
                         'setup_instructions': {
@@ -142,68 +142,20 @@ class CompanyRegistrationService:
             }
     
     def setup_line_environment_variables(self, project_id, line_credentials):
-        """LINE環境変数を設定"""
-        try:
-            print(f"🔧 LINE環境変数設定開始: プロジェクト {project_id}")
-            
-            url = "https://backboard.railway.app/graphql/v2"
-            headers = self.get_railway_headers()
-            
-            # LINE環境変数を設定
-            line_variables = {
-                'LINE_CHANNEL_ACCESS_TOKEN': line_credentials['line_channel_access_token'],
-                'LINE_CHANNEL_SECRET': line_credentials['line_channel_secret'],
-                'LINE_CHANNEL_ID': line_credentials['line_channel_id'],
-                'COMPANY_ID': str(line_credentials['company_id']),
-                'COMPANY_NAME': line_credentials['company_name'],
-                'BASE_URL': f"https://{self.base_domain}",
-                'DATABASE_URL': os.getenv('DATABASE_URL', ''),
-                'STRIPE_SECRET_KEY': os.getenv('STRIPE_SECRET_KEY', ''),
-                'STRIPE_PUBLISHABLE_KEY': os.getenv('STRIPE_PUBLISHABLE_KEY', '')
-            }
-            
-            success_count = 0
-            for var_name, var_value in line_variables.items():
-                if var_value:  # 空でない場合のみ設定
-                    set_query = """
-                    mutation SetVariable($projectId: String!, $name: String!, $value: String!) {
-                        variableCreate(input: { projectId: $projectId, name: $name, value: $value }) {
-                            id
-                            name
-                            value
-                        }
-                    }
-                    """
-                    
-                    variables = {
-                        "projectId": project_id,
-                        "name": var_name,
-                        "value": var_value
-                    }
-                    
-                    payload = {
-                        "query": set_query,
-                        "variables": variables
-                    }
-                    
-                    response = requests.post(url, headers=headers, json=payload, timeout=30)
-                    
-                    if response.status_code == 200:
-                        data = response.json()
-                        if 'data' in data and data['data']['variableCreate']:
-                            print(f"✅ 環境変数設定完了: {var_name}")
-                            success_count += 1
-                        else:
-                            print(f"⚠️ 環境変数設定警告: {var_name} - {data}")
-                    else:
-                        print(f"❌ 環境変数設定エラー: {var_name} - {response.status_code}")
-            
-            print(f"✅ 環境変数設定完了: {success_count}/{len(line_variables)}")
-            return success_count > 0
-            
-        except Exception as e:
-            print(f"❌ LINE環境変数設定エラー: {e}")
-            return False
+        """LINE環境変数を設定（手動設定に移行のため無効化）"""
+        print(f"⚠️ LINE環境変数設定は手動設定に移行しました: プロジェクト {project_id}")
+        print("📋 手動設定が必要な環境変数:")
+        print(f"   PORT=3000")
+        print(f"   COMPANY_ID={line_credentials.get('company_id', '(未設定)')}")
+        print(f"   COMPANY_NAME={line_credentials.get('company_name', '(未設定)')}")
+        print(f"   LINE_CHANNEL_ID={line_credentials.get('line_channel_id', '(未設定)')}")
+        print(f"   LINE_CHANNEL_ACCESS_TOKEN={line_credentials.get('line_channel_access_token', '(未設定)')}")
+        print(f"   LINE_CHANNEL_SECRET={line_credentials.get('line_channel_secret', '(未設定)')}")
+        print(f"   FLASK_SECRET_KEY=your_flask_secret_key_here")
+        print(f"   TIMEZONE=Asia/Tokyo")
+        print(f"   DATABASE_URL=(既存の設定を使用)")
+        print(f"   RAILWAY_TOKEN=(既存の設定を使用)")
+        return True
     
     def add_service_to_project(self, project_id):
         """プロジェクトにサービスを追加（複数の方法を試行）"""
