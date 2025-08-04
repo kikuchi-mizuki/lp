@@ -185,10 +185,10 @@ class AutomatedAIScheduleClone:
         
         # GraphQL mutation for setting environment variables
         mutation = """
-        mutation SetVariable($projectId: String!, $key: String!, $value: String!) {
-            variableCreate(input: { projectId: $projectId, key: $key, value: $value }) {
+        mutation SetVariable($projectId: ID!, $name: String!, $value: String!) {
+            variableCreate(input: { projectId: $projectId, name: $name, value: $value }) {
                 id
-                key
+                name
                 value
             }
         }
@@ -201,7 +201,7 @@ class AutomatedAIScheduleClone:
                         "query": mutation,
                         "variables": {
                             "projectId": project_id,
-                            "key": key,
+                            "name": key,
                             "value": value
                         }
                     }
@@ -219,8 +219,13 @@ class AutomatedAIScheduleClone:
                             print(f"✅ 環境変数 {key} の設定成功")
                         else:
                             print(f"⚠️ 環境変数 {key} の設定に失敗: {data}")
+                            # エラーの詳細を表示
+                            if 'errors' in data:
+                                for error in data['errors']:
+                                    print(f"   エラー: {error.get('message', 'Unknown error')}")
                     else:
                         print(f"⚠️ 環境変数 {key} の設定に失敗: {response.status_code}")
+                        print(f"   レスポンス: {response.text[:200]}")
                 except Exception as e:
                     print(f"⚠️ 環境変数 {key} の設定エラー: {e}")
     
