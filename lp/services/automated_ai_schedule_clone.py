@@ -218,10 +218,12 @@ class AutomatedAIScheduleClone:
             print("⚠️ Railwayトークンが設定されていないため、手動設定が必要です")
             return
         
-        # プロジェクトIDの検証
-        if not self.validate_project_id(project_id):
-            print(f"⚠️ プロジェクトID {project_id} が無効です。手動設定が必要です")
-            return
+        # プロジェクトIDの検証（権限の問題がある場合はスキップ）
+        try:
+            if not self.validate_project_id(project_id):
+                print(f"⚠️ プロジェクトID {project_id} の検証に失敗しましたが、環境変数設定を続行します")
+        except Exception as e:
+            print(f"⚠️ プロジェクトID検証でエラーが発生しましたが、環境変数設定を続行します: {e}")
         
         # Railway GraphQL APIを使用して環境変数を設定
         headers = {

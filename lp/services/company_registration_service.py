@@ -79,7 +79,12 @@ class CompanyRegistrationService:
                     
                     # 3. LINE環境変数を設定（スキップ可能）
                     try:
-                        if self.setup_line_environment_variables(new_project['id'], line_credentials):
+                        # line_credentialsにcompany_idとcompany_nameを追加
+                        enhanced_line_credentials = line_credentials.copy()
+                        enhanced_line_credentials['company_id'] = company_id
+                        enhanced_line_credentials['company_name'] = company_name
+                        
+                        if self.setup_line_environment_variables(new_project['id'], enhanced_line_credentials):
                             print("✅ LINE環境変数設定完了")
                         else:
                             print("⚠️ LINE環境変数設定失敗（手動設定が必要）")
