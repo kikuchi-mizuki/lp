@@ -1,6 +1,8 @@
 from flask import Blueprint, request, jsonify
 from services.monitoring_service import monitoring_service
 import json
+import os
+from datetime import datetime, timedelta
 
 monitoring_bp = Blueprint('monitoring', __name__, url_prefix='/api/v1/monitoring')
 
@@ -238,8 +240,6 @@ def export_monitoring_data():
             # JSONファイルとしてダウンロード
             from flask import send_file
             import tempfile
-            import os
-            from datetime import datetime
             
             # 一時ファイルを作成
             with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
@@ -295,8 +295,6 @@ def cleanup_monitoring_data():
         days_to_keep = data.get('days_to_keep', 30)
         
         # ログファイルのクリーンアップ
-        import os
-        from datetime import datetime, timedelta
         
         monitoring_dir = "monitoring"
         cutoff_date = datetime.now() - timedelta(days=days_to_keep)

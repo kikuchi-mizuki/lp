@@ -1,5 +1,9 @@
 from flask import Blueprint, request, jsonify
 import os, json, hmac, hashlib, base64
+import traceback
+import requests
+import stripe
+import unicodedata
 from services.line_service import send_line_message
 from services.line_service import (
     handle_add_content, handle_content_selection,
@@ -12,7 +16,6 @@ from utils.db import get_db_connection
 from models.user_state import get_user_state, set_user_state, clear_user_state, init_user_states_table
 from services.user_service import is_paid_user, get_restricted_message
 # from services.cancellation_service import is_content_cancelled, get_restriction_message_for_content  # 削除された関数
-import datetime
 
 line_bp = Blueprint('line', __name__)
 
@@ -131,7 +134,6 @@ def debug_diagnose_user(user_id):
         # LINE連携済みの場合、LINE APIでユーザー情報を確認
         if user[2]:
             try:
-                import requests
                 LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
                 headers = {
                     'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}',
@@ -157,7 +159,6 @@ def debug_diagnose_user(user_id):
         # サブスクリプション情報を確認
         if user[3]:
             try:
-                import stripe
                 # stripe.api_keyはapp.pyで既に設定済み
                 subscription = stripe.Subscription.retrieve(user[3])
                 diagnosis['stripe_subscription'] = {
@@ -221,7 +222,6 @@ def debug_send_welcome(user_id):
         }
         
         # LINE APIを使用してメッセージを送信（テスト用）
-        import requests
         LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
         
         headers = {
@@ -506,7 +506,6 @@ def line_webhook():
                         set_user_state(user_id, 'welcome_sent')
                     except Exception as e:
                         print(f'[DEBUG] ウェルカムメッセージ送信エラー: {e}')
-                        import traceback
                         traceback.print_exc()
                         print(f'[DEBUG] replyToken使用済みのため代替メッセージ送信をスキップ: user_id={user_id}')
                         set_user_state(user_id, 'welcome_sent')
@@ -532,7 +531,6 @@ def line_webhook():
                             set_user_state(user_id, 'welcome_sent')
                         except Exception as e:
                             print(f'[DEBUG] ウェルカムメッセージ送信エラー: {e}')
-                            import traceback
                             traceback.print_exc()
                             print(f'[DEBUG] replyToken使用済みのため代替メッセージ送信をスキップ: user_id={user_id}')
                             set_user_state(user_id, 'welcome_sent')
@@ -619,7 +617,6 @@ def line_webhook():
                             set_user_state(user_id, 'welcome_sent')
                         except Exception as e:
                             print(f'[DEBUG] 初回メッセージ時の案内文送信エラー: {e}')
-                            import traceback
                             traceback.print_exc()
                             # エラーが発生した場合は、replyTokenは既に使用済みなので送信しない
                             print(f'[DEBUG] replyToken使用済みのため代替メッセージ送信をスキップ: user_id={user_id}')
@@ -812,7 +809,6 @@ def line_webhook():
                         # 無効な入力の場合は確認を促す
                         send_line_message(event['replyToken'], [{"type": "text", "text": "「はい」または「いいえ」で回答してください。\n\n📱 または「メニュー」でメインメニューに戻ります。"}])
                 elif '@' in text and '.' in text and len(text) < 100:
-                    import unicodedata
                     def normalize_email(email):
                         email = email.strip().lower()
                         email = unicodedata.normalize('NFKC', email)
@@ -844,7 +840,6 @@ def line_webhook():
                                     print(f'[DEBUG] LINEユーザーID変更後の案内文送信完了: user_id={user_id}')
                                 except Exception as e:
                                     print(f'[DEBUG] LINEユーザーID変更後の案内文送信エラー: {e}')
-                                    import traceback
                                     traceback.print_exc()
                                     send_line_message(event['replyToken'], [{"type": "text", "text": "ようこそ！AIコレクションズへ\n\n「追加」と入力してコンテンツを追加してください。"}])
                             else:
@@ -863,7 +858,6 @@ def line_webhook():
                                 print(f'[DEBUG] メールアドレス連携時の案内文送信完了: user_id={user_id}')
                             except Exception as e:
                                 print(f'[DEBUG] メールアドレス連携時の案内文送信エラー: {e}')
-                                import traceback
                                 traceback.print_exc()
                                 send_line_message(event['replyToken'], [{"type": "text", "text": "ようこそ！AIコレクションズへ\n\n「追加」と入力してコンテンツを追加してください。"}])
                     else:
@@ -938,6 +932,5 @@ https://lp-production-9e2c.up.railway.app
                     send_line_message(event['replyToken'], [{"type": "text", "text": share_message}])
                 conn.close()
     except Exception as e:
-        import traceback
         traceback.print_exc()
     return jsonify({'status': 'ok'}) 

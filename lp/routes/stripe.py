@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 import stripe
 import os
+import traceback
 from utils.db import get_db_connection
 
 stripe_bp = Blueprint('stripe', __name__)
@@ -99,7 +100,6 @@ def stripe_webhook():
                     )
                     print(f'従量課金アイテム追加完了: subscription_id={subscription_id}, usage_price_id={USAGE_PRICE_ID}, result={result}')
             except Exception as e:
-                import traceback
                 print(f'従量課金アイテム追加エラー: {e}')
                 print(traceback.format_exc())
             
@@ -135,7 +135,6 @@ def stripe_webhook():
                     print(f'[DEBUG] 課金予定処理結果: {charge_result}')
                 except Exception as e:
                     print(f'[DEBUG] 課金予定処理エラー: {e}')
-                    import traceback
                     traceback.print_exc()
                 
                 # LINE連携済みの場合、案内メッセージを送信
@@ -202,7 +201,6 @@ def stripe_webhook():
                         print(f'[DEBUG] サブスクリプション作成時の案内文送信完了: line_user_id={line_user_id}')
                     except Exception as e:
                         print(f'[DEBUG] サブスクリプション作成時の案内文送信エラー: {e}')
-                        import traceback
                         traceback.print_exc()
                 else:
                     print(f'[DEBUG] LINE連携未完了のため案内文送信をスキップ: email={email}')
@@ -227,7 +225,6 @@ def stripe_webhook():
             
             conn.close()
     except Exception as e:
-        import traceback
         print(f"[Stripe Webhook] イベント処理エラー: {e}")
         print(traceback.format_exc())
         return '', 500

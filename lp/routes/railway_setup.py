@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify, render_template
 import os
 import requests
 import json
+import re
 from datetime import datetime
 
 railway_setup_bp = Blueprint('railway_setup', __name__)
@@ -278,7 +279,6 @@ def validate_project():
         project_id = data['project_id'].strip()
         
         # UUID形式の検証
-        import re
         if not re.match(r'^[a-f0-9-]{36}$', project_id):
             return jsonify({
                 'success': False,

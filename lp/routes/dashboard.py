@@ -1,6 +1,8 @@
 from flask import Blueprint, request, jsonify
 from services.dashboard_service import dashboard_service
 import json
+import os
+from datetime import datetime
 
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/api/v1/dashboard')
 
@@ -171,7 +173,6 @@ def export_dashboard_data():
             # JSONファイルとしてダウンロード
             from flask import send_file
             import tempfile
-            import os
             
             # 一時ファイルを作成
             with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
@@ -197,8 +198,6 @@ def export_dashboard_data():
 def get_realtime_stats():
     """リアルタイム統計を取得"""
     try:
-        from datetime import datetime
-        
         # 現在時刻の統計を取得
         realtime_stats = {
             'success': True,
