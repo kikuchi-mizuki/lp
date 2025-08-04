@@ -25,7 +25,7 @@ class AutomatedAIScheduleClone:
         try:
             # 1. 企業情報をデータベースに保存
             print("📝 ステップ1: 企業情報をデータベースに保存")
-            company_id = self.save_company_to_database(company_name)
+            company_id = self.save_company_to_database(company_name, line_channel_id, line_access_token, line_channel_secret)
             print(f"✅ 企業ID {company_id} で保存完了")
             
             # 2. Railwayプロジェクトを複製
@@ -89,7 +89,7 @@ class AutomatedAIScheduleClone:
             traceback.print_exc()
             return {'success': False, 'error': str(e)}
     
-    def save_company_to_database(self, company_name):
+    def save_company_to_database(self, company_name, line_channel_id="", line_access_token="", line_channel_secret=""):
         """企業情報をデータベースに保存"""
         conn = get_db_connection()
         c = conn.cursor()
@@ -108,11 +108,12 @@ class AutomatedAIScheduleClone:
         
         company_id = c.fetchone()[0]
         
-        # LINEアカウント情報を保存
-        c.execute('''
-            INSERT INTO company_line_accounts (company_id, line_channel_id, line_channel_access_token, line_channel_secret, created_at, updated_at)
-            VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-        ''', (company_id, '', '', ''))
+        # LINE認証情報が提供されている場合のみLINEアカウント情報を保存
+        if line_channel_id and line_access_token and line_channel_secret:
+            c.execute('''
+                INSERT INTO company_line_accounts (company_id, line_channel_id, line_channel_access_token, line_channel_secret, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            ''', (company_id, line_channel_id, line_access_token, line_channel_secret))
         
         conn.commit()
         conn.close()
