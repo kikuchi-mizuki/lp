@@ -30,7 +30,7 @@ class AutomatedAIScheduleClone:
             
             # 2. Railwayプロジェクトを複製
             print("\n🔄 ステップ2: Railwayプロジェクトを複製")
-            project_info = self.clone_railway_project(company_name, company_id)
+            project_info = self.clone_railway_project(company_name, company_id, line_channel_id, line_access_token, line_channel_secret)
             print(f"✅ プロジェクト複製完了: {project_info['project_name']}")
             
             # 3. 環境変数を自動設定
@@ -119,12 +119,19 @@ class AutomatedAIScheduleClone:
         
         return company_id
     
-    def clone_railway_project(self, company_name, company_id):
+    def clone_railway_project(self, company_name, company_id, line_channel_id="", line_access_token="", line_channel_secret=""):
         """Railwayプロジェクトを複製"""
         service = CompanyRegistrationService()
         
+        # LINE認証情報を準備
+        line_credentials = {
+            'line_channel_id': line_channel_id,
+            'line_channel_access_token': line_access_token,
+            'line_channel_secret': line_channel_secret
+        }
+        
         # AI予定秘書プロジェクトを複製
-        result = service.clone_ai_schedule_project(company_name, company_id)
+        result = service.clone_ai_schedule_project(company_id, company_name, line_credentials)
         
         if not result.get('success'):
             raise Exception(f"プロジェクト複製失敗: {result.get('error')}")
