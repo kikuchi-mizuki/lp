@@ -33,11 +33,21 @@ class AutomatedAIScheduleClone:
             project_info = self.clone_railway_project(company_name, company_id, line_channel_id, line_access_token, line_channel_secret)
             print(f"✅ プロジェクト複製完了: {project_info['project_name']}")
             
-            # 3. 環境変数を自動設定
-            print("\n⚙️ ステップ3: 環境変数を自動設定")
-            self.set_environment_variables(project_info['project_id'], company_id, company_name, 
-                                         line_channel_id, line_access_token, line_channel_secret)
-            print("✅ 環境変数設定完了")
+            # 3. 環境変数を自動設定（Railway APIの問題により手動設定に移行）
+            print("\n⚙️ ステップ3: 環境変数設定")
+            print("⚠️ Railway APIの権限問題により、環境変数は手動設定が必要です")
+            print("📋 手動設定が必要な環境変数:")
+            print(f"   PORT=3000")
+            print(f"   COMPANY_ID={company_id}")
+            print(f"   COMPANY_NAME={company_name}")
+            print(f"   LINE_CHANNEL_ID={line_channel_id or '(未設定)'}")
+            print(f"   LINE_CHANNEL_ACCESS_TOKEN={line_access_token or '(未設定)'}")
+            print(f"   LINE_CHANNEL_SECRET={line_channel_secret or '(未設定)'}")
+            print(f"   FLASK_SECRET_KEY=your_flask_secret_key_here")
+            print(f"   TIMEZONE=Asia/Tokyo")
+            print(f"   DATABASE_URL=(既存の設定を使用)")
+            print(f"   RAILWAY_TOKEN=(既存の設定を使用)")
+            print("✅ 環境変数設定情報の表示完了")
             
             # 4. GitHub Actionsワークフローを作成
             print("\n🔧 ステップ4: GitHub Actionsワークフローを作成")
@@ -49,38 +59,35 @@ class AutomatedAIScheduleClone:
             self.trigger_deployment(project_info['project_id'])
             print("✅ デプロイ開始完了")
             
-            # 6. デプロイ完了を待機
-            print("\n⏳ ステップ6: デプロイ完了を待機")
-            deployment_url = self.wait_for_deployment(project_info['project_id'])
-            print(f"✅ デプロイ完了: {deployment_url}")
+            # 6. 手動設定の指示
+            print("\n📋 ステップ6: 手動設定の指示")
+            print("✅ 手動設定情報の表示完了")
             
-            # 7. Webhook URLを更新
-            print("\n🔗 ステップ7: Webhook URLを更新")
-            webhook_url = f"{deployment_url}/ai-schedule/webhook"
-            self.update_webhook_url(company_id, webhook_url)
-            print(f"✅ Webhook URL更新完了: {webhook_url}")
+            # 7. 完了メッセージ
+            print("\n✅ ステップ7: プロセス完了")
+            print("✅ プロセス完了")
             
-            # 8. LINE Developers Consoleに自動設定
-            print("\n📱 ステップ8: LINE Developers Consoleに自動設定")
-            self.setup_line_webhook(line_channel_id, line_access_token, webhook_url)
-            print("✅ LINE Webhook設定完了")
-            
-            # 9. 動作確認
-            print("\n🧪 ステップ9: 動作確認")
-            self.test_webhook(webhook_url)
-            print("✅ 動作確認完了")
-            
-            print("\n🎉 AI予定秘書の完全自動複製が完了しました！")
+            print("\n🎉 AI予定秘書の複製プロセスが完了しました！")
             print(f"📋 企業名: {company_name}")
-            print(f"🌐 デプロイURL: {deployment_url}")
-            print(f"🔗 Webhook URL: {webhook_url}")
+            print(f"🆔 企業ID: {company_id}")
+            print(f"📦 プロジェクトID: {project_info['project_id']}")
+            print(f"🌐 プロジェクトURL: https://railway.app/project/{project_info['project_id']}")
+            print(f"📋 手動実行URL: https://github.com/kikuchi-mizuki/lp/actions/workflows/railway-deploy-{project_info['project_id']}.yml")
+            
+            print("\n📋 次の手順:")
+            print("1. Railwayダッシュボードでプロジェクトを開く")
+            print("2. 環境変数を手動で設定")
+            print("3. GitHub Actionsワークフローを手動実行")
+            print("4. デプロイ完了を確認")
+            print("5. LINE Webhook URLを設定")
             
             return {
                 'success': True,
                 'company_id': company_id,
                 'project_id': project_info['project_id'],
-                'deployment_url': deployment_url,
-                'webhook_url': webhook_url
+                'project_url': f"https://railway.app/project/{project_info['project_id']}",
+                'workflow_url': f"https://github.com/kikuchi-mizuki/lp/actions/workflows/railway-deploy-{project_info['project_id']}.yml",
+                'message': 'AI予定秘書の複製プロセスが完了しました。手動設定が必要です。'
             }
             
         except Exception as e:
