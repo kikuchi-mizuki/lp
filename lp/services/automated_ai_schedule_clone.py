@@ -137,6 +137,58 @@ class AutomatedAIScheduleClone:
         
         return company_id
     
+    def validate_project_id(self, project_id):
+        """プロジェクトIDの有効性を検証"""
+        try:
+            headers = {
+                'Authorization': f'Bearer {self.railway_token}',
+                'Content-Type': 'application/json'
+            }
+            
+            # プロジェクト情報を取得するクエリ
+            query = """
+            query($id: ID!) {
+                project(id: $id) {
+                    id
+                    name
+                    description
+                    createdAt
+                }
+            }
+            """
+            
+            payload = {
+                "query": query,
+                "variables": {"id": project_id}
+            }
+            
+            response = requests.post(
+                'https://backboard.railway.app/graphql/v2',
+                headers=headers,
+                json=payload,
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if 'data' in data and 'project' in data['data'] and data['data']['project']:
+                    print(f"✅ プロジェクトID検証成功: {data['data']['project']['name']}")
+                    return True
+                else:
+                    print(f"❌ プロジェクトID検証失敗: プロジェクトが見つかりません")
+                    if 'errors' in data:
+                        for error in data['errors']:
+                            print(f"   エラー: {error.get('message', 'Unknown error')}")
+                    return False
+            else:
+                print(f"❌ プロジェクトID検証エラー: {response.status_code}")
+                print(f"   レスポンス: {response.text[:200]}")
+                return False
+                
+        except Exception as e:
+            print(f"❌ プロジェクトID検証エラー: {e}")
+            return False
+    
     def clone_railway_project(self, company_name, company_id, line_channel_id="", line_access_token="", line_channel_secret=""):
         """Railwayプロジェクトを複製"""
         service = CompanyRegistrationService()
@@ -164,6 +216,11 @@ class AutomatedAIScheduleClone:
         """環境変数を自動設定"""
         if not self.railway_token:
             print("⚠️ Railwayトークンが設定されていないため、手動設定が必要です")
+            return
+        
+        # プロジェクトIDの検証
+        if not self.validate_project_id(project_id):
+            print(f"⚠️ プロジェクトID {project_id} が無効です。手動設定が必要です")
             return
         
         # Railway GraphQL APIを使用して環境変数を設定
@@ -218,14 +275,25 @@ class AutomatedAIScheduleClone:
                         if 'data' in data and data['data']['variableCreate']:
                             print(f"✅ 環境変数 {key} の設定成功")
                         else:
-                            print(f"⚠️ 環境変数 {key} の設定に失敗: {data}")
+                            print(f"⚠️ 環境変数 {key} の設定に失敗")
+                            print(f"   レスポンス: {data}")
                             # エラーの詳細を表示
                             if 'errors' in data:
                                 for error in data['errors']:
                                     print(f"   エラー: {error.get('message', 'Unknown error')}")
+                                    if 'extensions' in error:
+                                        print(f"   詳細: {error['extensions']}")
                     else:
                         print(f"⚠️ 環境変数 {key} の設定に失敗: {response.status_code}")
-                        print(f"   レスポンス: {response.text[:200]}")
+                        print(f"   レスポンス: {response.text[:500]}")
+                        # レスポンスの詳細を確認
+                        try:
+                            error_data = response.json()
+                            if 'errors' in error_data:
+                                for error in error_data['errors']:
+                                    print(f"   エラー: {error.get('message', 'Unknown error')}")
+                        except:
+                            pass
                 except Exception as e:
                     print(f"⚠️ 環境変数 {key} の設定エラー: {e}")
     
