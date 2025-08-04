@@ -110,10 +110,27 @@ class AutomatedAIScheduleClone:
         
         # LINE認証情報が提供されている場合のみLINEアカウント情報を保存
         if line_channel_id and line_access_token and line_channel_secret:
+            # 既存のLINEチャネルIDをチェック
             c.execute('''
-                INSERT INTO company_line_accounts (company_id, line_channel_id, line_channel_access_token, line_channel_secret, created_at, updated_at)
-                VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-            ''', (company_id, line_channel_id, line_access_token, line_channel_secret))
+                SELECT id FROM company_line_accounts WHERE line_channel_id = %s
+            ''', (line_channel_id,))
+            
+            existing_account = c.fetchone()
+            
+            if existing_account:
+                # 既に存在する場合は更新
+                print(f"⚠️ LINEチャネルID {line_channel_id} は既に存在します。更新します。")
+                c.execute('''
+                    UPDATE company_line_accounts 
+                    SET company_id = %s, line_channel_access_token = %s, line_channel_secret = %s, updated_at = CURRENT_TIMESTAMP
+                    WHERE line_channel_id = %s
+                ''', (company_id, line_access_token, line_channel_secret, line_channel_id))
+            else:
+                # 新規挿入
+                c.execute('''
+                    INSERT INTO company_line_accounts (company_id, line_channel_id, line_channel_access_token, line_channel_secret, created_at, updated_at)
+                    VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ''', (company_id, line_channel_id, line_access_token, line_channel_secret))
         
         conn.commit()
         conn.close()
