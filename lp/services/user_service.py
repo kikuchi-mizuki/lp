@@ -262,3 +262,110 @@ def get_restricted_message():
             ]
         }
     } 
+
+def find_company_by_email(email):
+    """
+    メールアドレスで企業を検索（LINEユーザーID変更対応）
+    
+    Args:
+        email (str): メールアドレス
+        
+    Returns:
+        dict: 企業情報
+    """
+    try:
+        import psycopg2
+        from dotenv import load_dotenv
+        load_dotenv()
+        
+        # PostgreSQL接続情報
+        database_url = "postgresql://postgres:WZgnjZezoefHmxbwRjUbiPhajtwubmUs@gondola.proxy.rlwy.net:16797/railway"
+        conn = psycopg2.connect(database_url)
+        c = conn.cursor()
+        
+        # メールアドレスでユーザーを検索
+        c.execute('''
+            SELECT id, line_user_id, stripe_subscription_id
+            FROM users 
+            WHERE email = %s
+        ''', (email,))
+        
+        user_result = c.fetchone()
+        if not user_result:
+            conn.close()
+            return None
+        
+        user_id, line_user_id, stripe_subscription_id = user_result
+        
+        # 企業情報を検索
+        c.execute('''
+            SELECT id, company_name, line_user_id, stripe_subscription_id, status
+            FROM companies 
+            WHERE stripe_subscription_id = %s
+        ''', (stripe_subscription_id,))
+        
+        company_result = c.fetchone()
+        conn.close()
+        
+        if company_result:
+            return {
+                'company_id': company_result[0],
+                'company_name': company_result[1],
+                'line_user_id': company_result[2],
+                'stripe_subscription_id': company_result[3],
+                'status': company_result[4],
+                'user_id': user_id
+            }
+        
+        return None
+        
+    except Exception as e:
+        print(f'[ERROR] メールアドレスベース企業検索エラー: {e}')
+        return None
+
+def update_line_user_id_for_company(company_id, new_line_user_id):
+    """
+    企業のLINEユーザーIDを更新（LINEユーザーID変更対応）
+    
+    Args:
+        company_id (int): 企業ID
+        new_line_user_id (str): 新しいLINEユーザーID
+        
+    Returns:
+        bool: 更新成功
+    """
+    try:
+        import psycopg2
+        from dotenv import load_dotenv
+        load_dotenv()
+        
+        # PostgreSQL接続情報
+        database_url = "postgresql://postgres:WZgnjZezoefHmxbwRjUbiPhajtwubmUs@gondola.proxy.rlwy.net:16797/railway"
+        conn = psycopg2.connect(database_url)
+        c = conn.cursor()
+        
+        # 企業のLINEユーザーIDを更新
+        c.execute('''
+            UPDATE companies 
+            SET line_user_id = %s, updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+        ''', (new_line_user_id, company_id))
+        
+        # ユーザーのLINEユーザーIDも更新
+        c.execute('''
+            UPDATE users 
+            SET line_user_id = %s, updated_at = CURRENT_TIMESTAMP
+            WHERE id = (
+                SELECT user_id FROM companies WHERE id = %s
+            )
+        ''', (new_line_user_id, company_id))
+        
+        conn.commit()
+        conn.close()
+        
+        print(f'[DEBUG] LINEユーザーID更新完了: company_id={company_id}, new_line_user_id={new_line_user_id}')
+        return True
+        
+    except Exception as e:
+        print(f'[ERROR] LINEユーザーID更新エラー: {e}')
+        return False
