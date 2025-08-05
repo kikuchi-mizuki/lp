@@ -475,17 +475,23 @@ def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, co
         # 全コンテンツの合計数を取得
         conn_count = get_db_connection()
         c_count = conn_count.cursor()
+        
+        # データベースタイプに応じて適切なプレースホルダーを使用
+        from utils.db import get_db_type
+        db_type = get_db_type()
+        placeholder = '%s' if db_type == 'postgresql' else '?'
+        
         # PostgreSQL用のプレースホルダーを使用
-        c_count.execute('SELECT COUNT(*) FROM usage_logs WHERE user_id = %s', (user_id_db,))
+        c_count.execute(f'SELECT COUNT(*) FROM usage_logs WHERE user_id = {placeholder}', (user_id_db,))
         total_usage_count = c_count.fetchone()[0]
         
         # デバッグ用：実際のusage_logsを確認
-        c_count.execute('SELECT id, content_type, created_at FROM usage_logs WHERE user_id = %s ORDER BY created_at', (user_id_db,))
+        c_count.execute(f'SELECT id, content_type, created_at FROM usage_logs WHERE user_id = {placeholder} ORDER BY created_at', (user_id_db,))
         all_logs = c_count.fetchall()
         print(f'[DEBUG] 全usage_logs: {all_logs}')
         
         # 同じコンテンツの追加回数を確認
-        c_count.execute('SELECT COUNT(*) FROM usage_logs WHERE user_id = %s AND content_type = %s', (user_id_db, content['name']))
+        c_count.execute(f'SELECT COUNT(*) FROM usage_logs WHERE user_id = {placeholder} AND content_type = {placeholder}', (user_id_db, content['name']))
         same_content_count = c_count.fetchone()[0]
         conn_count.close()
         
@@ -542,9 +548,14 @@ def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, co
             try:
                 conn_trial = get_db_connection()
                 c_trial = conn_trial.cursor()
-                c_trial.execute('''
+                
+                # データベースタイプに応じて適切なプレースホルダーを使用
+                db_type = get_db_type()
+                placeholder = '%s' if db_type == 'postgresql' else '?'
+                
+                c_trial.execute(f'''
                     SELECT COUNT(*) FROM usage_logs 
-                    WHERE user_id = %s AND pending_charge = FALSE
+                    WHERE user_id = {placeholder} AND pending_charge = FALSE
                 ''', (user_id_db,))
                 trial_additions = c_trial.fetchone()[0]
                 conn_trial.close()
@@ -613,11 +624,16 @@ def handle_cancel_confirmation(user_id, content_number):
                 'error': '無効なコンテンツ番号です'
             }
         
+        # データベースタイプに応じて適切なプレースホルダーを使用
+        from utils.db import get_db_type
+        db_type = get_db_type()
+        placeholder = '%s' if db_type == 'postgresql' else '?'
+        
         # 解約対象のコンテンツを取得
-        c.execute('''
+        c.execute(f'''
             SELECT id, content_type, is_free, stripe_usage_record_id 
             FROM usage_logs 
-            WHERE user_id = %s AND content_type = %s
+            WHERE user_id = {placeholder} AND content_type = {placeholder}
             ORDER BY created_at DESC
             LIMIT 1
         ''', (user_id, content_type))
@@ -633,7 +649,7 @@ def handle_cancel_confirmation(user_id, content_number):
         
         # 解約処理
         # 1. usage_logsテーブルから削除
-        c.execute('DELETE FROM usage_logs WHERE id = %s', (usage_id,))
+        c.execute(f'DELETE FROM usage_logs WHERE id = {placeholder}', (usage_id,))
         
         # 2. StripeのUsage Recordを削除（課金済みの場合）
         if stripe_usage_record_id and not is_free:
@@ -668,11 +684,15 @@ def handle_content_confirmation(user_id, content_type):
         conn = get_db_connection()
         c = conn.cursor()
         
+        # データベースタイプに応じて適切なプレースホルダーを使用
+        db_type = get_db_type()
+        placeholder = '%s' if db_type == 'postgresql' else '?'
+        
         # ユーザーの現在のサブスクリプション情報を取得
-        c.execute('''
+        c.execute(f'''
             SELECT stripe_subscription_id, current_period_start, current_period_end
             FROM subscription_periods
-            WHERE user_id = %s AND status = 'active'
+            WHERE user_id = {placeholder} AND status = 'active'
             ORDER BY created_at DESC
             LIMIT 1
         ''', (user_id,))
@@ -700,12 +720,12 @@ def handle_content_confirmation(user_id, content_type):
         
         # サブスクリプション期間を更新（重複を避けるためUPSERT使用）
         try:
-            c.execute('''
+            c.execute(f'''
                 INSERT INTO subscription_periods (
                     user_id, stripe_subscription_id, subscription_status, status,
                     current_period_start, current_period_end,
                     trial_start, trial_end, created_at, updated_at
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ) VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
                 ON CONFLICT (user_id, stripe_subscription_id) DO UPDATE SET
                     subscription_status = EXCLUDED.subscription_status,
                     status = EXCLUDED.status,
@@ -739,10 +759,10 @@ def handle_content_confirmation(user_id, content_type):
         
         # コンテンツ確認ログを記録
         try:
-            c.execute('''
+            c.execute(f'''
                 INSERT INTO usage_logs (
                     user_id, content_type, usage_quantity, is_free, pending_charge, created_at
-                ) VALUES (%s, %s, %s, %s, %s, %s)
+                ) VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
             ''', (
                 user_id,
                 content_type,
@@ -794,8 +814,13 @@ def handle_cancel_request(reply_token, user_id_db, stripe_subscription_id):
         conn = get_db_connection()
         c = conn.cursor()
         
+        # データベースタイプに応じて適切なプレースホルダーを使用
+        from utils.db import get_db_type
+        db_type = get_db_type()
+        placeholder = '%s' if db_type == 'postgresql' else '?'
+        
         # 実際に追加されたコンテンツを取得
-        c.execute('SELECT content_type, is_free FROM usage_logs WHERE user_id = %s ORDER BY created_at', (user_id_db,))
+        c.execute(f'SELECT content_type, is_free FROM usage_logs WHERE user_id = {placeholder} ORDER BY created_at', (user_id_db,))
         added_contents = c.fetchall()
         conn.close()
         
@@ -858,7 +883,12 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
         # 実際に追加されたコンテンツを取得
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute('SELECT id, content_type, is_free FROM usage_logs WHERE user_id = %s ORDER BY created_at', (user_id_db,))
+        
+        # データベースタイプに応じて適切なプレースホルダーを使用
+        db_type = get_db_type()
+        placeholder = '%s' if db_type == 'postgresql' else '?'
+        
+        c.execute(f'SELECT id, content_type, is_free FROM usage_logs WHERE user_id = {placeholder} ORDER BY created_at', (user_id_db,))
         added_contents = c.fetchall()
         
         # 選択された番号を解析（AI技術を活用した高度な数字抽出処理）
@@ -878,7 +908,7 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
         
         # LINEユーザーIDを事前に取得
         line_user_id = None
-        c.execute('SELECT line_user_id FROM users WHERE id = %s', (user_id_db,))
+        c.execute(f'SELECT line_user_id FROM users WHERE id = {placeholder}', (user_id_db,))
         line_result = c.fetchone()
         if line_result and line_result[0]:
             line_user_id = line_result[0]
