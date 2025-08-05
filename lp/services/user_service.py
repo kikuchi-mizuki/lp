@@ -177,6 +177,13 @@ def is_paid_user_company_centric(line_user_id):
         print(f'[DEBUG] 接続先ユーザー: {conn.info.user}')
         
         # 企業情報を取得（LINEユーザーIDで検索）
+        print(f'[DEBUG] 検索用LINEユーザーID: line_user_id={line_user_id}, type={type(line_user_id)}')
+        
+        # テーブル構造を確認
+        c.execute("SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'companies' AND column_name = 'line_user_id'")
+        column_info = c.fetchone()
+        print(f'[DEBUG] line_user_idカラム情報: {column_info}')
+        
         c.execute('''
             SELECT id, company_name, stripe_subscription_id, status
             FROM companies 
