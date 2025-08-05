@@ -439,6 +439,9 @@ def handle_add_content(reply_token, user_id_db, stripe_subscription_id):
 
 def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, content_number):
     try:
+        # check_subscription_status関数をインポート
+        from services.stripe_service import check_subscription_status
+        
         content_info = {
             '1': {
                 'name': 'AI予定秘書',
