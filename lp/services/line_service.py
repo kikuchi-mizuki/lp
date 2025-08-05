@@ -400,6 +400,8 @@ def setup_rich_menu():
 
 def handle_add_content(reply_token, user_id_db, stripe_subscription_id):
     try:
+        print(f'[DEBUG] handle_add_content開始: user_id_db={user_id_db}, stripe_subscription_id={stripe_subscription_id}')
+        
         # 企業中心の決済状況をチェック
         from services.user_service import is_paid_user_company_centric
         
@@ -409,6 +411,8 @@ def handle_add_content(reply_token, user_id_db, stripe_subscription_id):
         c.execute('SELECT line_user_id FROM users WHERE id = %s', (user_id_db,))
         user_result = c.fetchone()
         conn.close()
+        
+        print(f'[DEBUG] ユーザー検索結果: user_result={user_result}')
         
         if not user_result:
             payment_message = {
@@ -431,7 +435,10 @@ def handle_add_content(reply_token, user_id_db, stripe_subscription_id):
             return
         
         line_user_id = user_result[0]
+        print(f'[DEBUG] LINEユーザーID取得: line_user_id={line_user_id}')
+        
         payment_check = is_paid_user_company_centric(line_user_id)
+        print(f'[DEBUG] 決済チェック結果: payment_check={payment_check}')
         
         if not payment_check['is_paid']:
             # 決済状況に応じたメッセージを表示
