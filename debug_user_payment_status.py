@@ -28,24 +28,24 @@ def debug_user_payment_status(line_user_id):
         c = conn.cursor()
         
         c.execute('''
-            SELECT id, email, stripe_customer_id, stripe_subscription_id, created_at, updated_at
-            FROM users 
+            SELECT id, company_name, stripe_subscription_id, status, created_at, updated_at
+            FROM companies 
             WHERE line_user_id = %s
         ''', (line_user_id,))
         
         user_result = c.fetchone()
         
         if not user_result:
-            print("❌ データベースにユーザーが見つかりません")
-            print("   原因: LINE_IDがデータベースに登録されていない")
+                    print("❌ データベースに企業が見つかりません")
+        print("   原因: LINE_IDがデータベースに登録されていない")
             return
         
-        user_id, email, stripe_customer_id, stripe_subscription_id, created_at, updated_at = user_result
-        print(f"✅ ユーザー情報取得成功:")
-        print(f"   - データベースID: {user_id}")
-        print(f"   - メールアドレス: {email}")
-        print(f"   - Stripe顧客ID: {stripe_customer_id}")
+        company_id, company_name, stripe_subscription_id, status, created_at, updated_at = user_result
+        print(f"✅ 企業情報取得成功:")
+        print(f"   - 企業ID: {company_id}")
+        print(f"   - 企業名: {company_name}")
         print(f"   - StripeサブスクリプションID: {stripe_subscription_id}")
+        print(f"   - ステータス: {status}")
         print(f"   - 作成日時: {created_at}")
         print(f"   - 更新日時: {updated_at}")
         
@@ -62,10 +62,11 @@ def debug_user_payment_status(line_user_id):
         print(f"   - 解約予定: {subscription_status.get('cancel_at_period_end')}")
         print(f"   - 期間終了: {subscription_status.get('current_period_end')}")
         
-        # 3. is_paid_user関数の結果を確認
-        print("\n🎯 ステップ3: is_paid_user関数の結果を確認")
-        payment_check = is_paid_user(line_user_id)
-        print(f"✅ is_paid_user結果:")
+        # 3. is_paid_user_company_centric関数の結果を確認
+        print("\n🎯 ステップ3: is_paid_user_company_centric関数の結果を確認")
+        from services.user_service import is_paid_user_company_centric
+        payment_check = is_paid_user_company_centric(line_user_id)
+        print(f"✅ is_paid_user_company_centric結果:")
         print(f"   - 決済済み: {payment_check['is_paid']}")
         print(f"   - サブスクリプション状態: {payment_check['subscription_status']}")
         print(f"   - メッセージ: {payment_check['message']}")
@@ -98,7 +99,7 @@ def debug_user_payment_status(line_user_id):
 
 def list_recent_users():
     """最近のユーザー一覧を表示"""
-    print("\n📋 最近のユーザー一覧")
+            print("\n📋 最近の企業一覧")
     print("=" * 30)
     
     try:
@@ -106,17 +107,17 @@ def list_recent_users():
         c = conn.cursor()
         
         c.execute('''
-            SELECT id, email, line_user_id, stripe_subscription_id, created_at
-            FROM users 
+            SELECT id, company_name, line_user_id, stripe_subscription_id, created_at
+            FROM companies 
             ORDER BY created_at DESC 
             LIMIT 10
         ''')
         
         users = c.fetchall()
         
-        for user in users:
-            user_id, email, line_user_id, stripe_subscription_id, created_at = user
-            print(f"ID: {user_id}, メール: {email}, LINE_ID: {line_user_id}, 作成日: {created_at}")
+        for company in users:
+            company_id, company_name, line_user_id, stripe_subscription_id, created_at = company
+            print(f"ID: {company_id}, 企業名: {company_name}, LINE_ID: {line_user_id}, 作成日: {created_at}")
         
         conn.close()
         
@@ -130,5 +131,5 @@ if __name__ == "__main__":
     else:
         print("使用方法: python debug_user_payment_status.py <LINE_USER_ID>")
         print("例: python debug_user_payment_status.py U1234567890abcdef")
-        print("\n最近のユーザー一覧:")
+        print("\n最近の企業一覧:")
         list_recent_users() 

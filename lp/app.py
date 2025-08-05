@@ -268,7 +268,7 @@ def error_log():
 def debug_user(line_user_id):
     """ユーザーの決済状況をデバッグするエンドポイント"""
     try:
-        from services.user_service import is_paid_user
+        from services.user_service import is_paid_user_company_centric
         from services.stripe_service import check_subscription_status
         from utils.db import get_db_connection
         
@@ -279,25 +279,24 @@ def debug_user(line_user_id):
             'stripe_check': {}
         }
         
-        # データベースからユーザー情報を直接取得
+        # データベースから企業情報を直接取得（企業ID中心統合対応）
         conn = get_db_connection()
         c = conn.cursor()
         c.execute('''
-            SELECT id, email, stripe_customer_id, stripe_subscription_id, line_user_id, created_at, updated_at
-            FROM users 
+            SELECT id, company_name, stripe_subscription_id, status, created_at, updated_at
+            FROM companies 
             WHERE line_user_id = %s
         ''', (line_user_id,))
         
         db_result = c.fetchone()
         if db_result:
-            user_id, email, stripe_customer_id, stripe_subscription_id, line_user_id_db, created_at, updated_at = db_result
+            company_id, company_name, stripe_subscription_id, status, created_at, updated_at = db_result
             result['database_check'] = {
                 'found': True,
-                'user_id': user_id,
-                'email': email,
-                'stripe_customer_id': stripe_customer_id,
+                'company_id': company_id,
+                'company_name': company_name,
                 'stripe_subscription_id': stripe_subscription_id,
-                'line_user_id': line_user_id_db,
+                'status': status,
                 'created_at': str(created_at),
                 'updated_at': str(updated_at)
             }
@@ -306,8 +305,9 @@ def debug_user(line_user_id):
         
         conn.close()
         
-        # is_paid_user関数の結果
-        payment_check = is_paid_user(line_user_id)
+        # is_paid_user_company_centric関数の結果
+        from services.user_service import is_paid_user_company_centric
+        payment_check = is_paid_user_company_centric(line_user_id)
         result['payment_check'] = payment_check
         
         # Stripeサブスクリプションの状態を直接確認
