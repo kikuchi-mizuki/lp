@@ -294,6 +294,11 @@ def debug_payment_check():
                     current_time = datetime.now(jst)
                     print(f'[DEBUG] 現在時刻: {current_time}')
                     print(f'[DEBUG] 期限: {current_period_end}')
+                    
+                    # タイムゾーン情報を統一（current_period_endをawareに変換）
+                    if current_period_end.tzinfo is None:
+                        current_period_end = current_period_end.replace(tzinfo=jst)
+                    
                     print(f'[DEBUG] 期限切れ: {current_period_end <= current_time}')
                     
                     if current_period_end > current_time:

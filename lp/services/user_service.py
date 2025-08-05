@@ -232,6 +232,10 @@ def is_paid_user_company_centric(line_user_id):
                 jst = timezone(timedelta(hours=9))
                 current_time = datetime.now(jst)
                 
+                # タイムゾーン情報を統一（current_period_endをawareに変換）
+                if current_period_end.tzinfo is None:
+                    current_period_end = current_period_end.replace(tzinfo=jst)
+                
                 if current_period_end > current_time:
                     print(f'[DEBUG] 有効期限内: company_id={company_id}')
                     return {
