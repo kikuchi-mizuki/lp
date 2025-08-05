@@ -859,15 +859,20 @@ def line_webhook():
                         # 無効な入力の場合は確認を促す
                         send_line_message(event['replyToken'], [{"type": "text", "text": "「はい」または「いいえ」で回答してください。\n\n📱 または「メニュー」でメインメニューに戻ります。"}])
                 elif '@' in text and '.' in text and len(text) < 100:
+                    print(f'[DEBUG] メールアドレス連携処理開始: user_id={user_id}, text={text}')
                     def normalize_email(email):
                         email = email.strip().lower()
                         email = unicodedata.normalize('NFKC', email)
                         return email
                     normalized_email = normalize_email(text)
+                    print(f'[DEBUG] 正規化後のメールアドレス: {normalized_email}')
+                    
                     c.execute('SELECT id, line_user_id FROM users WHERE email = %s', (normalized_email,))
                     user = c.fetchone()
+                    print(f'[DEBUG] usersテーブル検索結果: {user}')
                     if user:
                         db_user_id, existing_line_user_id = user
+                        print(f'[DEBUG] ユーザー発見: db_user_id={db_user_id}, existing_line_user_id={existing_line_user_id}')
                         
                         # LINEユーザーIDが既に設定されている場合
                         if existing_line_user_id:
@@ -897,6 +902,7 @@ def line_webhook():
                                 send_line_message(event['replyToken'], [{"type": "text", "text": 'このメールアドレスは既にLINE連携済みです。'}])
                         else:
                             # LINEユーザーIDが未設定の場合（初回連携）
+                            print(f'[DEBUG] 初回連携処理開始: user_id={user_id}, db_user_id={db_user_id}')
                             c.execute('UPDATE users SET line_user_id = %s WHERE id = %s', (user_id, db_user_id))
                             conn.commit()
                             print(f'[DEBUG] メールアドレス連携完了: user_id={user_id}, db_user_id={db_user_id}')
@@ -907,6 +913,7 @@ def line_webhook():
                             # メールアドレスで企業データを検索
                             c.execute('SELECT id, company_name, stripe_subscription_id FROM companies WHERE email = %s', (normalized_email,))
                             company = c.fetchone()
+                            print(f'[DEBUG] companiesテーブル検索結果: {company}')
                             
                             if company:
                                 company_id, company_name, stripe_subscription_id = company
@@ -946,6 +953,7 @@ def line_webhook():
                                 send_line_message(event['replyToken'], [{"type": "text", "text": "企業データが見つかりません。決済が完了しているかご確認ください。"}])
                     else:
                         # メールアドレスが見つからない場合
+                        print(f'[DEBUG] メールアドレスが見つかりません: email={normalized_email}')
                         send_line_message(event['replyToken'], [{"type": "text", "text": 'ご登録メールアドレスが見つかりません。LPでご登録済みかご確認ください。'}])
                 else:
                     print(f'[DEBUG] デフォルト処理: user_id={user_id}, state={state}, text={text}')
