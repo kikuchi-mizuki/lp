@@ -624,6 +624,14 @@ def line_webhook():
                     company = c.fetchone()
                     print(f'[DEBUG] 未紐付け企業検索結果: {company}')
                     
+                    # 未紐付け企業が見つからない場合、メールアドレスで検索
+                    if not company:
+                        print(f'[DEBUG] 未紐付け企業も見つからないため、メールアドレスで企業を検索')
+                        # ユーザーがメールアドレスを送信していない場合の処理
+                        send_line_message(event['replyToken'], [{"type": "text", "text": "決済済みの方は、登録時のメールアドレスを送信してください。\n\n例: example@example.com"}])
+                        conn.close()
+                        continue
+                    
                     if company:
                         print(f'[DEBUG] 未紐付け企業発見、紐付け処理開始: user_id={user_id}, company_id={company[0]}')
                         

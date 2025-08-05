@@ -66,7 +66,7 @@ def stripe_webhook():
                 existing_company = c.fetchone()
                 
                 if not existing_company:
-                    # 企業データが存在しない場合は作成
+                    # 企業データが存在しない場合は作成（line_user_idはNULLのまま）
                     company_name = f"企業_{email.split('@')[0]}"
                     c.execute('''
                         INSERT INTO companies (company_name, company_code, email, stripe_subscription_id, status, created_at)
@@ -102,7 +102,7 @@ def stripe_webhook():
                 c.execute('INSERT INTO users (email, stripe_customer_id, stripe_subscription_id) VALUES (%s, %s, %s)', (email, customer_id, subscription_id))
                 user_id = c.lastrowid
                 
-                # companiesテーブルにも企業データを作成
+                # companiesテーブルにも企業データを作成（line_user_idはNULLのまま）
                 company_name = f"企業_{email.split('@')[0]}"
                 c.execute('''
                     INSERT INTO companies (company_name, company_code, email, stripe_subscription_id, status, created_at)
@@ -170,7 +170,7 @@ def stripe_webhook():
                 existing_company = c.fetchone()
                 
                 if not existing_company:
-                    # 企業データが存在しない場合は作成
+                    # 企業データが存在しない場合は作成（line_user_idはNULLのまま）
                     company_name = f"企業_{email.split('@')[0]}"
                     c.execute('''
                         INSERT INTO companies (company_name, company_code, email, stripe_subscription_id, status, created_at)
@@ -215,7 +215,7 @@ def stripe_webhook():
                 c.execute('INSERT INTO users (email, stripe_customer_id, stripe_subscription_id) VALUES (%s, %s, %s)', (email, customer_id, subscription_id))
                 user_id = c.lastrowid
                 
-                # companiesテーブルにも企業データを作成
+                # companiesテーブルにも企業データを作成（line_user_idはNULLのまま）
                 company_name = f"企業_{email.split('@')[0]}"
                 c.execute('''
                     INSERT INTO companies (company_name, company_code, email, stripe_subscription_id, status, created_at)
@@ -274,7 +274,7 @@ def stripe_webhook():
                 existing_company = c.fetchone()
                 
                 if not existing_company:
-                    # 企業データが存在しない場合は作成
+                    # 企業データが存在しない場合は作成（line_user_idはNULLのまま）
                     company_name = f"企業_{email.split('@')[0]}"
                     c.execute('''
                         INSERT INTO companies (company_name, company_code, email, stripe_subscription_id, status, created_at)
@@ -309,7 +309,7 @@ def stripe_webhook():
                 c.execute('INSERT INTO users (email, stripe_customer_id, stripe_subscription_id) VALUES (%s, %s, %s)', (email, customer_id, subscription_id))
                 user_id = c.lastrowid
                 
-                # companiesテーブルにも企業データを作成
+                # companiesテーブルにも企業データを作成（line_user_idはNULLのまま）
                 company_name = f"企業_{email.split('@')[0]}"
                 c.execute('''
                     INSERT INTO companies (company_name, company_code, email, stripe_subscription_id, status, created_at)
