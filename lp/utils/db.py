@@ -7,7 +7,7 @@ DATABASE_URL = os.getenv('DATABASE_URL', 'database.db')
 
 def get_db_connection():
     """データベース接続を取得"""
-    database_url = os.getenv('DATABASE_URL')
+    database_url = os.getenv('RAILWAY_DATABASE_URL') or os.getenv('DATABASE_URL')
     
     # Railwayの外部接続URLを優先使用
     if not database_url or (database_url and 'postgres.railway.internal' in database_url):
@@ -38,7 +38,7 @@ def get_db_connection():
 
 def get_db_type():
     """データベースタイプを取得（postgresql または sqlite）"""
-    database_url = os.getenv('DATABASE_URL')
+    database_url = os.getenv('RAILWAY_DATABASE_URL') or os.getenv('DATABASE_URL')
     if database_url and database_url.startswith('postgresql://'):
         return 'postgresql'
     elif database_url and database_url.startswith('sqlite://'):

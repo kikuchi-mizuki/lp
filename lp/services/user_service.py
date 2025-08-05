@@ -158,19 +158,10 @@ def is_paid_user_company_centric(line_user_id):
         from dotenv import load_dotenv
         load_dotenv()
         
-        database_url = os.getenv('RAILWAY_DATABASE_URL')
-        print(f'[DEBUG] データベースURL確認: {database_url[:20] if database_url else "None"}...')
+        # PostgreSQL接続情報
+        database_url = "postgresql://postgres:WZgnjZezoefHmxbwRjUbiPhajtwubmUs@gondola.proxy.rlwy.net:16797/railway"
+        print(f'[DEBUG] PostgreSQL接続開始: {database_url[:50]}...')
         
-        if not database_url:
-            print(f'[ERROR] RAILWAY_DATABASE_URLが設定されていません')
-            return {
-                'is_paid': False,
-                'subscription_status': 'error',
-                'message': 'データベース接続エラーが発生しました。',
-                'redirect_url': 'https://line.me/R/ti/p/@ai_collections'
-            }
-        
-        print(f'[DEBUG] PostgreSQL接続開始')
         conn = psycopg2.connect(database_url)
         c = conn.cursor()
         print(f'[DEBUG] PostgreSQL接続成功')
