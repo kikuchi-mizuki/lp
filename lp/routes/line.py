@@ -791,21 +791,7 @@ def line_webhook():
                             # 数字が抽出できない場合は詳細なエラーメッセージ
                             error_message = "数字を入力してください。\n\n対応形式:\n• 1,2,3 (カンマ区切り)\n• 1.2.3 (ドット区切り)\n• 1 2 3 (スペース区切り)\n• 一二三 (日本語数字)\n• 1番目,2番目 (序数表現)\n• 最初,二番目 (日本語序数)"
                             send_line_message(event['replyToken'], [{"type": "text", "text": error_message}])
-                # add_select状態での処理（優先度を上げる）
-                elif state == 'add_select':
-                    print(f'[DEBUG] add_select状態での処理: user_id={user_id}, text={text}')
-                    if text in ['1', '2', '3']:
-                        print(f'[DEBUG] コンテンツ選択: text={text}')
-                        set_user_state(user_id, f'confirm_{text}')
-                        handle_content_selection(event['replyToken'], company_id, stripe_subscription_id, text)
-                    elif text == 'メニュー':
-                        set_user_state(user_id, 'welcome_sent')
-                        send_line_message(event['replyToken'], [get_menu_message()])
-                    elif text == 'ヘルプ':
-                        send_line_message(event['replyToken'], get_help_message())
-                    else:
-                        send_line_message(event['replyToken'], [{"type": "text", "text": "1〜3の数字でコンテンツを選択してください。\n\nまたは「メニュー」でメインメニューに戻ります。"}])
-                    continue
+
                 # その他のコマンド処理（add_select状態以外）
                 elif text == '追加' and state != 'cancel_select':
                     print(f'[DEBUG] 追加コマンド受信: user_id={user_id}, state={state}')
