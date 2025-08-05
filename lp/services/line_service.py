@@ -405,37 +405,9 @@ def handle_add_content(reply_token, user_id_db, stripe_subscription_id):
         # 企業中心の決済状況をチェック
         from services.user_service import is_paid_user_company_centric
         
-        # LINEユーザーIDを取得
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute('SELECT line_user_id FROM users WHERE id = %s', (user_id_db,))
-        user_result = c.fetchone()
-        conn.close()
-        
-        print(f'[DEBUG] ユーザー検索結果: user_result={user_result}')
-        
-        if not user_result:
-            payment_message = {
-                "type": "template",
-                "altText": "ユーザー情報エラー",
-                "template": {
-                    "type": "buttons",
-                    "title": "ユーザー情報エラー",
-                    "text": "ユーザー情報が見つかりません。\n\nLINEアカウントの再登録をお試しください。",
-                    "actions": [
-                        {
-                            "type": "uri",
-                            "label": "決済画面へ",
-                            "uri": "https://lp-production-9e2c.up.railway.app"
-                        }
-                    ]
-                }
-            }
-            send_line_message(reply_token, [payment_message])
-            return
-        
-        line_user_id = user_result[0]
-        print(f'[DEBUG] LINEユーザーID取得: line_user_id={line_user_id}')
+        # LINEユーザーIDを直接使用（user_id_dbが既にLINEユーザーID）
+        line_user_id = user_id_db
+        print(f'[DEBUG] LINEユーザーID直接使用: line_user_id={line_user_id}')
         
         payment_check = is_paid_user_company_centric(line_user_id)
         print(f'[DEBUG] 決済チェック結果: payment_check={payment_check}')
@@ -1561,30 +1533,47 @@ def check_user_access_with_period(user_id, content_type):
 
 def handle_status_check(reply_token, user_id_db):
     """
-    ユーザーの利用状況を確認してLINEメッセージで返す
+    ユーザーの利用状況を確認してLINEメッセージで返す（企業中心統合対応）
     """
     try:
+        # LINEユーザーIDを直接使用
+        line_user_id = user_id_db
+        
+        # 企業中心の決済状況をチェック
+        from services.user_service import is_paid_user_company_centric
+        payment_check = is_paid_user_company_centric(line_user_id)
+        
+        if not payment_check['is_paid']:
+            # 未決済ユーザーの場合
+            status_message = "📊 利用状況\n\n"
+            status_message += f"❌ 決済状況: {payment_check['subscription_status']}\n"
+            status_message += f"💬 メッセージ: {payment_check.get('message', '決済が必要です')}\n\n"
+            status_message += "💳 決済画面でサブスクリプションを開始してください。"
+            send_line_message(reply_token, [{"type": "text", "text": status_message}])
+            return
+        
+        # 決済済みユーザーの場合、企業情報を取得
         conn = get_db_connection()
         c = conn.cursor()
         
-        # ユーザー情報を取得
-        c.execute('SELECT stripe_subscription_id, email FROM users WHERE id = %s', (user_id_db,))
-        user = c.fetchone()
+        # 企業情報を取得
+        c.execute('SELECT company_name, stripe_subscription_id FROM companies WHERE line_user_id = %s', (line_user_id,))
+        company = c.fetchone()
         
-        if not user:
-            send_line_message(reply_token, [{"type": "text", "text": "ユーザー情報が見つかりません。"}])
+        if not company:
+            send_line_message(reply_token, [{"type": "text", "text": "企業情報が見つかりません。"}])
             return
         
-        stripe_subscription_id = user[0]
-        email = user[1]
+        company_name = company[0]
+        stripe_subscription_id = company[1]
         
-        # 利用状況を取得
+        # 利用状況を取得（企業中心）
         c.execute('''
             SELECT content_type, created_at, is_free, subscription_status
             FROM usage_logs 
-            WHERE user_id = %s 
+            WHERE company_id = (SELECT id FROM companies WHERE line_user_id = %s)
             ORDER BY created_at DESC
-        ''', (user_id_db,))
+        ''', (line_user_id,))
         usage_logs = c.fetchall()
         
         # サブスクリプション状況を確認
@@ -1606,7 +1595,7 @@ def handle_status_check(reply_token, user_id_db):
         
         # メッセージを構築
         status_message = f"📊 利用状況\n\n"
-        status_message += f"📧 メールアドレス: {email}\n"
+        status_message += f"🏢 企業名: {company_name}\n"
         status_message += f"💳 サブスクリプション: {subscription_status}\n\n"
         
         if usage_logs:
