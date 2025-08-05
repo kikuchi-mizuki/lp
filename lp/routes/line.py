@@ -442,9 +442,10 @@ def debug_cancellation_history(user_id):
 
 @line_bp.route('/line/webhook', methods=['POST'])
 def line_webhook():
-    print(f'[DEBUG] LINE Webhook受信: {request.method}')
-    print(f'[DEBUG] ヘッダー: {dict(request.headers)}')
-    print(f'[DEBUG] ボディ: {request.data.decode("utf-8")}')
+    print(f'[DEBUG] LINE Webhook受信開始')
+    print(f'[DEBUG] リクエストメソッド: {request.method}')
+    print(f'[DEBUG] リクエストヘッダー: {dict(request.headers)}')
+    print(f'[DEBUG] リクエストボディ: {request.data.decode("utf-8")}')
     
     signature = request.headers.get('X-Line-Signature', '')
     body = request.data.decode('utf-8')
@@ -466,6 +467,7 @@ def line_webhook():
         print(f'[DEBUG] イベント数: {len(events)}')
         for event in events:
             print(f'[DEBUG] イベント処理開始: {event.get("type")}')
+            print(f'[DEBUG] イベント詳細: {json.dumps(event, ensure_ascii=False, indent=2)}')
             # 友達追加イベントの処理
             if event.get('type') == 'follow':
                 user_id = event['source']['userId']
