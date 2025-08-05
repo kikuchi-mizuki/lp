@@ -472,9 +472,12 @@ def line_webhook():
                 print(f'[DEBUG] 友達追加イベント: user_id={user_id}')
                 
                 # 決済状況をチェック（企業ID中心統合対応）
+                print(f'[DEBUG] 決済チェック開始: user_id={user_id}')
                 payment_check = is_paid_user_company_centric(user_id)
+                print(f'[DEBUG] 決済チェック結果: user_id={user_id}, is_paid={payment_check["is_paid"]}, status={payment_check["subscription_status"]}, message={payment_check.get("message", "N/A")}')
+                
                 if not payment_check['is_paid']:
-                    print(f'[DEBUG] 未決済ユーザーの友達追加: user_id={user_id}, status={payment_check["subscription_status"]}')
+                    print(f'[DEBUG] 未決済ユーザー: user_id={user_id}, status={payment_check["subscription_status"]}')
                     # 制限メッセージを送信
                     restricted_message = get_restricted_message()
                     send_line_message(event['replyToken'], [restricted_message])
@@ -568,8 +571,9 @@ def line_webhook():
                 print(f'[DEBUG] イベント全体: {json.dumps(event, ensure_ascii=False, indent=2)}')
                 
                 # 決済状況をチェック（企業ID中心統合対応）
+                print(f'[DEBUG] 決済チェック開始: user_id={user_id}')
                 payment_check = is_paid_user_company_centric(user_id)
-                print(f'[DEBUG] 決済状況チェック結果: user_id={user_id}, is_paid={payment_check["is_paid"]}, status={payment_check["subscription_status"]}, message={payment_check.get("message", "N/A")}')
+                print(f'[DEBUG] 決済チェック結果: user_id={user_id}, is_paid={payment_check["is_paid"]}, status={payment_check["subscription_status"]}, message={payment_check.get("message", "N/A")}')
                 
                 if not payment_check['is_paid']:
                     print(f'[DEBUG] 未決済ユーザー: user_id={user_id}, status={payment_check["subscription_status"]}')
