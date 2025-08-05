@@ -440,6 +440,55 @@ def debug_cancellation_history(user_id):
     except Exception as e:
         return jsonify({'error': str(e)})
 
+@line_bp.route('/line/debug/test_webhook', methods=['POST'])
+def debug_test_webhook():
+    """デバッグ用LINE Webhookテスト"""
+    print(f'[DEBUG] デバッグWebhookテスト開始')
+    
+    try:
+        body = request.data.decode('utf-8')
+        events = json.loads(body).get('events', [])
+        print(f'[DEBUG] イベント数: {len(events)}')
+        
+        for event in events:
+            print(f'[DEBUG] イベント処理開始: {event.get("type")}')
+            print(f'[DEBUG] イベント詳細: {json.dumps(event, ensure_ascii=False, indent=2)}')
+            
+            if event.get('type') == 'message' and event['message'].get('type') == 'text':
+                user_id = event['source']['userId']
+                text = event['message']['text']
+                print(f'[DEBUG] テキストメッセージ受信: user_id={user_id}, text={text}')
+                
+                # 決済状況をチェック
+                print(f'[DEBUG] 決済チェック開始: user_id={user_id}')
+                payment_check = is_paid_user_company_centric(user_id)
+                print(f'[DEBUG] 決済チェック結果: {payment_check}')
+                
+                if not payment_check['is_paid']:
+                    print(f'[DEBUG] 未決済ユーザー: user_id={user_id}')
+                    return jsonify({
+                        'status': 'restricted',
+                        'user_id': user_id,
+                        'payment_check': payment_check,
+                        'message': '制限メッセージが送信されます'
+                    })
+                else:
+                    print(f'[DEBUG] 決済済みユーザー: user_id={user_id}')
+                    return jsonify({
+                        'status': 'allowed',
+                        'user_id': user_id,
+                        'payment_check': payment_check,
+                        'message': '正常に処理されます'
+                    })
+        
+        return jsonify({'status': 'no_events'})
+        
+    except Exception as e:
+        print(f'[ERROR] デバッグWebhookテストエラー: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
 @line_bp.route('/line/webhook', methods=['POST'])
 def line_webhook():
     print(f'[DEBUG] LINE Webhook受信開始')
@@ -450,7 +499,11 @@ def line_webhook():
     signature = request.headers.get('X-Line-Signature', '')
     body = request.data.decode('utf-8')
     LINE_CHANNEL_SECRET = os.getenv('LINE_CHANNEL_SECRET')
-    if LINE_CHANNEL_SECRET:
+    
+    # 開発環境では署名検証をスキップ（デバッグ用）
+    if os.getenv('FLASK_ENV') == 'development':
+        print(f'[DEBUG] 開発環境のため署名検証をスキップ')
+    elif LINE_CHANNEL_SECRET:
         try:
             hash = hmac.new(LINE_CHANNEL_SECRET.encode('utf-8'), body.encode('utf-8'), hashlib.sha256).digest()
             expected_signature = base64.b64encode(hash).decode('utf-8')
@@ -472,27 +525,6 @@ def line_webhook():
             if event.get('type') == 'follow':
                 user_id = event['source']['userId']
                 print(f'[DEBUG] 友達追加イベント: user_id={user_id}')
-                
-                # 決済状況をチェック（企業ID中心統合対応）
-                print(f'[DEBUG] 決済チェック開始: user_id={user_id}')
-                print(f'[DEBUG] 使用する関数: is_paid_user_company_centric')
-                print(f'[DEBUG] 関数呼び出し前: user_id={user_id}')
-                payment_check = is_paid_user_company_centric(user_id)
-                print(f'[DEBUG] 関数呼び出し後: user_id={user_id}, result={payment_check}')
-                print(f'[DEBUG] 決済チェック結果: user_id={user_id}, is_paid={payment_check["is_paid"]}, status={payment_check["subscription_status"]}, message={payment_check.get("message", "N/A")}')
-                print(f'[DEBUG] 決済チェック詳細: {json.dumps(payment_check, ensure_ascii=False, indent=2)}')
-                
-                if not payment_check['is_paid']:
-                    print(f'[DEBUG] 未決済ユーザー: user_id={user_id}, status={payment_check["subscription_status"]}')
-                    print(f'[DEBUG] 制限メッセージを送信: user_id={user_id}')
-                    # 制限メッセージを送信
-                    restricted_message = get_restricted_message()
-                    send_line_message(event['replyToken'], [restricted_message])
-                    continue
-                else:
-                    print(f'[DEBUG] 決済済みユーザー: user_id={user_id}, status={payment_check["subscription_status"]}')
-                    # 決済済みユーザーの場合は、正常なメッセージ処理に進む
-                    print(f'[DEBUG] 決済済みユーザーのため、正常なメッセージ処理に進む: user_id={user_id}')
                 
                 # 既に案内文が送信されているかチェック
                 if get_user_state(user_id) == 'welcome_sent':
@@ -615,12 +647,6 @@ def line_webhook():
                     if company:
                         print(f'[DEBUG] 未紐付け企業発見、紐付け処理開始: user_id={user_id}, company_id={company[0]}')
                         
-                        # 既に案内文が送信されているかチェック
-                        if get_user_state(user_id) == 'welcome_sent':
-                            print(f'[DEBUG] 既に案内文送信済み、スキップ: user_id={user_id}')
-                            conn.close()
-                            continue
-                        
                         # 既存のLINEユーザーID紐付けを解除（重複回避）
                         c.execute('UPDATE companies SET line_user_id = NULL WHERE line_user_id = %s', (user_id,))
                         
@@ -628,6 +654,27 @@ def line_webhook():
                         c.execute('UPDATE companies SET line_user_id = %s WHERE id = %s', (user_id, company[0]))
                         conn.commit()
                         print(f'[DEBUG] 初回メッセージ時の企業紐付け完了: user_id={user_id}, company_id={company[0]}')
+                        
+                        # 企業紐付け完了後、決済状況をチェック
+                        print(f'[DEBUG] 企業紐付け後の決済チェック開始: user_id={user_id}')
+                        payment_check = is_paid_user_company_centric(user_id)
+                        print(f'[DEBUG] 企業紐付け後の決済チェック結果: user_id={user_id}, is_paid={payment_check["is_paid"]}, status={payment_check["subscription_status"]}')
+                        
+                        if not payment_check['is_paid']:
+                            print(f'[DEBUG] 企業紐付け後も未決済: user_id={user_id}, status={payment_check["subscription_status"]}')
+                            # 制限メッセージを送信
+                            restricted_message = get_restricted_message()
+                            send_line_message(event['replyToken'], [restricted_message])
+                            conn.close()
+                            continue
+                        else:
+                            print(f'[DEBUG] 企業紐付け後、決済済み確認: user_id={user_id}')
+                        
+                        # 既に案内文が送信されているかチェック
+                        if get_user_state(user_id) == 'welcome_sent':
+                            print(f'[DEBUG] 既に案内文送信済み、スキップ: user_id={user_id}')
+                            conn.close()
+                            continue
                         
                         # 決済画面からLINEに移動した時の初回案内文（必ず送信）
                         print(f'[DEBUG] 案内文送信開始: user_id={user_id}, replyToken={event["replyToken"]}')
@@ -651,6 +698,21 @@ def line_webhook():
                 else:
                     company_id = company[0]
                     stripe_subscription_id = company[2]
+                    
+                    # 既存企業の場合、決済状況を再チェック
+                    print(f'[DEBUG] 既存企業の決済チェック開始: user_id={user_id}')
+                    payment_check = is_paid_user_company_centric(user_id)
+                    print(f'[DEBUG] 既存企業の決済チェック結果: user_id={user_id}, is_paid={payment_check["is_paid"]}, status={payment_check["subscription_status"]}')
+                    
+                    if not payment_check['is_paid']:
+                        print(f'[DEBUG] 既存企業だが未決済: user_id={user_id}, status={payment_check["subscription_status"]}')
+                        # 制限メッセージを送信
+                        restricted_message = get_restricted_message()
+                        send_line_message(event['replyToken'], [restricted_message])
+                        conn.close()
+                        continue
+                    else:
+                        print(f'[DEBUG] 既存企業で決済済み確認: user_id={user_id}')
                     
                     # 通常のメッセージ処理に進む（初回案内文の送信は後で処理）
                 

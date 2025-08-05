@@ -64,15 +64,6 @@ def ai_schedule_webhook(company_id):
                 user_id = event['source']['userId']
                 print(f'[AI Schedule Webhook] 友達追加イベント: user_id={user_id}')
                 
-                # 決済状況をチェック（企業ID中心統合対応）
-                payment_check = is_paid_user_company_centric(user_id)
-                if not payment_check['is_paid']:
-                    print(f'[AI Schedule Webhook] 未決済ユーザーの友達追加: user_id={user_id}, status={payment_check["subscription_status"]}')
-                    # 制限メッセージを送信
-                    restricted_message = get_restricted_message()
-                    send_line_message(event['replyToken'], [restricted_message])
-                    continue
-                
                 # 既に案内文が送信されているかチェック
                 if get_user_state(user_id) == 'welcome_sent':
                     print(f'[AI Schedule Webhook] 既に案内文送信済み、スキップ: user_id={user_id}')
@@ -86,6 +77,20 @@ def ai_schedule_webhook(company_id):
                 if existing_user:
                     # 既に紐付け済みの場合
                     print(f'[AI Schedule Webhook] 既に紐付け済み: user_id={user_id}, db_user_id={existing_user[0]}')
+                    
+                    # 企業紐付け完了後、決済状況をチェック
+                    print(f'[AI Schedule Webhook] 企業紐付け後の決済チェック開始: user_id={user_id}')
+                    payment_check = is_paid_user_company_centric(user_id)
+                    print(f'[AI Schedule Webhook] 企業紐付け後の決済チェック結果: user_id={user_id}, is_paid={payment_check["is_paid"]}, status={payment_check["subscription_status"]}')
+                    
+                    if not payment_check['is_paid']:
+                        print(f'[AI Schedule Webhook] 企業紐付け後も未決済: user_id={user_id}, status={payment_check["subscription_status"]}')
+                        # 制限メッセージを送信
+                        restricted_message = get_restricted_message()
+                        send_line_message(event['replyToken'], [restricted_message])
+                        continue
+                    else:
+                        print(f'[AI Schedule Webhook] 企業紐付け後、決済済み確認: user_id={user_id}')
                     
                     # AI予定秘書用のウェルカムメッセージを送信
                     welcome_message = {
@@ -111,6 +116,20 @@ def ai_schedule_webhook(company_id):
                         c.execute('UPDATE users SET line_user_id = %s WHERE id = %s', (user_id, unlinked_user[0]))
                         conn.commit()
                         print(f'[AI Schedule Webhook] ユーザー紐付け完了: user_id={user_id}, db_user_id={unlinked_user[0]}')
+                        
+                        # 企業紐付け完了後、決済状況をチェック
+                        print(f'[AI Schedule Webhook] 企業紐付け後の決済チェック開始: user_id={user_id}')
+                        payment_check = is_paid_user_company_centric(user_id)
+                        print(f'[AI Schedule Webhook] 企業紐付け後の決済チェック結果: user_id={user_id}, is_paid={payment_check["is_paid"]}, status={payment_check["subscription_status"]}')
+                        
+                        if not payment_check['is_paid']:
+                            print(f'[AI Schedule Webhook] 企業紐付け後も未決済: user_id={user_id}, status={payment_check["subscription_status"]}')
+                            # 制限メッセージを送信
+                            restricted_message = get_restricted_message()
+                            send_line_message(event['replyToken'], [restricted_message])
+                            continue
+                        else:
+                            print(f'[AI Schedule Webhook] 企業紐付け後、決済済み確認: user_id={user_id}')
                         
                         # AI予定秘書用のウェルカムメッセージを送信
                         welcome_message = {

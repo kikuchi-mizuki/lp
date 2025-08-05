@@ -36,8 +36,8 @@ def debug_user_payment_status(line_user_id):
         user_result = c.fetchone()
         
         if not user_result:
-                    print("❌ データベースに企業が見つかりません")
-        print("   原因: LINE_IDがデータベースに登録されていない")
+            print("❌ データベースに企業が見つかりません")
+            print("   原因: LINE_IDがデータベースに登録されていない")
             return
         
         company_id, company_name, stripe_subscription_id, status, created_at, updated_at = user_result
@@ -99,7 +99,7 @@ def debug_user_payment_status(line_user_id):
 
 def list_recent_users():
     """最近のユーザー一覧を表示"""
-            print("\n📋 最近の企業一覧")
+    print("\n📋 最近の企業一覧")
     print("=" * 30)
     
     try:
