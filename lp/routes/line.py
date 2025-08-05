@@ -476,7 +476,9 @@ def line_webhook():
                 # 決済状況をチェック（企業ID中心統合対応）
                 print(f'[DEBUG] 決済チェック開始: user_id={user_id}')
                 print(f'[DEBUG] 使用する関数: is_paid_user_company_centric')
+                print(f'[DEBUG] 関数呼び出し前: user_id={user_id}')
                 payment_check = is_paid_user_company_centric(user_id)
+                print(f'[DEBUG] 関数呼び出し後: user_id={user_id}, result={payment_check}')
                 print(f'[DEBUG] 決済チェック結果: user_id={user_id}, is_paid={payment_check["is_paid"]}, status={payment_check["subscription_status"]}, message={payment_check.get("message", "N/A")}')
                 print(f'[DEBUG] 決済チェック詳細: {json.dumps(payment_check, ensure_ascii=False, indent=2)}')
                 
@@ -582,7 +584,9 @@ def line_webhook():
                 # 決済状況をチェック（企業ID中心統合対応）
                 print(f'[DEBUG] 決済チェック開始: user_id={user_id}')
                 print(f'[DEBUG] 使用する関数: is_paid_user_company_centric')
+                print(f'[DEBUG] 関数呼び出し前: user_id={user_id}')
                 payment_check = is_paid_user_company_centric(user_id)
+                print(f'[DEBUG] 関数呼び出し後: user_id={user_id}, result={payment_check}')
                 print(f'[DEBUG] 決済チェック結果: user_id={user_id}, is_paid={payment_check["is_paid"]}, status={payment_check["subscription_status"]}, message={payment_check.get("message", "N/A")}')
                 print(f'[DEBUG] 決済チェック詳細: {json.dumps(payment_check, ensure_ascii=False, indent=2)}')
                 
