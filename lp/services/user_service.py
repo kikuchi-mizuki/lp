@@ -208,7 +208,7 @@ def is_paid_user_company_centric(line_user_id):
         
         # 企業の決済状況をチェック
         c.execute('''
-            SELECT subscription_status 
+            SELECT subscription_status, current_period_end
             FROM company_payments 
             WHERE company_id = %s 
             ORDER BY created_at DESC 
@@ -223,13 +223,39 @@ def is_paid_user_company_centric(line_user_id):
         
         # 決済状況の判定
         if payment_result and payment_result[0] == 'active':
-            print(f'[DEBUG] 有効な決済: company_id={company_id}, status=active')
-            return {
-                'is_paid': True,
-                'subscription_status': 'active',
-                'message': None,
-                'redirect_url': None
-            }
+            current_period_end = payment_result[1]
+            print(f'[DEBUG] 有効な決済: company_id={company_id}, status=active, period_end={current_period_end}')
+            
+            # 期限切れチェック
+            if current_period_end:
+                from datetime import datetime, timezone, timedelta
+                jst = timezone(timedelta(hours=9))
+                current_time = datetime.now(jst)
+                
+                if current_period_end > current_time:
+                    print(f'[DEBUG] 有効期限内: company_id={company_id}')
+                    return {
+                        'is_paid': True,
+                        'subscription_status': 'active',
+                        'message': None,
+                        'redirect_url': None
+                    }
+                else:
+                    print(f'[DEBUG] 期限切れ: company_id={company_id}, period_end={current_period_end}, current_time={current_time}')
+                    return {
+                        'is_paid': False,
+                        'subscription_status': 'expired',
+                        'message': 'サブスクリプションの有効期限が切れています。',
+                        'redirect_url': 'https://line.me/R/ti/p/@ai_collections'
+                    }
+            else:
+                print(f'[DEBUG] 期限未設定: company_id={company_id}')
+                return {
+                    'is_paid': True,
+                    'subscription_status': 'active',
+                    'message': None,
+                    'redirect_url': None
+                }
         else:
             print(f'[DEBUG] 無効な決済または未決済: company_id={company_id}, payment_status={payment_result[0] if payment_result else "none"}')
             return {

@@ -66,7 +66,7 @@ def debug_database_state():
         result['data']['company_payments'] = payments_data
         
         # 3. usersテーブルの内容確認
-        c.execute("SELECT id, email, line_user_id, stripe_subscription_id, created_at FROM users ORDER BY id")
+        c.execute("SELECT id, email, line_user_id, stripe_subscription_id FROM users ORDER BY id")
         users = c.fetchall()
         
         users_data = []
@@ -75,8 +75,7 @@ def debug_database_state():
                 'id': user[0],
                 'email': user[1],
                 'line_user_id': user[2],
-                'stripe_subscription_id': user[3],
-                'created_at': str(user[4]) if user[4] else None
+                'stripe_subscription_id': user[3]
             })
         
         result['data']['users'] = users_data
