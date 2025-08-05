@@ -520,8 +520,15 @@ def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, co
             return
         
         # サブスクリプションのトライアル期間をチェック
-        subscription_status = check_subscription_status(stripe_subscription_id)
-        is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
+        try:
+            subscription_status = check_subscription_status(stripe_subscription_id)
+            is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
+            print(f'[DEBUG] サブスクリプション状態: {subscription_status}')
+        except Exception as e:
+            print(f'[DEBUG] Stripeサブスクリプション状態確認エラー: {e}')
+            # エラーの場合はデフォルト値を使用
+            is_trial_period = False
+            subscription_status = {'subscription': {'status': 'error'}}
         
         # トライアル期間終了後のコンテンツ追加回数を正しく計算
         if is_trial_period:
@@ -532,20 +539,27 @@ def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, co
         else:
             # トライアル期間終了後は、トライアル期間中の追加分を除いて計算
             # トライアル期間中の追加分を取得
-            conn_trial = get_db_connection()
-            c_trial = conn_trial.cursor()
-            c_trial.execute('''
-                SELECT COUNT(*) FROM usage_logs 
-                WHERE user_id = %s AND pending_charge = FALSE
-            ''', (user_id_db,))
-            trial_additions = c_trial.fetchone()[0]
-            conn_trial.close()
-            
-            # トライアル期間終了後の追加回数
-            post_trial_count = total_usage_count - trial_additions + 1
-            current_count = post_trial_count
-            is_free = current_count == 1
-            print(f'[DEBUG] 通常期間: total_usage_count={total_usage_count}, trial_additions={trial_additions}, current_count={current_count}, is_free={is_free}')
+            try:
+                conn_trial = get_db_connection()
+                c_trial = conn_trial.cursor()
+                c_trial.execute('''
+                    SELECT COUNT(*) FROM usage_logs 
+                    WHERE user_id = %s AND pending_charge = FALSE
+                ''', (user_id_db,))
+                trial_additions = c_trial.fetchone()[0]
+                conn_trial.close()
+                
+                # トライアル期間終了後の追加回数
+                post_trial_count = total_usage_count - trial_additions + 1
+                current_count = post_trial_count
+                is_free = current_count == 1
+                print(f'[DEBUG] 通常期間: total_usage_count={total_usage_count}, trial_additions={trial_additions}, current_count={current_count}, is_free={is_free}')
+            except Exception as e:
+                print(f'[DEBUG] トライアル期間計算エラー: {e}')
+                # エラーの場合はシンプルな計算
+                current_count = total_usage_count + 1
+                is_free = current_count == 1
+                print(f'[DEBUG] フォールバック計算: total_usage_count={total_usage_count}, current_count={current_count}, is_free={is_free}')
         
         if current_count == 1:
             price_message = f"料金：無料（{current_count}個目）"
