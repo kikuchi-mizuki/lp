@@ -69,9 +69,9 @@ def stripe_webhook():
                     # 企業データが存在しない場合は作成
                     company_name = f"企業_{email.split('@')[0]}"
                     c.execute('''
-                        INSERT INTO companies (company_name, company_code, stripe_subscription_id, status, created_at)
-                        VALUES (%s, %s, %s, 'active', CURRENT_TIMESTAMP)
-                    ''', (company_name, f"company_{user_id}", subscription_id))
+                        INSERT INTO companies (company_name, company_code, email, stripe_subscription_id, status, created_at)
+                        VALUES (%s, %s, %s, %s, 'active', CURRENT_TIMESTAMP)
+                    ''', (company_name, f"company_{user_id}", email, subscription_id))
                     company_id = c.lastrowid
                     
                     # company_paymentsテーブルにも決済データを作成
@@ -105,9 +105,9 @@ def stripe_webhook():
                 # companiesテーブルにも企業データを作成
                 company_name = f"企業_{email.split('@')[0]}"
                 c.execute('''
-                    INSERT INTO companies (company_name, company_code, stripe_subscription_id, status, created_at)
-                    VALUES (%s, %s, %s, 'active', CURRENT_TIMESTAMP)
-                ''', (company_name, f"company_{user_id}", subscription_id))
+                    INSERT INTO companies (company_name, company_code, email, stripe_subscription_id, status, created_at)
+                    VALUES (%s, %s, %s, %s, 'active', CURRENT_TIMESTAMP)
+                ''', (company_name, f"company_{user_id}", email, subscription_id))
                 company_id = c.lastrowid
                 
                 # company_paymentsテーブルにも決済データを作成
@@ -173,9 +173,9 @@ def stripe_webhook():
                     # 企業データが存在しない場合は作成
                     company_name = f"企業_{email.split('@')[0]}"
                     c.execute('''
-                        INSERT INTO companies (company_name, company_code, stripe_subscription_id, status, created_at)
-                        VALUES (%s, %s, %s, 'active', CURRENT_TIMESTAMP)
-                    ''', (company_name, f"company_{user_id}", subscription_id))
+                        INSERT INTO companies (company_name, company_code, email, stripe_subscription_id, status, created_at)
+                        VALUES (%s, %s, %s, %s, 'active', CURRENT_TIMESTAMP)
+                    ''', (company_name, f"company_{user_id}", email, subscription_id))
                     company_id = c.lastrowid
                     
                     # company_paymentsテーブルにも決済データを作成
@@ -218,9 +218,9 @@ def stripe_webhook():
                 # companiesテーブルにも企業データを作成
                 company_name = f"企業_{email.split('@')[0]}"
                 c.execute('''
-                    INSERT INTO companies (company_name, company_code, stripe_subscription_id, status, created_at)
-                    VALUES (%s, %s, %s, 'active', CURRENT_TIMESTAMP)
-                ''', (company_name, f"company_{user_id}", subscription_id))
+                    INSERT INTO companies (company_name, company_code, email, stripe_subscription_id, status, created_at)
+                    VALUES (%s, %s, %s, %s, 'active', CURRENT_TIMESTAMP)
+                ''', (company_name, f"company_{user_id}", email, subscription_id))
                 company_id = c.lastrowid
                 
                 # company_paymentsテーブルにも決済データを作成
@@ -277,9 +277,9 @@ def stripe_webhook():
                     # 企業データが存在しない場合は作成
                     company_name = f"企業_{email.split('@')[0]}"
                     c.execute('''
-                        INSERT INTO companies (company_name, company_code, stripe_subscription_id, status, created_at)
-                        VALUES (%s, %s, %s, 'active', CURRENT_TIMESTAMP)
-                    ''', (company_name, f"company_{user_id}", subscription_id))
+                        INSERT INTO companies (company_name, company_code, email, stripe_subscription_id, status, created_at)
+                        VALUES (%s, %s, %s, %s, 'active', CURRENT_TIMESTAMP)
+                    ''', (company_name, f"company_{user_id}", email, subscription_id))
                     company_id = c.lastrowid
                     
                     # company_paymentsテーブルにも決済データを作成
@@ -312,9 +312,9 @@ def stripe_webhook():
                 # companiesテーブルにも企業データを作成
                 company_name = f"企業_{email.split('@')[0]}"
                 c.execute('''
-                    INSERT INTO companies (company_name, company_code, stripe_subscription_id, status, created_at)
-                    VALUES (%s, %s, %s, 'active', CURRENT_TIMESTAMP)
-                ''', (company_name, f"company_{user_id}", subscription_id))
+                    INSERT INTO companies (company_name, company_code, email, stripe_subscription_id, status, created_at)
+                    VALUES (%s, %s, %s, %s, 'active', CURRENT_TIMESTAMP)
+                ''', (company_name, f"company_{user_id}", email, subscription_id))
                 company_id = c.lastrowid
                 
                 # company_paymentsテーブルにも決済データを作成
