@@ -489,6 +489,8 @@ def line_webhook():
                     continue
                 else:
                     print(f'[DEBUG] 決済済みユーザー: user_id={user_id}, status={payment_check["subscription_status"]}')
+                    # 決済済みユーザーの場合は、正常なメッセージ処理に進む
+                    print(f'[DEBUG] 決済済みユーザーのため、正常なメッセージ処理に進む: user_id={user_id}')
                 
                 # 既に案内文が送信されているかチェック
                 if get_user_state(user_id) == 'welcome_sent':
