@@ -1466,25 +1466,41 @@ def debug_create_content_period(user_id, content_type):
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)})
 
-@app.route('/debug/railway_env')
-def debug_railway_env():
-    """Railway環境変数を取得"""
+@app.route('/debug/railway')
+def debug_railway():
+    """Railway環境変数のデバッグ情報"""
     try:
+        railway_db_url = os.getenv('RAILWAY_DATABASE_URL')
         railway_token = os.getenv('RAILWAY_TOKEN')
         railway_project_id = os.getenv('RAILWAY_PROJECT_ID')
-        base_domain = os.getenv('BASE_DOMAIN')
+        
+        # データベース接続テスト
+        db_connection_success = False
+        db_error = None
+        if railway_db_url:
+            try:
+                import psycopg2
+                conn = psycopg2.connect(railway_db_url)
+                c = conn.cursor()
+                c.execute('SELECT COUNT(*) FROM companies')
+                count = c.fetchone()[0]
+                conn.close()
+                db_connection_success = True
+            except Exception as e:
+                db_error = str(e)
         
         return jsonify({
-            'RAILWAY_TOKEN': railway_token,
-            'RAILWAY_PROJECT_ID': railway_project_id,
-            'BASE_DOMAIN': base_domain,
-            'success': True
+            'railway_database_url_set': bool(railway_db_url),
+            'railway_token_set': bool(railway_token),
+            'railway_project_id_set': bool(railway_project_id),
+            'database_connection_success': db_connection_success,
+            'database_error': db_error,
+            'companies_count': count if db_connection_success else None
         })
     except Exception as e:
         return jsonify({
-            'error': str(e),
-            'success': False
-        }), 500
+            'error': str(e)
+        })
 
 if __name__ == '__main__':
     # データベース初期化をスキップしてアプリケーションを起動

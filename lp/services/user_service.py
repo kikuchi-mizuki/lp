@@ -159,6 +159,8 @@ def is_paid_user_company_centric(line_user_id):
         load_dotenv()
         
         database_url = os.getenv('RAILWAY_DATABASE_URL')
+        print(f'[DEBUG] データベースURL確認: {database_url[:20] if database_url else "None"}...')
+        
         if not database_url:
             print(f'[ERROR] RAILWAY_DATABASE_URLが設定されていません')
             return {
@@ -168,8 +170,10 @@ def is_paid_user_company_centric(line_user_id):
                 'redirect_url': 'https://line.me/R/ti/p/@ai_collections'
             }
         
+        print(f'[DEBUG] PostgreSQL接続開始')
         conn = psycopg2.connect(database_url)
         c = conn.cursor()
+        print(f'[DEBUG] PostgreSQL接続成功')
         
         # 企業情報を取得（LINEユーザーIDで検索）
         c.execute('''
@@ -207,6 +211,7 @@ def is_paid_user_company_centric(line_user_id):
         print(f'[DEBUG] 決済状況検索結果: company_id={company_id}, payment_result={payment_result}')
         
         conn.close()
+        print(f'[DEBUG] データベース接続終了')
         
         # 決済状況の判定
         if payment_result and payment_result[0] == 'active':
