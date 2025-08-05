@@ -173,7 +173,7 @@ def is_paid_user_company_centric(line_user_id):
         c = conn.cursor()
         print(f'[DEBUG] PostgreSQL接続成功')
         print(f'[DEBUG] 接続先ホスト: {conn.info.host}')
-        print(f'[DEBUG] 接続先データベース: {conn.info.database}')
+        print(f'[DEBUG] 接続先データベース: {conn.info.dbname}')
         print(f'[DEBUG] 接続先ユーザー: {conn.info.user}')
         
         # 企業情報を取得（LINEユーザーIDで検索）
