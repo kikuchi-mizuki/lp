@@ -475,15 +475,20 @@ def line_webhook():
                 
                 # 決済状況をチェック（企業ID中心統合対応）
                 print(f'[DEBUG] 決済チェック開始: user_id={user_id}')
+                print(f'[DEBUG] 使用する関数: is_paid_user_company_centric')
                 payment_check = is_paid_user_company_centric(user_id)
                 print(f'[DEBUG] 決済チェック結果: user_id={user_id}, is_paid={payment_check["is_paid"]}, status={payment_check["subscription_status"]}, message={payment_check.get("message", "N/A")}')
+                print(f'[DEBUG] 決済チェック詳細: {json.dumps(payment_check, ensure_ascii=False, indent=2)}')
                 
                 if not payment_check['is_paid']:
                     print(f'[DEBUG] 未決済ユーザー: user_id={user_id}, status={payment_check["subscription_status"]}')
+                    print(f'[DEBUG] 制限メッセージを送信: user_id={user_id}')
                     # 制限メッセージを送信
                     restricted_message = get_restricted_message()
                     send_line_message(event['replyToken'], [restricted_message])
                     continue
+                else:
+                    print(f'[DEBUG] 決済済みユーザー: user_id={user_id}, status={payment_check["subscription_status"]}')
                 
                 # 既に案内文が送信されているかチェック
                 if get_user_state(user_id) == 'welcome_sent':
@@ -574,15 +579,20 @@ def line_webhook():
                 
                 # 決済状況をチェック（企業ID中心統合対応）
                 print(f'[DEBUG] 決済チェック開始: user_id={user_id}')
+                print(f'[DEBUG] 使用する関数: is_paid_user_company_centric')
                 payment_check = is_paid_user_company_centric(user_id)
                 print(f'[DEBUG] 決済チェック結果: user_id={user_id}, is_paid={payment_check["is_paid"]}, status={payment_check["subscription_status"]}, message={payment_check.get("message", "N/A")}')
+                print(f'[DEBUG] 決済チェック詳細: {json.dumps(payment_check, ensure_ascii=False, indent=2)}')
                 
                 if not payment_check['is_paid']:
                     print(f'[DEBUG] 未決済ユーザー: user_id={user_id}, status={payment_check["subscription_status"]}')
+                    print(f'[DEBUG] 制限メッセージを送信: user_id={user_id}')
                     # 制限メッセージを送信
                     restricted_message = get_restricted_message()
                     send_line_message(event['replyToken'], [restricted_message])
                     continue
+                else:
+                    print(f'[DEBUG] 決済済みユーザー: user_id={user_id}, status={payment_check["subscription_status"]}')
                 
                 conn = get_db_connection()
                 c = conn.cursor()
