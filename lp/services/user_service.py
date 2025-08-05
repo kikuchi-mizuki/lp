@@ -162,6 +162,8 @@ def is_paid_user_company_centric(line_user_id):
         database_url = "postgresql://postgres:WZgnjZezoefHmxbwRjUbiPhajtwubmUs@gondola.proxy.rlwy.net:16797/railway"
         print(f'[DEBUG] PostgreSQL接続開始: {database_url[:50]}...')
         print(f'[DEBUG] 実際の接続URL: {database_url}')
+        print(f'[DEBUG] 環境変数DATABASE_URL: {os.getenv("DATABASE_URL", "未設定")}')
+        print(f'[DEBUG] 環境変数RAILWAY_DATABASE_URL: {os.getenv("RAILWAY_DATABASE_URL", "未設定")}')
         
         conn = psycopg2.connect(database_url)
         c = conn.cursor()
