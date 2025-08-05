@@ -668,6 +668,7 @@ def line_webhook():
                 
                 # 状態に基づく処理（優先順位順）
                 print(f'[DEBUG] 状態チェック: state={state}, text={text}')
+                print(f'[DEBUG] メッセージ処理分岐開始: text="{text}", state="{state}"')
                 if state == 'add_select':
                     print(f'[DEBUG] add_select状態での処理: user_id={user_id}, text={text}')
                     if text in ['1', '2', '3', '4']:
@@ -753,7 +754,9 @@ def line_webhook():
                     print(f'[DEBUG] 追加コマンド受信: user_id={user_id}, state={state}')
                     set_user_state(user_id, 'add_select')
                     print(f'[DEBUG] ユーザー状態をadd_selectに設定: user_id={user_id}')
+                    print(f'[DEBUG] handle_add_content呼び出し開始: replyToken={event["replyToken"]}, company_id={company_id}, stripe_subscription_id={stripe_subscription_id}')
                     handle_add_content(event['replyToken'], company_id, stripe_subscription_id)
+                    print(f'[DEBUG] handle_add_content呼び出し完了')
                 elif text == 'メニュー' and state != 'cancel_select':
                     print(f'[DEBUG] メニューコマンド受信: user_id={user_id}, state={state}')
                     send_line_message(event['replyToken'], [get_menu_message()])
@@ -887,6 +890,7 @@ def line_webhook():
                         send_line_message(event['replyToken'], [{"type": "text", "text": 'ご登録メールアドレスが見つかりません。LPでご登録済みかご確認ください。'}])
                 else:
                     print(f'[DEBUG] デフォルト処理: user_id={user_id}, state={state}, text={text}')
+                    print(f'[DEBUG] どの条件にも当てはまらないためデフォルト処理に進む: text="{text}", state="{state}"')
                     # どの条件にも当てはまらない場合のデフォルト処理
                     if state in ['cancel_select', 'add_select'] or (state and state.startswith('confirm_')):
                         # 特定の状態ではデフォルトメッセージを送信しない
