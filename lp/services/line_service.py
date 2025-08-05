@@ -1548,7 +1548,7 @@ def handle_status_check(reply_token, user_id_db):
         
         # 利用状況を取得
         c.execute('''
-            SELECT content_type, created_at, is_free, pending_charge 
+            SELECT content_type, created_at, is_free, subscription_status
             FROM usage_logs 
             WHERE user_id = %s 
             ORDER BY created_at DESC
@@ -1584,21 +1584,21 @@ def handle_status_check(reply_token, user_id_db):
                 content_type = log[0]
                 created_at = log[1]
                 is_free = log[2]
-                pending_charge = log[3]
+                subscription_status = log[3]
                 
                 if content_type not in content_count:
                     content_count[content_type] = {
                         'total': 0,
                         'free': 0,
                         'paid': 0,
-                        'pending': 0
+                        'active': 0
                     }
                 
                 content_count[content_type]['total'] += 1
                 if is_free:
                     content_count[content_type]['free'] += 1
-                elif pending_charge:
-                    content_count[content_type]['pending'] += 1
+                elif subscription_status == 'active':
+                    content_count[content_type]['active'] += 1
                 else:
                     content_count[content_type]['paid'] += 1
             
@@ -1608,8 +1608,8 @@ def handle_status_check(reply_token, user_id_db):
                     status_message += f" (無料: {counts['free']}回)"
                 if counts['paid'] > 0:
                     status_message += f" (有料: {counts['paid']}回)"
-                if counts['pending'] > 0:
-                    status_message += f" (未課金: {counts['pending']}回)"
+                if counts['active'] > 0:
+                    status_message += f" (有効: {counts['active']}回)"
                 status_message += "\n"
         else:
             status_message += "📋 利用コンテンツ: まだ利用していません\n"
