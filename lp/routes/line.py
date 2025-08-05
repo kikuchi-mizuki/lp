@@ -485,16 +485,16 @@ def line_webhook():
                     print(f'[DEBUG] 既に案内文送信済み、スキップ: user_id={user_id}')
                     continue
                 
-                # 既存のLINEユーザーIDで検索（LINEユーザーID変更の可能性を考慮）
+                # 企業ID中心統合システムで企業情報を検索
                 conn = get_db_connection()
                 c = conn.cursor()
-                c.execute('SELECT id, stripe_subscription_id, line_user_id FROM users WHERE line_user_id = %s', (user_id,))
-                existing_user = c.fetchone()
-                print(f'[DEBUG] 友達追加時の既存ユーザー検索結果: {existing_user}')
+                c.execute('SELECT id, company_name, stripe_subscription_id FROM companies WHERE line_user_id = %s', (user_id,))
+                existing_company = c.fetchone()
+                print(f'[DEBUG] 友達追加時の企業検索結果: {existing_company}')
                 
-                if existing_user:
+                if existing_company:
                     # 既に紐付け済みの場合
-                    print(f'[DEBUG] 既に紐付け済み: user_id={user_id}, db_user_id={existing_user[0]}')
+                    print(f'[DEBUG] 既に紐付け済み: user_id={user_id}, company_id={existing_company[0]}')
                     
                     # ボタン付きのウェルカムメッセージを送信
                     print(f'[DEBUG] 案内文送信開始: user_id={user_id}, replyToken={event["replyToken"]}')
@@ -510,16 +510,16 @@ def line_webhook():
                         print(f'[DEBUG] replyToken使用済みのため代替メッセージ送信をスキップ: user_id={user_id}')
                         set_user_state(user_id, 'welcome_sent')
                 else:
-                    # 未紐付けユーザーを検索
-                    c.execute('SELECT id, stripe_subscription_id FROM users WHERE line_user_id IS NULL ORDER BY created_at DESC LIMIT 1')
-                    unlinked_user = c.fetchone()
-                    print(f'[DEBUG] 友達追加時の未紐付けユーザー検索結果: {unlinked_user}')
+                    # 未紐付け企業を検索
+                    c.execute('SELECT id, company_name, stripe_subscription_id FROM companies WHERE line_user_id IS NULL ORDER BY created_at DESC LIMIT 1')
+                    unlinked_company = c.fetchone()
+                    print(f'[DEBUG] 友達追加時の未紐付け企業検索結果: {unlinked_company}')
                     
-                    if unlinked_user:
+                    if unlinked_company:
                         # 新しい紐付けを作成
-                        c.execute('UPDATE users SET line_user_id = %s WHERE id = %s', (user_id, unlinked_user[0]))
+                        c.execute('UPDATE companies SET line_user_id = %s WHERE id = %s', (user_id, unlinked_company[0]))
                         conn.commit()
-                        print(f'[DEBUG] ユーザー紐付け完了: user_id={user_id}, db_user_id={unlinked_user[0]}')
+                        print(f'[DEBUG] 企業紐付け完了: user_id={user_id}, company_id={unlinked_company[0]}')
                         
                         # ボタン付きのウェルカムメッセージを送信
                         print(f'[DEBUG] 案内文送信開始: user_id={user_id}, replyToken={event["replyToken"]}')
@@ -535,8 +535,8 @@ def line_webhook():
                             print(f'[DEBUG] replyToken使用済みのため代替メッセージ送信をスキップ: user_id={user_id}')
                             set_user_state(user_id, 'welcome_sent')
                     else:
-                        # 未登録ユーザーの場合
-                        print(f'[DEBUG] 未登録ユーザー: user_id={user_id}')
+                        # 未登録企業の場合
+                        print(f'[DEBUG] 未登録企業: user_id={user_id}')
                         from utils.message_templates import get_not_registered_message
                         send_line_message(event['replyToken'], [{"type": "text", "text": get_not_registered_message()}])
                 
@@ -551,13 +551,13 @@ def line_webhook():
                 # line_user_idをクリア（ブロックされた場合の対応）
                 conn = get_db_connection()
                 c = conn.cursor()
-                c.execute('UPDATE users SET line_user_id = NULL WHERE line_user_id = %s', (user_id,))
+                c.execute('UPDATE companies SET line_user_id = NULL WHERE line_user_id = %s', (user_id,))
                 conn.commit()
                 conn.close()
                 
                 # ユーザー状態もクリア
                 clear_user_state(user_id)
-                print(f'[DEBUG] ユーザー紐付け解除: user_id={user_id}')
+                print(f'[DEBUG] 企業紐付け解除: user_id={user_id}')
                 continue
             
             # テキストメッセージの処理
@@ -580,18 +580,18 @@ def line_webhook():
                 
                 conn = get_db_connection()
                 c = conn.cursor()
-                c.execute('SELECT id, stripe_subscription_id, line_user_id FROM users WHERE line_user_id = %s', (user_id,))
-                user = c.fetchone()
-                print(f'[DEBUG] 既存ユーザー検索結果: {user}')
+                c.execute('SELECT id, company_name, stripe_subscription_id FROM companies WHERE line_user_id = %s', (user_id,))
+                company = c.fetchone()
+                print(f'[DEBUG] 既存企業検索結果: {company}')
                 
-                if not user:
-                    print(f'[DEBUG] 既存ユーザーが見つからないため、未紐付けユーザーを検索')
-                    c.execute('SELECT id, stripe_subscription_id FROM users WHERE line_user_id IS NULL ORDER BY created_at DESC LIMIT 1')
-                    user = c.fetchone()
-                    print(f'[DEBUG] 未紐付けユーザー検索結果: {user}')
+                if not company:
+                    print(f'[DEBUG] 既存企業が見つからないため、未紐付け企業を検索')
+                    c.execute('SELECT id, company_name, stripe_subscription_id FROM companies WHERE line_user_id IS NULL ORDER BY created_at DESC LIMIT 1')
+                    company = c.fetchone()
+                    print(f'[DEBUG] 未紐付け企業検索結果: {company}')
                     
-                    if user:
-                        print(f'[DEBUG] 未紐付けユーザー発見、紐付け処理開始: user_id={user_id}, db_user_id={user[0]}')
+                    if company:
+                        print(f'[DEBUG] 未紐付け企業発見、紐付け処理開始: user_id={user_id}, company_id={company[0]}')
                         
                         # 既に案内文が送信されているかチェック
                         if get_user_state(user_id) == 'welcome_sent':
@@ -600,12 +600,12 @@ def line_webhook():
                             continue
                         
                         # 既存のLINEユーザーID紐付けを解除（重複回避）
-                        c.execute('UPDATE users SET line_user_id = NULL WHERE line_user_id = %s', (user_id,))
+                        c.execute('UPDATE companies SET line_user_id = NULL WHERE line_user_id = %s', (user_id,))
                         
                         # 新しい紐付けを作成
-                        c.execute('UPDATE users SET line_user_id = %s WHERE id = %s', (user_id, user[0]))
+                        c.execute('UPDATE companies SET line_user_id = %s WHERE id = %s', (user_id, company[0]))
                         conn.commit()
-                        print(f'[DEBUG] 初回メッセージ時のユーザー紐付け完了: user_id={user_id}, db_user_id={user[0]}')
+                        print(f'[DEBUG] 初回メッセージ時の企業紐付け完了: user_id={user_id}, company_id={company[0]}')
                         
                         # 決済画面からLINEに移動した時の初回案内文（必ず送信）
                         print(f'[DEBUG] 案内文送信開始: user_id={user_id}, replyToken={event["replyToken"]}')
@@ -622,13 +622,13 @@ def line_webhook():
                             print(f'[DEBUG] replyToken使用済みのため代替メッセージ送信をスキップ: user_id={user_id}')
                             set_user_state(user_id, 'welcome_sent')
                     else:
-                        print(f'[DEBUG] 未紐付けユーザーも見つからない')
+                        print(f'[DEBUG] 未紐付け企業も見つからない')
                         send_line_message(event['replyToken'], [{"type": "text", "text": get_not_registered_message()}])
                     conn.close()
                     continue
                 else:
-                    user_id_db = user[0]
-                    stripe_subscription_id = user[1]
+                    company_id = company[0]
+                    stripe_subscription_id = company[2]
                     
                     # 通常のメッセージ処理に進む（初回案内文の送信は後で処理）
                 
@@ -651,26 +651,26 @@ def line_webhook():
                     if text in ['1', '2', '3', '4']:
                         print(f'[DEBUG] コンテンツ選択: text={text}')
                         set_user_state(user_id, f'confirm_{text}')
-                        handle_content_selection(event['replyToken'], user_id_db, stripe_subscription_id, text)
+                        handle_content_selection(event['replyToken'], company_id, stripe_subscription_id, text)
                     elif text == 'メニュー':
                         set_user_state(user_id, 'welcome_sent')
                         send_line_message(event['replyToken'], [get_menu_message()])
                     elif text == 'ヘルプ':
                         send_line_message(event['replyToken'], get_help_message())
                     elif text == '状態':
-                        handle_status_check(event['replyToken'], user_id_db)
+                        handle_status_check(event['replyToken'], company_id)
                     else:
                         send_line_message(event['replyToken'], [{"type": "text", "text": "1〜3の数字でコンテンツを選択してください。\n\nまたは「メニュー」でメインメニューに戻ります。"}])
                     continue
                 # 解約関連のコマンドを優先処理
                 elif text == '解約':
                     print(f'[DEBUG] 解約コマンド受信: user_id={user_id}')
-                    handle_cancel_menu(event['replyToken'], user_id_db, stripe_subscription_id)
+                    handle_cancel_menu(event['replyToken'], company_id, stripe_subscription_id)
                 elif text == 'サブスクリプション解約':
-                    handle_subscription_cancel(event['replyToken'], user_id_db, stripe_subscription_id)
+                    handle_subscription_cancel(event['replyToken'], company_id, stripe_subscription_id)
                 elif text == 'コンテンツ解約':
                     set_user_state(user_id, 'cancel_select')
-                    handle_cancel_request(event['replyToken'], user_id_db, stripe_subscription_id)
+                    handle_cancel_request(event['replyToken'], company_id, stripe_subscription_id)
                 elif state == 'cancel_select':
                     print(f'[DEBUG] 解約選択処理: user_id={user_id}, state={state}, text={text}')
                     
@@ -681,7 +681,7 @@ def line_webhook():
                         # add_select状態の処理を実行
                         if text in ['1', '2', '3', '4']:
                             set_user_state(user_id, f'confirm_{text}')
-                            handle_content_selection(event['replyToken'], user_id_db, stripe_subscription_id, text)
+                            handle_content_selection(event['replyToken'], company_id, stripe_subscription_id, text)
                         continue
                     # 「メニュー」コマンドの場合は状態をリセットしてメニューを表示
                     elif text == 'メニュー':
@@ -691,10 +691,10 @@ def line_webhook():
                     # 主要なコマンドの場合は通常の処理に切り替え
                     elif text == '追加':
                         set_user_state(user_id, 'add_select')
-                        handle_add_content(event['replyToken'], user_id_db, stripe_subscription_id)
+                        handle_add_content(event['replyToken'], company_id, stripe_subscription_id)
                         continue
                     elif text == '状態':
-                        handle_status_check(event['replyToken'], user_id_db)
+                        handle_status_check(event['replyToken'], company_id)
                         continue
                     elif text == 'ヘルプ':
                         send_line_message(event['replyToken'], get_help_message())
@@ -712,7 +712,7 @@ def line_webhook():
                         placeholder = '%s' if db_type == 'postgresql' else '?'
                         
                         c.execute(f'SELECT COUNT(*) FROM usage_logs WHERE user_id = {placeholder} AND content_type IN ({placeholder}, {placeholder}, {placeholder})', 
-                                 (user_id_db, 'AI予定秘書', 'AI経理秘書', 'AIタスクコンシェルジュ'))
+                                 (company_id, 'AI予定秘書', 'AI経理秘書', 'AIタスクコンシェルジュ'))
                         content_count = c.fetchone()[0]
                         conn.close()
                         
@@ -720,7 +720,7 @@ def line_webhook():
                         valid_numbers, invalid_reasons, duplicates = validate_selection_numbers(numbers, content_count)
                         
                         if valid_numbers:  # 有効な数字が抽出できた場合のみ処理
-                            handle_cancel_selection(event['replyToken'], user_id_db, stripe_subscription_id, text)
+                            handle_cancel_selection(event['replyToken'], company_id, stripe_subscription_id, text)
                             set_user_state(user_id, 'welcome_sent')
                         else:
                             # 数字が抽出できない場合は詳細なエラーメッセージ
@@ -731,7 +731,7 @@ def line_webhook():
                     print(f'[DEBUG] 追加コマンド受信: user_id={user_id}, state={state}')
                     set_user_state(user_id, 'add_select')
                     print(f'[DEBUG] ユーザー状態をadd_selectに設定: user_id={user_id}')
-                    handle_add_content(event['replyToken'], user_id_db, stripe_subscription_id)
+                    handle_add_content(event['replyToken'], company_id, stripe_subscription_id)
                 elif text == 'メニュー' and state != 'cancel_select':
                     print(f'[DEBUG] メニューコマンド受信: user_id={user_id}, state={state}')
                     send_line_message(event['replyToken'], [get_menu_message()])
@@ -740,7 +740,7 @@ def line_webhook():
                     send_line_message(event['replyToken'], get_help_message())
                 elif text == '状態' and state != 'cancel_select':
                     print(f'[DEBUG] 状態コマンド受信: user_id={user_id}, state={state}')
-                    handle_status_check(event['replyToken'], user_id_db)
+                    handle_status_check(event['replyToken'], company_id)
                 elif state and state.startswith('confirm_'):
                     # 確認状態での処理
                     if text.lower() in ['はい', 'yes', 'y']:
@@ -778,7 +778,7 @@ def line_webhook():
                         if content_number in content_info:
                             content = content_info[content_number]
                             # コンテンツを追加
-                            result = handle_content_confirmation(user_id_db, content['name'])
+                            result = handle_content_confirmation(company_id, content['name'])
                             if result['success']:
                                 # 企業登録フォームへのリンクを含むメッセージ
                                 registration_url = result.get('registration_url', '')
