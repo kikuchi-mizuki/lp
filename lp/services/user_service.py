@@ -187,7 +187,7 @@ def is_paid_user_company_centric(line_user_id):
         c.execute('''
             SELECT id, company_name, stripe_subscription_id, status
             FROM companies 
-            WHERE line_user_id = %s
+            WHERE line_user_id = %s::text
         ''', (line_user_id,))
         
         result = c.fetchone()
