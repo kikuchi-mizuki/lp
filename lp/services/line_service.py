@@ -400,12 +400,59 @@ def setup_rich_menu():
 
 def handle_add_content(reply_token, user_id_db, stripe_subscription_id):
     try:
-        # サブスクリプション状態をチェック
-        subscription_status = check_subscription_status(stripe_subscription_id)
+        # 企業中心の決済状況をチェック
+        from services.user_service import is_paid_user_company_centric
         
-        if not subscription_status['is_active']:
-            if subscription_status['status'] == 'canceled':
-                # サブスクリプションが解約済み
+        # LINEユーザーIDを取得
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute('SELECT line_user_id FROM users WHERE id = %s', (user_id_db,))
+        user_result = c.fetchone()
+        conn.close()
+        
+        if not user_result:
+            payment_message = {
+                "type": "template",
+                "altText": "ユーザー情報エラー",
+                "template": {
+                    "type": "buttons",
+                    "title": "ユーザー情報エラー",
+                    "text": "ユーザー情報が見つかりません。\n\nLINEアカウントの再登録をお試しください。",
+                    "actions": [
+                        {
+                            "type": "uri",
+                            "label": "決済画面へ",
+                            "uri": "https://lp-production-9e2c.up.railway.app"
+                        }
+                    ]
+                }
+            }
+            send_line_message(reply_token, [payment_message])
+            return
+        
+        line_user_id = user_result[0]
+        payment_check = is_paid_user_company_centric(line_user_id)
+        
+        if not payment_check['is_paid']:
+            # 決済状況に応じたメッセージを表示
+            if payment_check['subscription_status'] == 'not_registered':
+                payment_message = {
+                    "type": "template",
+                    "altText": "未登録ユーザー",
+                    "template": {
+                        "type": "buttons",
+                        "title": "未登録ユーザー",
+                        "text": "AIコレクションズの公式LINEにご登録ください。\n\nコンテンツを追加するには、有効なサブスクリプションが必要です。",
+                        "actions": [
+                            {
+                                "type": "uri",
+                                "label": "決済画面へ",
+                                "uri": payment_check.get('redirect_url', 'https://lp-production-9e2c.up.railway.app')
+                            }
+                        ]
+                    }
+                }
+            elif payment_check['subscription_status'] == 'canceled':
                 payment_message = {
                     "type": "template",
                     "altText": "サブスクリプション解約済み",
@@ -422,28 +469,6 @@ def handle_add_content(reply_token, user_id_db, stripe_subscription_id):
                         ]
                     }
                 }
-                send_line_message(reply_token, [payment_message])
-                return
-            elif subscription_status.get('cancel_at_period_end', False):
-                # 期間終了時に解約予定
-                payment_message = {
-                    "type": "template",
-                    "altText": "サブスクリプション解約予定",
-                    "template": {
-                        "type": "buttons",
-                        "title": "サブスクリプション解約予定",
-                        "text": "サブスクリプションが期間終了時に解約予定です。\n\nコンテンツを追加するには、サブスクリプションを更新してください。",
-                        "actions": [
-                            {
-                                "type": "uri",
-                                "label": "決済画面へ",
-                                "uri": "https://lp-production-9e2c.up.railway.app"
-                            }
-                        ]
-                    }
-                }
-                send_line_message(reply_token, [payment_message])
-                return
             else:
                 # その他の無効な状態
                 payment_message = {
@@ -462,8 +487,8 @@ def handle_add_content(reply_token, user_id_db, stripe_subscription_id):
                         ]
                     }
                 }
-                send_line_message(reply_token, [payment_message])
-                return
+            send_line_message(reply_token, [payment_message])
+            return
         
         # サブスクリプションが有効な場合、通常のコンテンツ選択メニューを表示
         content_menu = {
