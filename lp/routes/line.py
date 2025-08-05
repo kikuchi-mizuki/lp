@@ -803,8 +803,6 @@ def line_webhook():
                         send_line_message(event['replyToken'], [get_menu_message()])
                     elif text == 'ヘルプ':
                         send_line_message(event['replyToken'], get_help_message())
-                    elif text == '状態':
-                        handle_status_check(event['replyToken'], company_id)
                     else:
                         send_line_message(event['replyToken'], [{"type": "text", "text": "1〜3の数字でコンテンツを選択してください。\n\nまたは「メニュー」でメインメニューに戻ります。"}])
                     continue
