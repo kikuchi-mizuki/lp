@@ -9,9 +9,13 @@ def get_db_connection():
     """データベース接続を取得"""
     database_url = os.getenv('RAILWAY_DATABASE_URL') or os.getenv('DATABASE_URL')
     
+    print(f'[DEBUG] 環境変数確認: RAILWAY_DATABASE_URL={os.getenv("RAILWAY_DATABASE_URL")}, DATABASE_URL={os.getenv("DATABASE_URL")}')
+    print(f'[DEBUG] 使用するdatabase_url: {database_url}')
+    
     # Railwayの外部接続URLを優先使用
-    if not database_url or (database_url and 'postgres.railway.internal' in database_url):
+    if not database_url or (database_url and ('postgres.railway.internal' in database_url or 'postgres.railway.app' in database_url)):
         database_url = "postgresql://postgres:WZgnjZezoefHmxbwRjUbiPhajtwubmUs@gondola.proxy.rlwy.net:16797/railway"
+        print(f'[DEBUG] 外部接続URLを使用: {database_url}')
     
     if database_url and database_url.startswith('postgresql://'):
         # PostgreSQL接続
