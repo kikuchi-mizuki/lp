@@ -576,6 +576,75 @@ def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, co
         print(f'コンテンツ選択エラー: {e}')
         send_line_message(reply_token, [{"type": "text", "text": "❌ エラーが発生しました。しばらく時間をおいて再度お試しください。"}])
 
+def handle_cancel_confirmation(user_id, content_number):
+    """解約確認処理"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # コンテンツ番号からコンテンツ名を取得
+        content_mapping = {
+            '1': 'AI予定秘書',
+            '2': 'AI経理秘書', 
+            '3': 'AIタスクコンシェルジュ'
+        }
+        
+        content_type = content_mapping.get(content_number)
+        if not content_type:
+            return {
+                'success': False,
+                'error': '無効なコンテンツ番号です'
+            }
+        
+        # 解約対象のコンテンツを取得
+        c.execute('''
+            SELECT id, content_type, is_free, stripe_usage_record_id 
+            FROM usage_logs 
+            WHERE user_id = %s AND content_type = %s
+            ORDER BY created_at DESC
+            LIMIT 1
+        ''', (user_id, content_type))
+        
+        usage_log = c.fetchone()
+        if not usage_log:
+            return {
+                'success': False,
+                'error': f'{content_type}は追加されていません'
+            }
+        
+        usage_id, content_type, is_free, stripe_usage_record_id = usage_log
+        
+        # 解約処理
+        # 1. usage_logsテーブルから削除
+        c.execute('DELETE FROM usage_logs WHERE id = %s', (usage_id,))
+        
+        # 2. StripeのUsage Recordを削除（課金済みの場合）
+        if stripe_usage_record_id and not is_free:
+            try:
+                stripe.UsageRecord.delete(stripe_usage_record_id)
+                print(f'[DEBUG] Stripe Usage Record削除: {stripe_usage_record_id}')
+            except Exception as e:
+                print(f'[DEBUG] Stripe Usage Record削除エラー: {e}')
+        
+        conn.commit()
+        conn.close()
+        
+        print(f'[DEBUG] 解約処理完了: user_id={user_id}, content_type={content_type}')
+        
+        return {
+            'success': True,
+            'content_type': content_type
+        }
+        
+    except Exception as e:
+        print(f'[ERROR] 解約確認処理エラー: {e}')
+        import traceback
+        traceback.print_exc()
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
 def handle_content_confirmation(user_id, content_type):
     """コンテンツ確認処理"""
     try:

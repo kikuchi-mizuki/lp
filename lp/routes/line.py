@@ -740,14 +740,13 @@ def line_webhook():
                 elif state == 'cancel_select':
                     print(f'[DEBUG] 解約選択処理: user_id={user_id}, state={state}, text={text}')
                     
-                    # 単純な数字（1,2,3）の場合はadd_select状態に切り替えて処理
+                    # 解約対象のコンテンツを選択
                     if text in ['1', '2', '3']:
-                        print(f'[DEBUG] 単純な数字のためadd_select状態に切り替え: text={text}')
-                        set_user_state(user_id, 'add_select')
-                        # add_select状態の処理を実行
-                        if text in ['1', '2', '3', '4']:
-                            set_user_state(user_id, f'confirm_{text}')
-                            handle_content_selection(event['replyToken'], company_id, stripe_subscription_id, text)
+                        print(f'[DEBUG] 解約対象コンテンツ選択: text={text}')
+                        # 解約確認状態に設定
+                        set_user_state(user_id, f'cancel_confirm_{text}')
+                        # 解約確認メッセージを送信
+                        handle_cancel_selection(event['replyToken'], company_id, stripe_subscription_id, text)
                         continue
                     # 「メニュー」コマンドの場合は状態をリセットしてメニューを表示
                     elif text == 'メニュー':
@@ -886,6 +885,34 @@ def line_webhook():
                     elif text.lower() in ['いいえ', 'no', 'n']:
                         # キャンセル処理
                         send_line_message(event['replyToken'], [{"type": "text", "text": "コンテンツの追加をキャンセルしました。\n\n📱 何かお手伝いできることはありますか？\n• 「追加」：他のコンテンツを追加\n• 「状態」：利用状況を確認\n• 「メニュー」：メインメニューに戻る\n• 「ヘルプ」：使い方を確認"}])
+                        set_user_state(user_id, 'welcome_sent')
+                    elif text == 'メニュー':
+                        set_user_state(user_id, 'welcome_sent')
+                        send_line_message(event['replyToken'], [get_menu_message()])
+                    else:
+                        # 無効な入力の場合は確認を促す
+                        send_line_message(event['replyToken'], [{"type": "text", "text": "「はい」または「いいえ」で回答してください。\n\n📱 または「メニュー」でメインメニューに戻ります。"}])
+                elif state and state.startswith('cancel_confirm_'):
+                    # 解約確認状態での処理
+                    if text.lower() in ['はい', 'yes', 'y']:
+                        # 解約確認状態からコンテンツ番号を取得
+                        content_number = state.split('_')[2]  # cancel_confirm_1 → 1
+                        
+                        # 解約処理を実行
+                        from services.line_service import handle_cancel_confirmation
+                        result = handle_cancel_confirmation(company_id, content_number)
+                        
+                        if result['success']:
+                            success_message = f"✅ コンテンツの解約が完了しました。\n\n📱 何かお手伝いできることはありますか？\n• 「追加」：他のコンテンツを追加\n• 「状態」：利用状況を確認\n• 「メニュー」：メインメニューに戻る\n• 「ヘルプ」：使い方を確認"
+                            send_line_message(event['replyToken'], [{"type": "text", "text": success_message}])
+                        else:
+                            error_message = f"❌ 解約処理に失敗しました: {result.get('error', '不明なエラー')}\n\n📱 「メニュー」と入力すると、メインメニューに戻れます。"
+                            send_line_message(event['replyToken'], [{"type": "text", "text": error_message}])
+                        
+                        set_user_state(user_id, 'welcome_sent')
+                    elif text.lower() in ['いいえ', 'no', 'n']:
+                        # キャンセル処理
+                        send_line_message(event['replyToken'], [{"type": "text", "text": "解約をキャンセルしました。\n\n📱 何かお手伝いできることはありますか？\n• 「追加」：他のコンテンツを追加\n• 「状態」：利用状況を確認\n• 「メニュー」：メインメニューに戻る\n• 「ヘルプ」：使い方を確認"}])
                         set_user_state(user_id, 'welcome_sent')
                     elif text == 'メニュー':
                         set_user_state(user_id, 'welcome_sent')
