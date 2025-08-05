@@ -583,7 +583,6 @@ def line_webhook():
                     else:
                         # 未登録企業の場合
                         print(f'[DEBUG] 未登録企業: user_id={user_id}')
-                        from utils.message_templates import get_not_registered_message
                         send_line_message(event['replyToken'], [{"type": "text", "text": get_not_registered_message()}])
                 
                 conn.close()
