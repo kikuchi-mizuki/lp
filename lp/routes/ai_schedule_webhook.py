@@ -6,7 +6,7 @@ import base64
 import json
 from utils.db import get_db_connection
 from services.line_service import send_line_message
-from services.user_service import is_paid_user, get_restricted_message
+from services.user_service import is_paid_user, is_paid_user_company_centric, get_restricted_message
 from models.user_state import get_user_state, set_user_state
 
 ai_schedule_webhook_bp = Blueprint('ai_schedule_webhook', __name__)
@@ -64,8 +64,8 @@ def ai_schedule_webhook(company_id):
                 user_id = event['source']['userId']
                 print(f'[AI Schedule Webhook] 友達追加イベント: user_id={user_id}')
                 
-                # 決済状況をチェック
-                payment_check = is_paid_user(user_id)
+                # 決済状況をチェック（企業ID中心統合対応）
+                payment_check = is_paid_user_company_centric(user_id)
                 if not payment_check['is_paid']:
                     print(f'[AI Schedule Webhook] 未決済ユーザーの友達追加: user_id={user_id}, status={payment_check["subscription_status"]}')
                     # 制限メッセージを送信
@@ -134,8 +134,8 @@ def ai_schedule_webhook(company_id):
                 message_text = event['message'].get('text', '')
                 print(f'[AI Schedule Webhook] メッセージ受信: user_id={user_id}, text={message_text}')
                 
-                # 決済状況をチェック
-                payment_check = is_paid_user(user_id)
+                # 決済状況をチェック（企業ID中心統合対応）
+                payment_check = is_paid_user_company_centric(user_id)
                 if not payment_check['is_paid']:
                     print(f'[AI Schedule Webhook] 未決済ユーザーのメッセージ: user_id={user_id}')
                     restricted_message = get_restricted_message()

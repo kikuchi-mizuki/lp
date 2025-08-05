@@ -14,7 +14,7 @@ from services.line_service import (
 from utils.message_templates import get_menu_message, get_help_message, get_default_message
 from utils.db import get_db_connection
 from models.user_state import get_user_state, set_user_state, clear_user_state, init_user_states_table
-from services.user_service import is_paid_user, get_restricted_message
+from services.user_service import is_paid_user, is_paid_user_company_centric, get_restricted_message
 # from services.cancellation_service import is_content_cancelled, get_restriction_message_for_content  # 削除された関数
 
 line_bp = Blueprint('line', __name__)
@@ -471,8 +471,8 @@ def line_webhook():
                 user_id = event['source']['userId']
                 print(f'[DEBUG] 友達追加イベント: user_id={user_id}')
                 
-                # 決済状況をチェック
-                payment_check = is_paid_user(user_id)
+                # 決済状況をチェック（企業ID中心統合対応）
+                payment_check = is_paid_user_company_centric(user_id)
                 if not payment_check['is_paid']:
                     print(f'[DEBUG] 未決済ユーザーの友達追加: user_id={user_id}, status={payment_check["subscription_status"]}')
                     # 制限メッセージを送信
@@ -567,8 +567,8 @@ def line_webhook():
                 print(f'[DEBUG] テキストメッセージ受信: user_id={user_id}, text={text}')
                 print(f'[DEBUG] イベント全体: {json.dumps(event, ensure_ascii=False, indent=2)}')
                 
-                # 決済状況をチェック
-                payment_check = is_paid_user(user_id)
+                # 決済状況をチェック（企業ID中心統合対応）
+                payment_check = is_paid_user_company_centric(user_id)
                 print(f'[DEBUG] 決済状況チェック結果: user_id={user_id}, is_paid={payment_check["is_paid"]}, status={payment_check["subscription_status"]}, message={payment_check.get("message", "N/A")}')
                 
                 if not payment_check['is_paid']:
