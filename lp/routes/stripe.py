@@ -343,6 +343,7 @@ def stripe_webhook():
             conn.close()
     except Exception as e:
         print(f"[Stripe Webhook] イベント処理エラー: {e}")
+        import traceback
         print(traceback.format_exc())
         return '', 500
     return '', 200 
