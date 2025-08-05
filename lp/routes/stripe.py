@@ -71,8 +71,10 @@ def stripe_webhook():
                     c.execute('''
                         INSERT INTO companies (company_name, company_code, email, stripe_subscription_id, status, created_at)
                         VALUES (%s, %s, %s, %s, 'active', CURRENT_TIMESTAMP)
+                        RETURNING id
                     ''', (company_name, f"company_{user_id}", email, subscription_id))
-                    company_id = c.lastrowid
+                    company_id = c.fetchone()[0]
+                    print(f'[DEBUG] 企業データ作成: company_id={company_id}, company_name={company_name}')
                     
                     # company_paymentsテーブルにも決済データを作成
                     c.execute('''
@@ -107,8 +109,10 @@ def stripe_webhook():
                 c.execute('''
                     INSERT INTO companies (company_name, company_code, email, stripe_subscription_id, status, created_at)
                     VALUES (%s, %s, %s, %s, 'active', CURRENT_TIMESTAMP)
+                    RETURNING id
                 ''', (company_name, f"company_{user_id}", email, subscription_id))
-                company_id = c.lastrowid
+                company_id = c.fetchone()[0]
+                print(f'[DEBUG] 企業データ作成: company_id={company_id}, company_name={company_name}')
                 
                 # company_paymentsテーブルにも決済データを作成
                 c.execute('''
@@ -175,8 +179,10 @@ def stripe_webhook():
                     c.execute('''
                         INSERT INTO companies (company_name, company_code, email, stripe_subscription_id, status, created_at)
                         VALUES (%s, %s, %s, %s, 'active', CURRENT_TIMESTAMP)
+                        RETURNING id
                     ''', (company_name, f"company_{user_id}", email, subscription_id))
-                    company_id = c.lastrowid
+                    company_id = c.fetchone()[0]
+                    print(f'[DEBUG] 企業データ作成: company_id={company_id}, company_name={company_name}')
                     
                     # company_paymentsテーブルにも決済データを作成
                     c.execute('''
@@ -220,8 +226,10 @@ def stripe_webhook():
                 c.execute('''
                     INSERT INTO companies (company_name, company_code, email, stripe_subscription_id, status, created_at)
                     VALUES (%s, %s, %s, %s, 'active', CURRENT_TIMESTAMP)
+                    RETURNING id
                 ''', (company_name, f"company_{user_id}", email, subscription_id))
-                company_id = c.lastrowid
+                company_id = c.fetchone()[0]
+                print(f'[DEBUG] 企業データ作成: company_id={company_id}, company_name={company_name}')
                 
                 # company_paymentsテーブルにも決済データを作成
                 c.execute('''
@@ -279,8 +287,10 @@ def stripe_webhook():
                     c.execute('''
                         INSERT INTO companies (company_name, company_code, email, stripe_subscription_id, status, created_at)
                         VALUES (%s, %s, %s, %s, 'active', CURRENT_TIMESTAMP)
+                        RETURNING id
                     ''', (company_name, f"company_{user_id}", email, subscription_id))
-                    company_id = c.lastrowid
+                    company_id = c.fetchone()[0]
+                    print(f'[DEBUG] 企業データ作成: company_id={company_id}, company_name={company_name}')
                     
                     # company_paymentsテーブルにも決済データを作成
                     c.execute('''
@@ -314,8 +324,10 @@ def stripe_webhook():
                 c.execute('''
                     INSERT INTO companies (company_name, company_code, email, stripe_subscription_id, status, created_at)
                     VALUES (%s, %s, %s, %s, 'active', CURRENT_TIMESTAMP)
+                    RETURNING id
                 ''', (company_name, f"company_{user_id}", email, subscription_id))
-                company_id = c.lastrowid
+                company_id = c.fetchone()[0]
+                print(f'[DEBUG] 企業データ作成: company_id={company_id}, company_name={company_name}')
                 
                 # company_paymentsテーブルにも決済データを作成
                 c.execute('''
