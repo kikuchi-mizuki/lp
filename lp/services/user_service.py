@@ -136,6 +136,107 @@ def is_paid_user(line_user_id):
             'redirect_url': 'https://line.me/R/ti/p/@ai_collections'
         }
 
+def is_paid_user_company_centric(line_user_id):
+    """
+    企業ID中心統合に対応した決済状況チェック（PostgreSQL対応）
+    
+    Args:
+        line_user_id (str): LINEユーザーID
+        
+    Returns:
+        dict: {
+            'is_paid': bool,
+            'subscription_status': str,
+            'message': str,
+            'redirect_url': str
+        }
+    """
+    print(f'[DEBUG] is_paid_user_company_centric開始: line_user_id={line_user_id}')
+    try:
+        # PostgreSQL接続を使用
+        import psycopg2
+        from dotenv import load_dotenv
+        load_dotenv()
+        
+        database_url = os.getenv('RAILWAY_DATABASE_URL')
+        if not database_url:
+            print(f'[ERROR] RAILWAY_DATABASE_URLが設定されていません')
+            return {
+                'is_paid': False,
+                'subscription_status': 'error',
+                'message': 'データベース接続エラーが発生しました。',
+                'redirect_url': 'https://line.me/R/ti/p/@ai_collections'
+            }
+        
+        conn = psycopg2.connect(database_url)
+        c = conn.cursor()
+        
+        # 企業情報を取得（LINEユーザーIDで検索）
+        c.execute('''
+            SELECT id, company_name, stripe_subscription_id, status
+            FROM companies 
+            WHERE line_user_id = %s
+        ''', (line_user_id,))
+        
+        result = c.fetchone()
+        print(f'[DEBUG] 企業データベース検索結果: line_user_id={line_user_id}, result={result}')
+        
+        if not result:
+            print(f'[DEBUG] 企業が見つかりません: line_user_id={line_user_id}')
+            conn.close()
+            return {
+                'is_paid': False,
+                'subscription_status': 'not_registered',
+                'message': 'AIコレクションズの公式LINEにご登録ください。',
+                'redirect_url': 'https://line.me/R/ti/p/@ai_collections'
+            }
+        
+        company_id, company_name, stripe_subscription_id, status = result
+        print(f'[DEBUG] 企業情報取得: company_id={company_id}, company_name={company_name}, stripe_subscription_id={stripe_subscription_id}, status={status}')
+        
+        # 企業の決済状況をチェック
+        c.execute('''
+            SELECT subscription_status 
+            FROM company_payments 
+            WHERE company_id = %s 
+            ORDER BY created_at DESC 
+            LIMIT 1
+        ''', (company_id,))
+        
+        payment_result = c.fetchone()
+        print(f'[DEBUG] 決済状況検索結果: company_id={company_id}, payment_result={payment_result}')
+        
+        conn.close()
+        
+        # 決済状況の判定
+        if payment_result and payment_result[0] == 'active':
+            print(f'[DEBUG] 有効な決済: company_id={company_id}, status=active')
+            return {
+                'is_paid': True,
+                'subscription_status': 'active',
+                'message': None,
+                'redirect_url': None
+            }
+        else:
+            print(f'[DEBUG] 無効な決済または未決済: company_id={company_id}, payment_status={payment_result[0] if payment_result else "none"}')
+            return {
+                'is_paid': False,
+                'subscription_status': payment_result[0] if payment_result else 'not_paid',
+                'message': '決済済みユーザーのみご利用いただけます。',
+                'redirect_url': 'https://line.me/R/ti/p/@ai_collections'
+            }
+            
+    except Exception as e:
+        print(f'[ERROR] 企業ID中心統合決済状況チェックエラー: {e}')
+        import traceback
+        traceback.print_exc()
+        return {
+            'is_paid': False,
+            'subscription_status': 'error',
+            'message': 'システムエラーが発生しました。',
+            'redirect_url': 'https://line.me/R/ti/p/@ai_collections'
+        }
+
 def get_restricted_message():
     """
     制限メッセージを取得
