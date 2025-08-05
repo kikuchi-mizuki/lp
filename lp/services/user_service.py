@@ -158,8 +158,12 @@ def is_paid_user_company_centric(line_user_id):
         from dotenv import load_dotenv
         load_dotenv()
         
-        # PostgreSQL接続情報
-        database_url = "postgresql://postgres:WZgnjZezoefHmxbwRjUbiPhajtwubmUs@gondola.proxy.rlwy.net:16797/railway"
+        # Railway本番環境のデータベース接続情報
+        database_url = os.getenv("DATABASE_URL")
+        if not database_url:
+            # フォールバック用の接続情報
+            database_url = "postgresql://postgres:WZgnjZezoefHmxbwRjUbiPhajtwubmUs@gondola.proxy.rlwy.net:16797/railway"
+        
         print(f'[DEBUG] PostgreSQL接続開始: {database_url[:50]}...')
         print(f'[DEBUG] 実際の接続URL: {database_url}')
         print(f'[DEBUG] 環境変数DATABASE_URL: {os.getenv("DATABASE_URL", "未設定")}')
@@ -168,6 +172,9 @@ def is_paid_user_company_centric(line_user_id):
         conn = psycopg2.connect(database_url)
         c = conn.cursor()
         print(f'[DEBUG] PostgreSQL接続成功')
+        print(f'[DEBUG] 接続先ホスト: {conn.info.host}')
+        print(f'[DEBUG] 接続先データベース: {conn.info.database}')
+        print(f'[DEBUG] 接続先ユーザー: {conn.info.user}')
         
         # 企業情報を取得（LINEユーザーIDで検索）
         c.execute('''
