@@ -402,74 +402,8 @@ def handle_add_content(reply_token, user_id_db, stripe_subscription_id):
     try:
         print(f'[DEBUG] handle_add_content開始: user_id_db={user_id_db}, stripe_subscription_id={stripe_subscription_id}')
         
-        # 企業中心の決済状況をチェック
-        from services.user_service import is_paid_user_company_centric
-        
-        # LINEユーザーIDを直接使用（user_id_dbが既にLINEユーザーID）
-        line_user_id = user_id_db
-        print(f'[DEBUG] LINEユーザーID直接使用: line_user_id={line_user_id}')
-        
-        payment_check = is_paid_user_company_centric(line_user_id)
-        print(f'[DEBUG] 決済チェック結果: payment_check={payment_check}')
-        
-        if not payment_check['is_paid']:
-            # 決済状況に応じたメッセージを表示
-            if payment_check['subscription_status'] == 'not_registered':
-                payment_message = {
-                    "type": "template",
-                    "altText": "未登録ユーザー",
-                    "template": {
-                        "type": "buttons",
-                        "title": "未登録ユーザー",
-                        "text": "AIコレクションズの公式LINEにご登録ください。\n\nコンテンツを追加するには、有効なサブスクリプションが必要です。",
-                        "actions": [
-                            {
-                                "type": "uri",
-                                "label": "決済画面へ",
-                                "uri": payment_check.get('redirect_url', 'https://lp-production-9e2c.up.railway.app')
-                            }
-                        ]
-                    }
-                }
-            elif payment_check['subscription_status'] == 'canceled':
-                payment_message = {
-                    "type": "template",
-                    "altText": "サブスクリプション解約済み",
-                    "template": {
-                        "type": "buttons",
-                        "title": "サブスクリプション解約済み",
-                        "text": "サブスクリプションが解約されています。\n\nコンテンツを追加するには、新しいサブスクリプションが必要です。",
-                        "actions": [
-                            {
-                                "type": "uri",
-                                "label": "決済画面へ",
-                                "uri": "https://lp-production-9e2c.up.railway.app"
-                            }
-                        ]
-                    }
-                }
-            else:
-                # その他の無効な状態
-                payment_message = {
-                    "type": "template",
-                    "altText": "サブスクリプション無効",
-                    "template": {
-                        "type": "buttons",
-                        "title": "サブスクリプション無効",
-                        "text": "サブスクリプションが無効な状態です。\n\nコンテンツを追加するには、有効なサブスクリプションが必要です。",
-                        "actions": [
-                            {
-                                "type": "uri",
-                                "label": "決済画面へ",
-                                "uri": "https://lp-production-9e2c.up.railway.app"
-                            }
-                        ]
-                    }
-                }
-            send_line_message(reply_token, [payment_message])
-            return
-        
-        # サブスクリプションが有効な場合、通常のコンテンツ選択メニューを表示
+        # 企業紐付け完了後のため、制限チェックは不要
+        # 通常のコンテンツ選択メニューを表示
         content_menu = {
             "type": "template",
             "altText": "コンテンツ選択メニュー",
@@ -1539,18 +1473,7 @@ def handle_status_check(reply_token, user_id_db):
         # LINEユーザーIDを直接使用
         line_user_id = user_id_db
         
-        # 企業中心の決済状況をチェック
-        from services.user_service import is_paid_user_company_centric
-        payment_check = is_paid_user_company_centric(line_user_id)
-        
-        if not payment_check['is_paid']:
-            # 未決済ユーザーの場合
-            status_message = "📊 利用状況\n\n"
-            status_message += f"❌ 決済状況: {payment_check['subscription_status']}\n"
-            status_message += f"💬 メッセージ: {payment_check.get('message', '決済が必要です')}\n\n"
-            status_message += "💳 決済画面でサブスクリプションを開始してください。"
-            send_line_message(reply_token, [{"type": "text", "text": status_message}])
-            return
+        # 企業紐付け完了後のため、制限チェックは不要
         
         # 決済済みユーザーの場合、企業情報を取得
         conn = get_db_connection()
