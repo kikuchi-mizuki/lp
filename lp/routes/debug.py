@@ -216,4 +216,159 @@ def fix_payment_periods():
         traceback.print_exc()
         result['error'] = str(e)
     
+    return jsonify(result)
+
+@debug_bp.route('/debug/payment-check')
+def debug_payment_check():
+    """決済チェックの詳細デバッグエンドポイント"""
+    
+    result = {
+        'success': False,
+        'debug_info': {},
+        'error': None
+    }
+    
+    try:
+        # Railway本番環境のデータベース接続情報
+        database_url = os.getenv("DATABASE_URL")
+        if not database_url:
+            database_url = "postgresql://postgres:WZgnjZezoefHmxbwRjUbiPhajtwubmUs@gondola.proxy.rlwy.net:16797/railway"
+        
+        print(f'[DEBUG] Railway接続URL: {database_url}')
+        
+        conn = psycopg2.connect(database_url)
+        c = conn.cursor()
+        
+        print(f'[DEBUG] Railwayデータベース接続成功')
+        
+        target_line_user_id = "U1b9d0d75b0c770dc1107dde349d572f7"
+        print(f'[DEBUG] 対象LINEユーザーID: {target_line_user_id}')
+        
+        # 1. 企業情報の取得
+        print(f'\n=== 企業情報の取得 ===')
+        c.execute('''
+            SELECT id, company_name, stripe_subscription_id, status
+            FROM companies 
+            WHERE line_user_id = %s::text
+        ''', (target_line_user_id,))
+        
+        company_result = c.fetchone()
+        print(f'[DEBUG] 企業検索結果: {company_result}')
+        
+        if company_result:
+            result['debug_info']['company'] = {
+                'id': company_result[0],
+                'name': company_result[1],
+                'stripe_id': company_result[2],
+                'status': company_result[3]
+            }
+        else:
+            result['debug_info']['company'] = None
+        
+        # 2. 決済情報の取得
+        print(f'\n=== 決済情報の取得 ===')
+        if company_result:
+            company_id = company_result[0]
+            c.execute('''
+                SELECT subscription_status, current_period_end
+                FROM company_payments 
+                WHERE company_id = %s 
+                ORDER BY created_at DESC 
+                LIMIT 1
+            ''', (company_id,))
+            
+            payment_result = c.fetchone()
+            print(f'[DEBUG] 決済検索結果: {payment_result}')
+            
+            if payment_result:
+                subscription_status, current_period_end = payment_result
+                result['debug_info']['payment'] = {
+                    'status': subscription_status,
+                    'period_end': str(current_period_end) if current_period_end else None
+                }
+                
+                # 3. 期限チェック
+                print(f'\n=== 期限チェック ===')
+                if current_period_end:
+                    jst = timezone(timedelta(hours=9))
+                    current_time = datetime.now(jst)
+                    print(f'[DEBUG] 現在時刻: {current_time}')
+                    print(f'[DEBUG] 期限: {current_period_end}')
+                    print(f'[DEBUG] 期限切れ: {current_period_end <= current_time}')
+                    
+                    if current_period_end > current_time:
+                        print(f'[DEBUG] 有効期限内')
+                        is_paid = True
+                        final_status = 'active'
+                    else:
+                        print(f'[DEBUG] 期限切れ')
+                        is_paid = False
+                        final_status = 'expired'
+                else:
+                    print(f'[DEBUG] 期限未設定')
+                    is_paid = True
+                    final_status = 'active'
+                
+                # 4. 最終判定
+                print(f'\n=== 最終判定 ===')
+                if subscription_status == 'active' and is_paid:
+                    print(f'[DEBUG] 有効な決済: is_paid=True, status={final_status}')
+                    final_result = {
+                        'is_paid': True,
+                        'subscription_status': final_status,
+                        'message': None,
+                        'redirect_url': None
+                    }
+                else:
+                    print(f'[DEBUG] 無効な決済: is_paid=False, status={subscription_status}')
+                    final_result = {
+                        'is_paid': False,
+                        'subscription_status': subscription_status,
+                        'message': '決済済みユーザーのみご利用いただけます。',
+                        'redirect_url': 'https://line.me/R/ti/p/@ai_collections'
+                    }
+                
+                result['debug_info']['final_result'] = final_result
+                print(f'[DEBUG] 最終結果: {final_result}')
+            else:
+                result['debug_info']['payment'] = None
+                result['debug_info']['final_result'] = {
+                    'is_paid': False,
+                    'subscription_status': 'no_payment',
+                    'message': '決済情報が見つかりません',
+                    'redirect_url': 'https://line.me/R/ti/p/@ai_collections'
+                }
+        
+        # 5. 全決済レコードの確認
+        print(f'\n=== 全決済レコードの確認 ===')
+        if company_result:
+            company_id = company_result[0]
+            c.execute('''
+                SELECT id, company_id, subscription_status, current_period_end, created_at
+                FROM company_payments 
+                WHERE company_id = %s 
+                ORDER BY created_at DESC
+            ''', (company_id,))
+            
+            all_payments = c.fetchall()
+            payments_data = []
+            for payment in all_payments:
+                payments_data.append({
+                    'id': payment[0],
+                    'company_id': payment[1],
+                    'status': payment[2],
+                    'period_end': str(payment[3]) if payment[3] else None,
+                    'created_at': str(payment[4]) if payment[4] else None
+                })
+            result['debug_info']['all_payments'] = payments_data
+        
+        conn.close()
+        result['success'] = True
+        
+    except Exception as e:
+        print(f'[ERROR] 決済チェックデバッグエラー: {e}')
+        import traceback
+        traceback.print_exc()
+        result['error'] = str(e)
+    
     return jsonify(result) 
