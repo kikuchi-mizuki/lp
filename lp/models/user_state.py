@@ -40,13 +40,13 @@ def set_user_state(line_user_id, state):
         db_type = get_db_type()
         
         if db_type == 'postgresql':
-            # PostgreSQL用のUPSERT構文
+            # PostgreSQL用のUPSERT構文（idカラムは自動生成）
             c.execute('''
                 INSERT INTO user_states (line_user_id, state, updated_at) 
                 VALUES (%s, %s, %s)
                 ON CONFLICT (line_user_id) 
-                DO UPDATE SET state = %s, updated_at = %s
-            ''', (line_user_id, state, datetime.datetime.now(), state, datetime.datetime.now()))
+                DO UPDATE SET state = EXCLUDED.state, updated_at = EXCLUDED.updated_at
+            ''', (line_user_id, state, datetime.datetime.now()))
         else:
             # SQLite用のREPLACE構文
             c.execute('''
