@@ -376,4 +376,105 @@ def debug_payment_check():
         traceback.print_exc()
         result['error'] = str(e)
     
+    return jsonify(result)
+
+@debug_bp.route('/debug/simulate-line-webhook')
+def simulate_line_webhook():
+    """LINE Webhook処理のシミュレーション"""
+    
+    result = {
+        'success': False,
+        'steps': [],
+        'error': None
+    }
+    
+    try:
+        # シミュレーション用のデータ
+        user_id = "U1b9d0d75b0c770dc1107dde349d572f7"
+        text = "追加"
+        
+        result['steps'].append(f'[STEP 1] ユーザーID: {user_id}')
+        result['steps'].append(f'[STEP 2] メッセージ: {text}')
+        
+        # 1. 決済チェック
+        result['steps'].append('[STEP 3] 決済チェック開始')
+        from services.user_service import is_paid_user_company_centric
+        
+        try:
+            payment_check = is_paid_user_company_centric(user_id)
+            result['steps'].append(f'[STEP 4] 決済チェック結果: {payment_check}')
+            
+            if not payment_check['is_paid']:
+                result['steps'].append('[STEP 5] 未決済ユーザー - 制限メッセージ送信')
+                result['success'] = True
+                return jsonify(result)
+        except Exception as e:
+            result['steps'].append(f'[STEP 4] 決済チェックエラー: {e}')
+            result['error'] = str(e)
+            return jsonify(result)
+        
+        # 2. 企業情報取得
+        result['steps'].append('[STEP 5] 企業情報取得開始')
+        from utils.db import get_db_connection
+        
+        try:
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute('SELECT id, company_name, stripe_subscription_id FROM companies WHERE line_user_id = %s', (user_id,))
+            company = c.fetchone()
+            result['steps'].append(f'[STEP 6] 企業情報: {company}')
+            conn.close()
+            
+            if not company:
+                result['steps'].append('[STEP 7] 企業情報なし - エラーメッセージ送信')
+                result['success'] = True
+                return jsonify(result)
+        except Exception as e:
+            result['steps'].append(f'[STEP 6] 企業情報取得エラー: {e}')
+            result['error'] = str(e)
+            return jsonify(result)
+        
+        # 3. ユーザー状態確認
+        result['steps'].append('[STEP 7] ユーザー状態確認開始')
+        from models.user_state import get_user_state
+        
+        try:
+            state = get_user_state(user_id)
+            result['steps'].append(f'[STEP 8] ユーザー状態: {state}')
+        except Exception as e:
+            result['steps'].append(f'[STEP 8] ユーザー状態確認エラー: {e}')
+            result['error'] = str(e)
+            return jsonify(result)
+        
+        # 4. メッセージ処理分岐
+        result['steps'].append('[STEP 9] メッセージ処理分岐開始')
+        
+        if text == '追加':
+            result['steps'].append('[STEP 10] 追加コマンド処理開始')
+            
+            try:
+                from services.line_service import handle_add_content
+                company_id = company[0]
+                stripe_subscription_id = company[2]
+                
+                result['steps'].append(f'[STEP 11] handle_add_content呼び出し: company_id={company_id}, stripe_subscription_id={stripe_subscription_id}')
+                
+                # 実際の関数呼び出しは行わず、ログのみ
+                result['steps'].append('[STEP 12] handle_add_content実行完了')
+                
+            except Exception as e:
+                result['steps'].append(f'[STEP 11] handle_add_contentエラー: {e}')
+                result['error'] = str(e)
+                return jsonify(result)
+        else:
+            result['steps'].append('[STEP 10] その他のメッセージ処理')
+        
+        result['success'] = True
+        
+    except Exception as e:
+        result['steps'].append(f'[ERROR] シミュレーションエラー: {e}')
+        result['error'] = str(e)
+        import traceback
+        traceback.print_exc()
+    
     return jsonify(result) 
