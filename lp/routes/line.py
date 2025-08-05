@@ -613,25 +613,6 @@ def line_webhook():
                 print(f'[DEBUG] テキストメッセージ受信: user_id={user_id}, text={text}')
                 print(f'[DEBUG] イベント全体: {json.dumps(event, ensure_ascii=False, indent=2)}')
                 
-                # 決済状況をチェック（企業ID中心統合対応）
-                print(f'[DEBUG] 決済チェック開始: user_id={user_id}')
-                print(f'[DEBUG] 使用する関数: is_paid_user_company_centric')
-                print(f'[DEBUG] 関数呼び出し前: user_id={user_id}')
-                payment_check = is_paid_user_company_centric(user_id)
-                print(f'[DEBUG] 関数呼び出し後: user_id={user_id}, result={payment_check}')
-                print(f'[DEBUG] 決済チェック結果: user_id={user_id}, is_paid={payment_check["is_paid"]}, status={payment_check["subscription_status"]}, message={payment_check.get("message", "N/A")}')
-                print(f'[DEBUG] 決済チェック詳細: {json.dumps(payment_check, ensure_ascii=False, indent=2)}')
-                
-                if not payment_check['is_paid']:
-                    print(f'[DEBUG] 未決済ユーザー: user_id={user_id}, status={payment_check["subscription_status"]}')
-                    print(f'[DEBUG] 制限メッセージを送信: user_id={user_id}')
-                    # 制限メッセージを送信
-                    restricted_message = get_restricted_message()
-                    send_line_message(event['replyToken'], [restricted_message])
-                    continue
-                else:
-                    print(f'[DEBUG] 決済済みユーザー: user_id={user_id}, status={payment_check["subscription_status"]}')
-                
                 conn = get_db_connection()
                 c = conn.cursor()
                 c.execute('SELECT id, company_name, stripe_subscription_id FROM companies WHERE line_user_id = %s', (user_id,))
@@ -811,6 +792,23 @@ def line_webhook():
                             # 数字が抽出できない場合は詳細なエラーメッセージ
                             error_message = "数字を入力してください。\n\n対応形式:\n• 1,2,3 (カンマ区切り)\n• 1.2.3 (ドット区切り)\n• 1 2 3 (スペース区切り)\n• 一二三 (日本語数字)\n• 1番目,2番目 (序数表現)\n• 最初,二番目 (日本語序数)"
                             send_line_message(event['replyToken'], [{"type": "text", "text": error_message}])
+                # add_select状態での処理（優先度を上げる）
+                elif state == 'add_select':
+                    print(f'[DEBUG] add_select状態での処理: user_id={user_id}, text={text}')
+                    if text in ['1', '2', '3']:
+                        print(f'[DEBUG] コンテンツ選択: text={text}')
+                        set_user_state(user_id, f'confirm_{text}')
+                        handle_content_selection(event['replyToken'], company_id, stripe_subscription_id, text)
+                    elif text == 'メニュー':
+                        set_user_state(user_id, 'welcome_sent')
+                        send_line_message(event['replyToken'], [get_menu_message()])
+                    elif text == 'ヘルプ':
+                        send_line_message(event['replyToken'], get_help_message())
+                    elif text == '状態':
+                        handle_status_check(event['replyToken'], company_id)
+                    else:
+                        send_line_message(event['replyToken'], [{"type": "text", "text": "1〜3の数字でコンテンツを選択してください。\n\nまたは「メニュー」でメインメニューに戻ります。"}])
+                    continue
                 # その他のコマンド処理（add_select状態以外）
                 elif text == '追加' and state != 'cancel_select':
                     print(f'[DEBUG] 追加コマンド受信: user_id={user_id}, state={state}')
