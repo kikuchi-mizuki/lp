@@ -60,6 +60,28 @@ def stripe_webhook():
                 user_id, line_user_id = existing_user_by_email
                 # 既存ユーザーの決済情報を更新
                 c.execute('UPDATE users SET stripe_customer_id = %s, stripe_subscription_id = %s WHERE id = %s', (customer_id, subscription_id, user_id))
+                
+                # companiesテーブルに企業データが存在するかチェック
+                c.execute('SELECT id FROM companies WHERE stripe_subscription_id = %s', (subscription_id,))
+                existing_company = c.fetchone()
+                
+                if not existing_company:
+                    # 企業データが存在しない場合は作成
+                    company_name = f"企業_{email.split('@')[0]}"
+                    c.execute('''
+                        INSERT INTO companies (company_name, company_code, stripe_subscription_id, status, created_at)
+                        VALUES (%s, %s, %s, 'active', CURRENT_TIMESTAMP)
+                    ''', (company_name, f"company_{user_id}", subscription_id))
+                    company_id = c.lastrowid
+                    
+                    # company_paymentsテーブルにも決済データを作成
+                    c.execute('''
+                        INSERT INTO company_payments (company_id, stripe_customer_id, stripe_subscription_id, subscription_status, created_at)
+                        VALUES (%s, %s, %s, 'active', CURRENT_TIMESTAMP)
+                    ''', (company_id, customer_id, subscription_id))
+                    
+                    print(f'企業データ作成完了: company_id={company_id}, company_name={company_name}')
+                
                 conn.commit()
                 print(f'既存ユーザーの決済情報を更新: id={user_id}, subscription_id={subscription_id}')
                 
@@ -78,8 +100,25 @@ def stripe_webhook():
             else:
                 # 新規ユーザーとして登録
                 c.execute('INSERT INTO users (email, stripe_customer_id, stripe_subscription_id) VALUES (%s, %s, %s)', (email, customer_id, subscription_id))
+                user_id = c.lastrowid
+                
+                # companiesテーブルにも企業データを作成
+                company_name = f"企業_{email.split('@')[0]}"
+                c.execute('''
+                    INSERT INTO companies (company_name, company_code, stripe_subscription_id, status, created_at)
+                    VALUES (%s, %s, %s, 'active', CURRENT_TIMESTAMP)
+                ''', (company_name, f"company_{user_id}", subscription_id))
+                company_id = c.lastrowid
+                
+                # company_paymentsテーブルにも決済データを作成
+                c.execute('''
+                    INSERT INTO company_payments (company_id, stripe_customer_id, stripe_subscription_id, subscription_status, created_at)
+                    VALUES (%s, %s, %s, 'active', CURRENT_TIMESTAMP)
+                ''', (company_id, customer_id, subscription_id))
+                
                 conn.commit()
                 print(f'新規ユーザー登録完了: email={email}, customer_id={customer_id}, subscription_id={subscription_id}')
+                print(f'企業データ作成完了: company_id={company_id}, company_name={company_name}')
             
             # 従量課金アイテムを追加
             try:
@@ -125,6 +164,28 @@ def stripe_webhook():
                 user_id, line_user_id = existing_user_by_email
                 # 既存ユーザーの決済情報を更新
                 c.execute('UPDATE users SET stripe_customer_id = %s, stripe_subscription_id = %s WHERE id = %s', (customer_id, subscription_id, user_id))
+                
+                # companiesテーブルに企業データが存在するかチェック
+                c.execute('SELECT id FROM companies WHERE stripe_subscription_id = %s', (subscription_id,))
+                existing_company = c.fetchone()
+                
+                if not existing_company:
+                    # 企業データが存在しない場合は作成
+                    company_name = f"企業_{email.split('@')[0]}"
+                    c.execute('''
+                        INSERT INTO companies (company_name, company_code, stripe_subscription_id, status, created_at)
+                        VALUES (%s, %s, %s, 'active', CURRENT_TIMESTAMP)
+                    ''', (company_name, f"company_{user_id}", subscription_id))
+                    company_id = c.lastrowid
+                    
+                    # company_paymentsテーブルにも決済データを作成
+                    c.execute('''
+                        INSERT INTO company_payments (company_id, stripe_customer_id, stripe_subscription_id, subscription_status, created_at)
+                        VALUES (%s, %s, %s, 'active', CURRENT_TIMESTAMP)
+                    ''', (company_id, customer_id, subscription_id))
+                    
+                    print(f'企業データ作成完了: company_id={company_id}, company_name={company_name}')
+                
                 conn.commit()
                 print(f'既存ユーザーの決済情報を更新: id={user_id}, subscription_id={subscription_id}')
                 
@@ -152,8 +213,25 @@ def stripe_webhook():
             else:
                 # 新規ユーザーとして登録
                 c.execute('INSERT INTO users (email, stripe_customer_id, stripe_subscription_id) VALUES (%s, %s, %s)', (email, customer_id, subscription_id))
+                user_id = c.lastrowid
+                
+                # companiesテーブルにも企業データを作成
+                company_name = f"企業_{email.split('@')[0]}"
+                c.execute('''
+                    INSERT INTO companies (company_name, company_code, stripe_subscription_id, status, created_at)
+                    VALUES (%s, %s, %s, 'active', CURRENT_TIMESTAMP)
+                ''', (company_name, f"company_{user_id}", subscription_id))
+                company_id = c.lastrowid
+                
+                # company_paymentsテーブルにも決済データを作成
+                c.execute('''
+                    INSERT INTO company_payments (company_id, stripe_customer_id, stripe_subscription_id, subscription_status, created_at)
+                    VALUES (%s, %s, %s, 'active', CURRENT_TIMESTAMP)
+                ''', (company_id, customer_id, subscription_id))
+                
                 conn.commit()
                 print(f'新規ユーザー登録完了: email={email}, customer_id={customer_id}, subscription_id={subscription_id}')
+                print(f'企業データ作成完了: company_id={company_id}, company_name={company_name}')
             
             # 従量課金アイテムを追加
             try:
@@ -190,6 +268,28 @@ def stripe_webhook():
                 user_id, line_user_id = existing_user_by_email
                 # 既存ユーザーの決済情報を更新
                 c.execute('UPDATE users SET stripe_customer_id = %s, stripe_subscription_id = %s WHERE id = %s', (customer_id, subscription_id, user_id))
+                
+                # companiesテーブルに企業データが存在するかチェック
+                c.execute('SELECT id FROM companies WHERE stripe_subscription_id = %s', (subscription_id,))
+                existing_company = c.fetchone()
+                
+                if not existing_company:
+                    # 企業データが存在しない場合は作成
+                    company_name = f"企業_{email.split('@')[0]}"
+                    c.execute('''
+                        INSERT INTO companies (company_name, company_code, stripe_subscription_id, status, created_at)
+                        VALUES (%s, %s, %s, 'active', CURRENT_TIMESTAMP)
+                    ''', (company_name, f"company_{user_id}", subscription_id))
+                    company_id = c.lastrowid
+                    
+                    # company_paymentsテーブルにも決済データを作成
+                    c.execute('''
+                        INSERT INTO company_payments (company_id, stripe_customer_id, stripe_subscription_id, subscription_status, created_at)
+                        VALUES (%s, %s, %s, 'active', CURRENT_TIMESTAMP)
+                    ''', (company_id, customer_id, subscription_id))
+                    
+                    print(f'企業データ作成完了: company_id={company_id}, company_name={company_name}')
+                
                 conn.commit()
                 print(f'既存ユーザーの決済情報を更新: id={user_id}, subscription_id={subscription_id}')
                 
@@ -207,8 +307,25 @@ def stripe_webhook():
             else:
                 # 新規ユーザーとして登録
                 c.execute('INSERT INTO users (email, stripe_customer_id, stripe_subscription_id) VALUES (%s, %s, %s)', (email, customer_id, subscription_id))
+                user_id = c.lastrowid
+                
+                # companiesテーブルにも企業データを作成
+                company_name = f"企業_{email.split('@')[0]}"
+                c.execute('''
+                    INSERT INTO companies (company_name, company_code, stripe_subscription_id, status, created_at)
+                    VALUES (%s, %s, %s, 'active', CURRENT_TIMESTAMP)
+                ''', (company_name, f"company_{user_id}", subscription_id))
+                company_id = c.lastrowid
+                
+                # company_paymentsテーブルにも決済データを作成
+                c.execute('''
+                    INSERT INTO company_payments (company_id, stripe_customer_id, stripe_subscription_id, subscription_status, created_at)
+                    VALUES (%s, %s, %s, 'active', CURRENT_TIMESTAMP)
+                ''', (company_id, customer_id, subscription_id))
+                
                 conn.commit()
                 print(f'新規ユーザー登録完了: email={email}, customer_id={customer_id}, subscription_id={subscription_id}')
+                print(f'企業データ作成完了: company_id={company_id}, company_name={company_name}')
             
             # 従量課金アイテムを追加
             try:
