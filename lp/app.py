@@ -34,6 +34,7 @@ from routes.company_registration import company_registration_bp
 from routes.railway_setup import railway_setup_bp
 from routes.ai_schedule_webhook import ai_schedule_webhook_bp
 from routes.ai_schedule_webhook_simple import ai_schedule_webhook_simple_bp
+from routes.debug import debug_bp
 
 load_dotenv()
 
@@ -227,6 +228,7 @@ app.register_blueprint(company_registration_bp)
 app.register_blueprint(railway_setup_bp)
 app.register_blueprint(ai_schedule_webhook_bp)
 app.register_blueprint(ai_schedule_webhook_simple_bp)
+app.register_blueprint(debug_bp)
 
 @app.route('/')
 def index():
