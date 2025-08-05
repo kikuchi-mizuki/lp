@@ -48,105 +48,121 @@ LINE_CHANNEL_SECRET = os.getenv('LINE_CHANNEL_SECRET')
 DATABASE_URL = os.getenv('DATABASE_URL', 'database.db')
 
 def init_db():
-    """データベースの初期化"""
-    conn = get_db_connection()
-    c = conn.cursor()
-    
-    # データベースタイプを確認
-    from utils.db import get_db_type
-    db_type = get_db_type()
-    
-    if db_type == 'postgresql':
-        # PostgreSQL用のテーブル作成
-        c.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                id SERIAL PRIMARY KEY,
-                email VARCHAR(255) UNIQUE NOT NULL,
-                stripe_customer_id VARCHAR(255),
-                stripe_subscription_id VARCHAR(255),
-                line_user_id VARCHAR(255) UNIQUE
-            )
-        ''')
+    """データベースの初期化（企業ID中心統合対応）"""
+    conn = None
+    c = None
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
         
-        c.execute('''
-            CREATE TABLE IF NOT EXISTS usage_logs (
-                id SERIAL PRIMARY KEY,
-                user_id INTEGER NOT NULL,
-                content_type VARCHAR(100) NOT NULL,
-                is_free BOOLEAN DEFAULT FALSE,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                subscription_status VARCHAR(50),
-                current_period_start TIMESTAMP,
-                current_period_end TIMESTAMP,
-                trial_start TIMESTAMP,
-                trial_end TIMESTAMP,
-                stripe_subscription_id VARCHAR(255),
-                FOREIGN KEY (user_id) REFERENCES users (id)
-            )
-        ''')
+        # データベースタイプを確認
+        from utils.db import get_db_type
+        db_type = get_db_type()
         
-        c.execute('''
-            CREATE TABLE IF NOT EXISTS cancellation_history (
-                id SERIAL PRIMARY KEY,
-                user_id INTEGER NOT NULL,
-                content_type VARCHAR(100) NOT NULL,
-                cancelled_at TIMESTAMP NOT NULL,
-                subscription_status VARCHAR(50),
-                current_period_start TIMESTAMP,
-                current_period_end TIMESTAMP,
-                trial_start TIMESTAMP,
-                trial_end TIMESTAMP,
-                stripe_subscription_id VARCHAR(255),
-                FOREIGN KEY (user_id) REFERENCES users (id)
-            )
-        ''')
-        
-        # 契約期間管理テーブルを追加
-        c.execute('''
-            CREATE TABLE IF NOT EXISTS subscription_periods (
-                id SERIAL PRIMARY KEY,
-                user_id INTEGER NOT NULL,
-                stripe_subscription_id VARCHAR(255) NOT NULL,
-                subscription_status VARCHAR(50) NOT NULL,
-                current_period_start TIMESTAMP,
-                current_period_end TIMESTAMP,
-                trial_start TIMESTAMP,
-                trial_end TIMESTAMP,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users (id),
-                UNIQUE(stripe_subscription_id)
-            )
-        ''')
-        
-    else:
-        # SQLite用のテーブル作成
-        c.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                email TEXT UNIQUE NOT NULL,
-                stripe_customer_id TEXT,
-                stripe_subscription_id TEXT,
-                line_user_id TEXT UNIQUE
-            )
-        ''')
-        
-        c.execute('''
-            CREATE TABLE IF NOT EXISTS usage_logs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                content_type TEXT NOT NULL,
-                is_free BOOLEAN DEFAULT 0,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                subscription_status TEXT,
-                current_period_start TIMESTAMP,
-                current_period_end TIMESTAMP,
-                trial_start TIMESTAMP,
-                trial_end TIMESTAMP,
-                stripe_subscription_id TEXT,
-                FOREIGN KEY (user_id) REFERENCES users (id)
-            )
-        ''')
+        if db_type == 'postgresql':
+            # PostgreSQL用の企業テーブル作成
+            c.execute('''
+                CREATE TABLE IF NOT EXISTS companies (
+                    id SERIAL PRIMARY KEY,
+                    company_name VARCHAR(255) NOT NULL,
+                    line_user_id VARCHAR(255) UNIQUE,
+                    stripe_subscription_id VARCHAR(255),
+                    status VARCHAR(50) DEFAULT 'active',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # 企業決済テーブル
+            c.execute('''
+                CREATE TABLE IF NOT EXISTS company_payments (
+                    id SERIAL PRIMARY KEY,
+                    company_id INTEGER NOT NULL,
+                    stripe_subscription_id VARCHAR(255),
+                    subscription_status VARCHAR(50) DEFAULT 'active',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (company_id) REFERENCES companies (id)
+                )
+            ''')
+            
+            # 企業使用ログテーブル
+            c.execute('''
+                CREATE TABLE IF NOT EXISTS company_usage_logs (
+                    id SERIAL PRIMARY KEY,
+                    company_id INTEGER NOT NULL,
+                    content_type VARCHAR(100) NOT NULL,
+                    is_free BOOLEAN DEFAULT FALSE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    subscription_status VARCHAR(50),
+                    current_period_start TIMESTAMP,
+                    current_period_end TIMESTAMP,
+                    trial_start TIMESTAMP,
+                    trial_end TIMESTAMP,
+                    stripe_subscription_id VARCHAR(255),
+                    FOREIGN KEY (company_id) REFERENCES companies (id)
+                )
+            ''')
+            
+            # 企業LINEアカウントテーブル
+            c.execute('''
+                CREATE TABLE IF NOT EXISTS company_line_accounts (
+                    id SERIAL PRIMARY KEY,
+                    company_id INTEGER NOT NULL,
+                    line_channel_id VARCHAR(255),
+                    line_channel_secret VARCHAR(255),
+                    line_channel_access_token VARCHAR(255),
+                    webhook_url VARCHAR(500),
+                    status VARCHAR(50) DEFAULT 'active',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (company_id) REFERENCES companies (id)
+                )
+            ''')
+            
+            # 企業デプロイメントテーブル
+            c.execute('''
+                CREATE TABLE IF NOT EXISTS company_deployments (
+                    id SERIAL PRIMARY KEY,
+                    company_id INTEGER NOT NULL,
+                    service_name VARCHAR(255),
+                    deployment_url VARCHAR(500),
+                    status VARCHAR(50) DEFAULT 'active',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (company_id) REFERENCES companies (id)
+                )
+            ''')
+            
+            conn.commit()
+            print("✅ 企業ID中心統合データベース初期化完了")
+            
+        else:
+            # SQLite用のテーブル作成（簡略化）
+            c.execute('''
+                CREATE TABLE IF NOT EXISTS companies (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    company_name TEXT NOT NULL,
+                    line_user_id TEXT UNIQUE,
+                    stripe_subscription_id TEXT,
+                    status TEXT DEFAULT 'active',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            conn.commit()
+            print("✅ SQLite企業テーブル初期化完了")
+            
+    except Exception as e:
+        print(f"❌ データベース初期化エラー: {e}")
+        import traceback
+        traceback.print_exc()
+    finally:
+        if c:
+            c.close()
+        if conn:
+            conn.close()
         
         c.execute('''
             CREATE TABLE IF NOT EXISTS cancellation_history (
@@ -188,8 +204,6 @@ def init_db():
     # ユーザー状態テーブルの初期化
     from models.user_state import init_user_states_table
     init_user_states_table()
-
-init_db()
 
 app = Flask(__name__, static_folder='static', static_url_path='/static')
 app.register_blueprint(line_bp)
@@ -1473,4 +1487,11 @@ def debug_railway_env():
         }), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 5000))) 
+    # データベース初期化をスキップしてアプリケーションを起動
+    print("🚀 アプリケーション起動中...")
+    
+    # デフォルトポートを5000に設定
+    port = int(os.environ.get('PORT', 5000))
+    print(f"📡 ポート {port} で起動します")
+    
+    app.run(debug=True, host='0.0.0.0', port=port) 
