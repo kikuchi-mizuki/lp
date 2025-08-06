@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
-from services.automation_service import automation_service
-from services.security_service import require_auth, require_admin
+from lp.services.automation_service import automation_service
+from lp.services.security_service import require_auth, require_admin
 import json
 from datetime import datetime, timedelta
 

@@ -2,9 +2,9 @@ import os
 import json
 import logging
 from datetime import datetime, timedelta
-from utils.db import get_db_connection
-from services.notification_service import notification_service
-from services.company_service import CompanyService
+from lp.utils.db import get_db_connection
+from lp.services.notification_service import notification_service
+from lp.services.company_service import CompanyService
 
 class ReminderService:
     """自動リマインダーサービス"""

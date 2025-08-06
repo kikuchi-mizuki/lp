@@ -5,8 +5,8 @@ LINE API用ルート
 """
 
 from flask import Blueprint, request, jsonify
-from services.line_api_service import line_api_service
-from services.company_service import CompanyService
+from lp.services.line_api_service import line_api_service
+from lp.services.company_service import CompanyService
 
 # インスタンスを作成
 company_service = CompanyService()

@@ -8,9 +8,9 @@
 from flask import Blueprint, request, jsonify, render_template, redirect, url_for
 import os
 import json
-from services.company_registration_service import CompanyRegistrationService
-from services.automated_ai_schedule_clone import AutomatedAIScheduleClone
-from utils.db import get_db_connection
+from lp.services.company_registration_service import CompanyRegistrationService
+from lp.services.automated_ai_schedule_clone import AutomatedAIScheduleClone
+from lp.utils.db import get_db_connection
 
 company_registration_bp = Blueprint('company_registration', __name__)
 

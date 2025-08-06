@@ -398,7 +398,7 @@ def simulate_line_webhook():
         
         # 1. 決済チェック
         result['steps'].append('[STEP 3] 決済チェック開始')
-        from services.user_service import is_paid_user_company_centric
+        from lp.services.user_service import is_paid_user_company_centric
         
         try:
             payment_check = is_paid_user_company_centric(user_id)
@@ -415,7 +415,7 @@ def simulate_line_webhook():
         
         # 2. 企業情報取得
         result['steps'].append('[STEP 5] 企業情報取得開始')
-        from utils.db import get_db_connection
+        from lp.utils.db import get_db_connection
         
         try:
             conn = get_db_connection()
@@ -436,7 +436,7 @@ def simulate_line_webhook():
         
         # 3. ユーザー状態確認
         result['steps'].append('[STEP 7] ユーザー状態確認開始')
-        from models.user_state import get_user_state
+        from lp.models.user_state import get_user_state
         
         try:
             state = get_user_state(user_id)
@@ -453,7 +453,7 @@ def simulate_line_webhook():
             result['steps'].append('[STEP 10] 追加コマンド処理開始')
             
             try:
-                from services.line_service import handle_add_content
+                from lp.services.line_service import handle_add_content
                 company_id = company[0]
                 stripe_subscription_id = company[2]
                 

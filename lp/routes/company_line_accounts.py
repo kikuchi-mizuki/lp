@@ -6,7 +6,7 @@
 """
 
 from flask import Blueprint, request, jsonify
-from services.company_line_account_service import company_line_service
+from lp.services.company_line_account_service import company_line_service
 import json
 
 company_line_accounts_bp = Blueprint('company_line_accounts', __name__, url_prefix='/api/v1/company-line-accounts')

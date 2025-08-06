@@ -7,8 +7,8 @@ import stripe
 import uuid
 import json
 from datetime import datetime, timedelta
-from utils.db import get_db_connection
-from services.stripe_service import check_subscription_status
+from lp.utils.db import get_db_connection
+from lp.services.stripe_service import check_subscription_status
 
 class CompanyService:
     """企業管理サービス"""

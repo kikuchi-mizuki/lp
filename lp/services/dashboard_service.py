@@ -1,10 +1,10 @@
 import json
 from datetime import datetime, timedelta
-from utils.db import get_db_connection
-from services.company_service import CompanyService
-from services.cancellation_service import cancellation_service
-from services.notification_service import notification_service
-from services.backup_service import backup_service
+from lp.utils.db import get_db_connection
+from lp.services.company_service import CompanyService
+from lp.services.cancellation_service import cancellation_service
+from lp.services.notification_service import notification_service
+from lp.services.backup_service import backup_service
 
 class DashboardService:
     """管理ダッシュボードサービス"""

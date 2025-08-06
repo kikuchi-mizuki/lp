@@ -4,7 +4,7 @@ import hmac
 import hashlib
 import base64
 import json
-from utils.db import get_db_connection
+from lp.utils.db import get_db_connection
 
 ai_schedule_webhook_simple_bp = Blueprint('ai_schedule_webhook_simple', __name__)
 
@@ -54,7 +54,7 @@ def ai_schedule_webhook_simple():
                 }
                 
                 try:
-                    from services.line_service import send_line_message
+                    from lp.services.line_service import send_line_message
                     send_line_message(event['replyToken'], [welcome_message])
                     print(f'[AI Schedule Webhook] AI予定秘書ウェルカムメッセージ送信完了: user_id={user_id}')
                 except Exception as e:
@@ -89,7 +89,7 @@ def ai_schedule_webhook_simple():
                     }
                 
                 try:
-                    from services.line_service import send_line_message
+                    from lp.services.line_service import send_line_message
                     send_line_message(event['replyToken'], [response_message])
                     print(f'[AI Schedule Webhook] 応答メッセージ送信完了: user_id={user_id}')
                 except Exception as e:

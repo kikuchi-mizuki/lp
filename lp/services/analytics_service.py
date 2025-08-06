@@ -4,9 +4,9 @@ import logging
 import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
-from utils.db import get_db_connection
-from services.company_service import CompanyService
-from services.dashboard_service import dashboard_service
+from lp.utils.db import get_db_connection
+from lp.services.company_service import CompanyService
+from lp.services.dashboard_service import dashboard_service
 
 class AnalyticsService:
     """高度な分析サービス"""

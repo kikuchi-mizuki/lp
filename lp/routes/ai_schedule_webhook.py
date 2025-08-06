@@ -4,10 +4,10 @@ import hmac
 import hashlib
 import base64
 import json
-from utils.db import get_db_connection
-from services.line_service import send_line_message
-from services.user_service import is_paid_user, is_paid_user_company_centric, get_restricted_message
-from models.user_state import get_user_state, set_user_state
+from lp.utils.db import get_db_connection
+from lp.services.line_service import send_line_message
+from lp.services.user_service import is_paid_user, is_paid_user_company_centric, get_restricted_message
+from lp.models.user_state import get_user_state, set_user_state
 
 ai_schedule_webhook_bp = Blueprint('ai_schedule_webhook', __name__)
 

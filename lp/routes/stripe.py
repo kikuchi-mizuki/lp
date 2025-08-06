@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 import stripe
 import os
 import traceback
-from utils.db import get_db_connection
+from lp.utils.db import get_db_connection
 
 stripe_bp = Blueprint('stripe', __name__)
 
@@ -90,7 +90,7 @@ def stripe_webhook():
                 # LINE連携済みの場合、案内メッセージを送信
                 if line_user_id:
                     try:
-                        from services.line_service import send_welcome_with_buttons_push
+                        from lp.services.line_service import send_welcome_with_buttons_push
                         send_welcome_with_buttons_push(line_user_id)
                         print(f'[DEBUG] 決済完了時の案内文送信完了: line_user_id={line_user_id}')
                     except Exception as e:
@@ -119,7 +119,7 @@ def stripe_webhook():
                         
                         # 案内メッセージを送信
                         try:
-                            from services.line_service import send_welcome_with_buttons_push
+                            from lp.services.line_service import send_welcome_with_buttons_push
                             send_welcome_with_buttons_push(user_id)
                             print(f'[DEBUG] 決済完了時の自動案内文送信完了: user_id={user_id}')
                         except Exception as e:
@@ -226,7 +226,7 @@ def stripe_webhook():
                 
                 # 課金予定のコンテンツを実際に課金
                 try:
-                    from services.line_service import process_pending_charges
+                    from lp.services.line_service import process_pending_charges
                     charge_result = process_pending_charges(user_id, subscription_id)
                     print(f'[DEBUG] 課金予定処理結果: {charge_result}')
                 except Exception as e:
@@ -236,7 +236,7 @@ def stripe_webhook():
                 # LINE連携済みの場合、案内メッセージを送信
                 if line_user_id:
                     try:
-                        from services.line_service import send_welcome_with_buttons_push
+                        from lp.services.line_service import send_welcome_with_buttons_push
                         send_welcome_with_buttons_push(line_user_id)
                         print(f'[DEBUG] 決済完了時の案内文送信完了: line_user_id={line_user_id}')
                     except Exception as e:
@@ -265,7 +265,7 @@ def stripe_webhook():
                         
                         # 案内メッセージを送信
                         try:
-                            from services.line_service import send_welcome_with_buttons_push
+                            from lp.services.line_service import send_welcome_with_buttons_push
                             send_welcome_with_buttons_push(user_id)
                             print(f'[DEBUG] 決済完了時の自動案内文送信完了: user_id={user_id}')
                         except Exception as e:
@@ -364,7 +364,7 @@ def stripe_webhook():
                 # LINE連携済みの場合、案内メッセージを送信
                 if line_user_id:
                     try:
-                        from services.line_service import send_welcome_with_buttons_push
+                        from lp.services.line_service import send_welcome_with_buttons_push
                         send_welcome_with_buttons_push(line_user_id)
                         print(f'[DEBUG] サブスクリプション作成時の案内文送信完了: line_user_id={line_user_id}')
                     except Exception as e:
@@ -392,7 +392,7 @@ def stripe_webhook():
                         
                         # 案内メッセージを送信
                         try:
-                            from services.line_service import send_welcome_with_buttons_push
+                            from lp.services.line_service import send_welcome_with_buttons_push
                             send_welcome_with_buttons_push(user_id)
                             print(f'[DEBUG] サブスクリプション作成時の自動案内文送信完了: user_id={user_id}')
                         except Exception as e:

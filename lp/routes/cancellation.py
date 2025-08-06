@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
-from services.cancellation_service import cancellation_service
-from services.company_service import CompanyService
+from lp.services.cancellation_service import cancellation_service
+from lp.services.company_service import CompanyService
 import json
 from datetime import datetime
 

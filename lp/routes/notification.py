@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
-from services.notification_service import notification_service
-from services.company_service import CompanyService
+from lp.services.notification_service import notification_service
+from lp.services.company_service import CompanyService
 import json
 
 notification_bp = Blueprint('notification', __name__, url_prefix='/api/v1/notification')

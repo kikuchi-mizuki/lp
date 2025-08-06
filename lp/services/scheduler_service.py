@@ -4,10 +4,10 @@ import schedule
 import time
 import threading
 from datetime import datetime, timedelta
-from utils.db import get_db_connection
-from services.cancellation_service import cancellation_service
-from services.notification_service import notification_service
-from services.company_service import CompanyService
+from lp.utils.db import get_db_connection
+from lp.services.cancellation_service import cancellation_service
+from lp.services.notification_service import notification_service
+from lp.services.company_service import CompanyService
 
 class SchedulerService:
     """自動スケジューラーサービス"""
