@@ -1604,8 +1604,8 @@ def debug_railway():
             'error': str(e)
         })
 
-@app.route('/debug/update_company_line_user_id/<int:company_id>/<line_user_id>')
-def debug_update_company_line_user_id(company_id, line_user_id):
+@app.route('/debug/update_company_line_user_id_direct/<int:company_id>/<line_user_id>')
+def debug_update_company_line_user_id_direct(company_id, line_user_id):
     """デバッグ用：企業データのLINEユーザーIDを直接更新"""
     try:
         conn = get_db_connection()
