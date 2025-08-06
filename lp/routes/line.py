@@ -4,18 +4,19 @@ import traceback
 import requests
 import stripe
 import unicodedata
-from lp.services.line_service import send_line_message
-from lp.services.line_service import (
-    handle_add_content, handle_content_selection,
-    handle_content_confirmation, handle_cancel_request,
+from services.line_service import send_line_message
+from services.line_service import (
+    handle_add_content, handle_content_selection, handle_cancel_request,
     handle_cancel_selection, handle_subscription_cancel, handle_cancel_menu,
-    get_welcome_message, get_not_registered_message, handle_status_check
+    handle_status_check, send_welcome_with_buttons, get_welcome_message,
+    get_not_registered_message, extract_numbers_from_text, validate_selection_numbers,
+    smart_number_extraction, handle_cancel_confirmation, handle_content_confirmation
 )
-from lp.utils.message_templates import get_menu_message, get_help_message, get_default_message
-from lp.utils.db import get_db_connection
-from lp.models.user_state import get_user_state, set_user_state, clear_user_state, init_user_states_table
-from lp.services.user_service import is_paid_user, is_paid_user_company_centric, get_restricted_message
-# from lp.services.cancellation_service import is_content_cancelled, get_restriction_message_for_content  # 削除された関数
+from utils.message_templates import get_menu_message, get_help_message, get_default_message
+from utils.db import get_db_connection
+from models.user_state import get_user_state, set_user_state, clear_user_state, init_user_states_table
+from services.user_service import is_paid_user, is_paid_user_company_centric, get_restricted_message
+# from services.cancellation_service import is_content_cancelled, get_restriction_message_for_content  # 削除された関数
 
 line_bp = Blueprint('line', __name__)
 
@@ -45,8 +46,7 @@ def payment_completed_webhook_by_user_id(user_id):
             # 既にLINE連携済みの場合、直接案内文を送信
             print(f'[DEBUG] 既存LINE連携ユーザーへの自動案内文送信: line_user_id={line_user_id}')
             try:
-                from lp.services.line_service import send_welcome_with_buttons_push
-                success = send_welcome_with_buttons_push(line_user_id)
+                success = send_welcome_with_buttons(line_user_id)
                 if success:
                     # 自動案内文送信後にユーザー状態を設定（重複防止）
                     set_user_state(line_user_id, 'welcome_sent')
@@ -427,7 +427,7 @@ def get_restriction_message(content_type):
 def debug_cancellation_history(user_id):
     """デバッグ用：ユーザーの解約履歴を確認"""
     try:
-        # from lp.services.cancellation_service import get_cancelled_contents  # 削除された関数
+        # from services.cancellation_service import get_cancelled_contents  # 削除された関数
         
         # cancelled_contents = get_cancelled_contents(user_id)  # 削除された関数
         cancelled_contents = []  # 一時的に空リスト
@@ -545,7 +545,6 @@ def line_webhook():
                     # ボタン付きのウェルカムメッセージを送信
                     print(f'[DEBUG] 案内文送信開始: user_id={user_id}, replyToken={event["replyToken"]}')
                     try:
-                        from lp.services.line_service import send_welcome_with_buttons
                         send_welcome_with_buttons(event['replyToken'])
                         print(f'[DEBUG] ウェルカムメッセージ送信完了: user_id={user_id}')
                         # ユーザー状態を設定して重複送信を防ぐ
@@ -570,7 +569,6 @@ def line_webhook():
                         # ボタン付きのウェルカムメッセージを送信
                         print(f'[DEBUG] 案内文送信開始: user_id={user_id}, replyToken={event["replyToken"]}')
                         try:
-                            from lp.services.line_service import send_welcome_with_buttons
                             send_welcome_with_buttons(event['replyToken'])
                             print(f'[DEBUG] ウェルカムメッセージ送信完了: user_id={user_id}')
                             # ユーザー状態を設定して重複送信を防ぐ
@@ -641,7 +639,6 @@ def line_webhook():
                         
                         # 案内メッセージを送信
                         try:
-                            from lp.services.line_service import send_welcome_with_buttons
                             send_welcome_with_buttons(event['replyToken'])
                             print(f'[DEBUG] 決済済みユーザーの案内文送信完了: user_id={user_id}')
                             # ユーザー状態を設定
@@ -766,13 +763,13 @@ def line_webhook():
                             continue
                         else:
                             # AI技術を活用した高度な数字抽出関数を使用して処理
-                            from lp.services.line_service import smart_number_extraction, validate_selection_numbers
+                            from services.line_service import smart_number_extraction, validate_selection_numbers
                             
                             # データベースからコンテンツ数を取得
                             conn = get_db_connection()
                             c = conn.cursor()
                             # データベースタイプに応じてプレースホルダーを選択
-                            from lp.utils.db import get_db_type
+                            from utils.db import get_db_type
                             db_type = get_db_type()
                             placeholder = '%s' if db_type == 'postgresql' else '?'
                             
@@ -883,7 +880,7 @@ def line_webhook():
                             content_number = state.split('_')[2]  # cancel_confirm_1 → 1
                             
                             # 解約処理を実行
-                            from lp.services.line_service import handle_cancel_confirmation
+                            from services.line_service import handle_cancel_confirmation
                             result = handle_cancel_confirmation(company_id, content_number)
                             
                             if result['success']:
@@ -962,7 +959,6 @@ def line_webhook():
                                         print(f'[DEBUG] 決済済み確認: user_id={user_id}')
                                         # 案内メッセージを送信
                                         try:
-                                            from lp.services.line_service import send_welcome_with_buttons
                                             send_welcome_with_buttons(event['replyToken'])
                                             print(f'[DEBUG] メールアドレス連携時の案内文送信完了: user_id={user_id}')
                                             # ユーザー状態を設定
@@ -1016,7 +1012,6 @@ def line_webhook():
                                     print(f'[DEBUG] 決済済み確認: user_id={user_id}')
                                     # 案内メッセージを送信
                                     try:
-                                        from lp.services.line_service import send_welcome_with_buttons
                                         send_welcome_with_buttons(event['replyToken'])
                                         print(f'[DEBUG] メールアドレス連携時の案内文送信完了: user_id={user_id}')
                                         # ユーザー状態を設定
@@ -1066,7 +1061,6 @@ def line_webhook():
                                     print(f'[DEBUG] 決済済み確認: user_id={user_id}')
                                     # 案内メッセージを送信
                                     try:
-                                        from lp.services.line_service import send_welcome_with_buttons
                                         send_welcome_with_buttons(event['replyToken'])
                                         print(f'[DEBUG] 決済データ紐付け時の案内文送信完了: user_id={user_id}')
                                         # ユーザー状態を設定

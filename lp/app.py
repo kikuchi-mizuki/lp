@@ -11,30 +11,30 @@ import sqlite3
 import psycopg2
 import time
 from urllib.parse import urlparse
-from lp.utils.message_templates import get_default_message, get_menu_message, get_help_message
-from lp.utils.db import get_db_connection
-from lp.routes.line import line_bp
-from lp.routes.stripe import stripe_bp
-from lp.routes.company import company_bp
-from lp.routes.line_api import line_api_bp
-from lp.routes.stripe_payment import stripe_payment_bp
-from lp.routes.content_management import content_management_bp
-from lp.routes.cancellation import cancellation_bp
-from lp.routes.notification import notification_bp
-from lp.routes.scheduler import scheduler_bp
-from lp.routes.backup import backup_bp
-from lp.routes.dashboard import dashboard_bp
-from lp.routes.monitoring import monitoring_bp
-from lp.routes.reminder import reminder_bp
-from lp.routes.security import security_bp
-from lp.routes.dashboard_ui import dashboard_ui_bp
-from lp.routes.automation import automation_bp
-from lp.routes.company_line_accounts import company_line_accounts_bp
-from lp.routes.company_registration import company_registration_bp
-from lp.routes.railway_setup import railway_setup_bp
-from lp.routes.ai_schedule_webhook import ai_schedule_webhook_bp
-from lp.routes.ai_schedule_webhook_simple import ai_schedule_webhook_simple_bp
-from lp.routes.debug import debug_bp
+from utils.message_templates import get_default_message, get_menu_message, get_help_message
+from utils.db import get_db_connection
+from routes.line import line_bp
+from routes.stripe import stripe_bp
+from routes.company import company_bp
+from routes.line_api import line_api_bp
+from routes.stripe_payment import stripe_payment_bp
+from routes.content_management import content_management_bp
+from routes.cancellation import cancellation_bp
+from routes.notification import notification_bp
+from routes.scheduler import scheduler_bp
+from routes.backup import backup_bp
+from routes.dashboard import dashboard_bp
+from routes.monitoring import monitoring_bp
+from routes.reminder import reminder_bp
+from routes.security import security_bp
+from routes.dashboard_ui import dashboard_ui_bp
+from routes.automation import automation_bp
+from routes.company_line_accounts import company_line_accounts_bp
+from routes.company_registration import company_registration_bp
+from routes.railway_setup import railway_setup_bp
+from routes.ai_schedule_webhook import ai_schedule_webhook_bp
+from routes.ai_schedule_webhook_simple import ai_schedule_webhook_simple_bp
+from routes.debug import debug_bp
 from datetime import datetime
 
 load_dotenv()
@@ -285,7 +285,7 @@ def error_log():
 def monitor_line_errors():
     """LINE APIエラーの監視エンドポイント"""
     try:
-        from lp.services.monitoring_service import monitoring_service
+        from services.monitoring_service import monitoring_service
         result = monitoring_service.check_line_api_errors()
         return jsonify(result)
     except Exception as e:
@@ -298,7 +298,7 @@ def monitor_line_errors():
 def monitor_stripe_errors():
     """Stripeエラーの監視エンドポイント"""
     try:
-        from lp.services.monitoring_service import monitoring_service
+        from services.monitoring_service import monitoring_service
         result = monitoring_service.check_stripe_errors()
         return jsonify(result)
     except Exception as e:
@@ -311,7 +311,7 @@ def monitor_stripe_errors():
 def monitor_all_errors():
     """全エラーの監視エンドポイント"""
     try:
-        from lp.services.monitoring_service import monitoring_service
+        from services.monitoring_service import monitoring_service
         
         line_result = monitoring_service.check_line_api_errors()
         stripe_result = monitoring_service.check_stripe_errors()
