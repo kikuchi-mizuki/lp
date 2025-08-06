@@ -95,13 +95,17 @@ def init_db():
                 )
             ''')
             
-            # 企業サブスクリプション管理テーブル（最小限）
+            # 企業サブスクリプション管理テーブル（料金管理強化）
             c.execute('''
                 CREATE TABLE IF NOT EXISTS company_subscriptions (
                     id SERIAL PRIMARY KEY,
                     company_id INTEGER NOT NULL,
                     content_type VARCHAR(100) NOT NULL,
                     subscription_status VARCHAR(50) DEFAULT 'active',
+                    base_price INTEGER DEFAULT 5000,
+                    additional_price INTEGER DEFAULT 0,
+                    total_price INTEGER DEFAULT 5000,
+                    stripe_subscription_id VARCHAR(255),
                     current_period_end TIMESTAMP,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (company_id) REFERENCES companies(id),
@@ -152,6 +156,10 @@ def init_db():
                     company_id INTEGER NOT NULL,
                     content_type TEXT NOT NULL,
                     subscription_status TEXT DEFAULT 'active',
+                    base_price INTEGER DEFAULT 5000,
+                    additional_price INTEGER DEFAULT 0,
+                    total_price INTEGER DEFAULT 5000,
+                    stripe_subscription_id TEXT,
                     current_period_end TIMESTAMP,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (company_id) REFERENCES companies(id),
@@ -451,9 +459,9 @@ def create_company_line_account(company_id, company_data):
         raise
 
 # 企業サブスクリプション情報をデータベースに保存
-def save_company_subscription(company_id, stripe_subscription_id):
+def save_company_subscription(company_id, stripe_subscription_id, content_type='ai_schedule'):
     """
-    企業サブスクリプション情報をデータベースに保存
+    企業サブスクリプション情報をデータベースに保存（料金管理強化）
     """
     conn = None
     c = None
@@ -462,9 +470,10 @@ def save_company_subscription(company_id, stripe_subscription_id):
         # Stripeからサブスクリプション情報を取得
         subscription = stripe.Subscription.retrieve(stripe_subscription_id)
         
-        # セッションから企業データを取得
-        company_data = session.get('company_data', {})
-        content_type = company_data.get('content_type', 'AI予定秘書')
+        # 料金計算
+        base_price = 5000  # 基本料金（月額5,000円）
+        additional_price = 0  # 追加コンテンツ料金（初期は0）
+        total_price = base_price + additional_price
         
         # サブスクリプションの期間を計算
         current_period_end = datetime.fromtimestamp(subscription.current_period_end)
@@ -474,18 +483,23 @@ def save_company_subscription(company_id, stripe_subscription_id):
         
         c.execute('''
             INSERT INTO company_subscriptions 
-            (company_id, content_type, subscription_status, current_period_end)
-            VALUES (%s, %s, %s, %s)
+            (company_id, content_type, subscription_status, base_price, additional_price, 
+             total_price, stripe_subscription_id, current_period_end)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         ''', (
             company_id,
             content_type,
             subscription.status,
+            base_price,
+            additional_price,
+            total_price,
+            stripe_subscription_id,
             current_period_end
         ))
         
         conn.commit()
         
-        print(f"✅ 企業サブスクリプションを保存しました: {company_id}")
+        print(f"✅ 企業サブスクリプションを保存しました: {company_id}, 料金: {total_price}円")
         
     except Exception as e:
         print(f"❌ 企業サブスクリプション保存エラー: {e}")
@@ -497,6 +511,31 @@ def save_company_subscription(company_id, stripe_subscription_id):
             c.close()
         if conn:
             conn.close()
+
+def calculate_company_pricing(company_id, content_types):
+    """
+    企業の料金計算
+    """
+    base_price = 5000  # 基本料金
+    additional_price_per_content = 1500  # 追加コンテンツ料金
+    
+    # 基本料金（1つ目のコンテンツは基本料金に含まれる）
+    if len(content_types) == 1:
+        total_price = base_price
+        additional_price = 0
+    else:
+        # 追加コンテンツ料金
+        additional_contents = len(content_types) - 1
+        additional_price = additional_contents * additional_price_per_content
+        total_price = base_price + additional_price
+    
+    return {
+        'base_price': base_price,
+        'additional_price': additional_price,
+        'total_price': total_price,
+        'content_count': len(content_types),
+        'additional_content_count': max(0, len(content_types) - 1)
+    }
 
 # Stripe Webhook処理（企業ユーザー専用）
 @app.route('/webhook/stripe/company', methods=['POST'])
@@ -1292,12 +1331,12 @@ def debug_usage_logs():
 
 @app.route('/debug/subscription_periods')
 def debug_subscription_periods():
-    """契約期間管理テーブルの内容を確認"""
+    """契約期間管理テーブルの内容を確認（料金情報含む）"""
     try:
         conn = get_db_connection()
         c = conn.cursor()
         
-        # company_subscriptionsテーブルの内容を取得
+        # company_subscriptionsテーブルの内容を取得（料金情報含む）
         c.execute('''
             SELECT 
                 cs.id,
@@ -1306,6 +1345,10 @@ def debug_subscription_periods():
                 c.email,
                 cs.content_type,
                 cs.subscription_status,
+                cs.base_price,
+                cs.additional_price,
+                cs.total_price,
+                cs.stripe_subscription_id,
                 cs.current_period_end,
                 cs.created_at
             FROM company_subscriptions cs
@@ -1322,33 +1365,45 @@ def debug_subscription_periods():
                 'email': row[3],
                 'content_type': row[4],
                 'subscription_status': row[5],
-                'current_period_end': row[6],
-                'created_at': row[7]
+                'base_price': row[6],
+                'additional_price': row[7],
+                'total_price': row[8],
+                'stripe_subscription_id': row[9],
+                'current_period_end': row[10],
+                'created_at': row[11]
             })
         
-        # テーブル構造も確認
-        c.execute("""
-            SELECT column_name, data_type, is_nullable 
-            FROM information_schema.columns 
-            WHERE table_name = 'company_subscriptions' 
-            ORDER BY ordinal_position
-        """)
+        # 企業ごとの料金サマリー
+        c.execute('''
+            SELECT 
+                c.company_name,
+                c.email,
+                COUNT(cs.content_type) as content_count,
+                SUM(cs.total_price) as total_monthly_cost,
+                STRING_AGG(cs.content_type, ', ') as content_types
+            FROM companies c
+            LEFT JOIN company_subscriptions cs ON c.id = cs.company_id
+            WHERE cs.subscription_status = 'active'
+            GROUP BY c.id, c.company_name, c.email
+            ORDER BY total_monthly_cost DESC
+        ''')
         
-        columns = []
+        company_summary = []
         for row in c.fetchall():
-            columns.append({
-                'column': row[0],
-                'type': row[1],
-                'nullable': row[2]
+            company_summary.append({
+                'company_name': row[0],
+                'email': row[1],
+                'content_count': row[2],
+                'total_monthly_cost': row[3],
+                'content_types': row[4]
             })
         
         conn.close()
         
         return jsonify({
-            'status': 'ok',
-            'company_subscriptions': subscriptions,
-            'table_structure': columns,
-            'count': len(subscriptions)
+            'subscriptions': subscriptions,
+            'company_summary': company_summary,
+            'total_count': len(subscriptions)
         })
         
     except Exception as e:
@@ -1642,6 +1697,80 @@ def debug_update_company_line_user_id_direct(company_id, line_user_id):
         else:
             return jsonify({'error': '更新後の確認に失敗しました'})
             
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
+@app.route('/debug/company/pricing/<int:company_id>')
+def debug_company_pricing(company_id):
+    """企業の料金情報を表示"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 企業基本情報を取得
+        c.execute('''
+            SELECT company_name, email, status
+            FROM companies 
+            WHERE id = %s
+        ''', (company_id,))
+        
+        company = c.fetchone()
+        if not company:
+            return jsonify({'error': '企業が見つかりません'}), 404
+        
+        # 企業のサブスクリプション情報を取得
+        c.execute('''
+            SELECT 
+                content_type,
+                subscription_status,
+                base_price,
+                additional_price,
+                total_price,
+                stripe_subscription_id,
+                current_period_end
+            FROM company_subscriptions 
+            WHERE company_id = %s
+            ORDER BY created_at DESC
+        ''', (company_id,))
+        
+        subscriptions = []
+        total_monthly_cost = 0
+        content_types = []
+        
+        for row in c.fetchall():
+            subscriptions.append({
+                'content_type': row[0],
+                'subscription_status': row[1],
+                'base_price': row[2],
+                'additional_price': row[3],
+                'total_price': row[4],
+                'stripe_subscription_id': row[5],
+                'current_period_end': row[6]
+            })
+            total_monthly_cost += row[4]
+            content_types.append(row[0])
+        
+        conn.close()
+        
+        # 料金計算
+        pricing_info = calculate_company_pricing(company_id, content_types)
+        
+        return jsonify({
+            'company': {
+                'id': company_id,
+                'name': company[0],
+                'email': company[1],
+                'status': company[2]
+            },
+            'subscriptions': subscriptions,
+            'pricing_summary': {
+                'total_monthly_cost': total_monthly_cost,
+                'content_count': len(content_types),
+                'content_types': content_types,
+                'calculated_pricing': pricing_info
+            }
+        })
+        
     except Exception as e:
         return jsonify({'error': str(e)})
 
