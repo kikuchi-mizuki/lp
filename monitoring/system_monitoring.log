@@ -161,3 +161,18 @@
 2025-08-05 19:14:16,333 - werkzeug - INFO -  * Restarting with stat
 2025-08-05 19:14:16,864 - werkzeug - WARNING -  * Debugger is active!
 2025-08-05 19:14:16,869 - werkzeug - INFO -  * Debugger PIN: 861-793-851
+2025-08-06 12:41:07,850 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.0.207:5000
+2025-08-06 12:41:07,851 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-08-06 12:41:07,852 - werkzeug - INFO -  * Restarting with stat
+2025-08-06 12:41:08,377 - werkzeug - WARNING -  * Debugger is active!
+2025-08-06 12:41:08,385 - werkzeug - INFO -  * Debugger PIN: 861-793-851
+2025-08-06 12:41:14,386 - werkzeug - INFO - 127.0.0.1 - - [06/Aug/2025 12:41:14] "GET /monitor/errors HTTP/1.1" 200 -
+2025-08-06 12:41:21,899 - werkzeug - INFO -  * Detected change in '/Users/kikuchimizuki/Desktop/aicollections/lp/lp/routes/line.py', reloading
+2025-08-06 12:41:22,090 - werkzeug - INFO -  * Restarting with stat
+2025-08-06 12:41:22,653 - werkzeug - WARNING -  * Debugger is active!
+2025-08-06 12:41:22,658 - werkzeug - INFO -  * Debugger PIN: 861-793-851
+2025-08-06 12:52:24,257 - werkzeug - INFO -  * Detected change in '/Users/kikuchimizuki/Desktop/aicollections/lp/lp/app.py', reloading
+2025-08-06 12:52:24,438 - werkzeug - INFO -  * Restarting with stat

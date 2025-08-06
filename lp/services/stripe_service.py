@@ -59,10 +59,17 @@ def add_metered_price_to_subscription(subscription_id, price_id=None):
         subscription = stripe.Subscription.retrieve(subscription_id)
         
         # 既に同じPriceが追加されているかチェック
+        existing_item = None
         for item in subscription['items']['data']:
             if item['price']['id'] == price_id:
-                print(f"Price {price_id} は既にサブスクリプション {subscription_id} に追加されています")
-                return subscription
+                existing_item = item
+                print(f"Price {price_id} は既にサブスクリプション {subscription_id} に追加されています (SubscriptionItem: {item['id']})")
+                return {
+                    'success': True,
+                    'message': f"Price {price_id} は既に追加されています",
+                    'subscription_item_id': item['id'],
+                    'subscription': subscription
+                }
         
         # 従量課金Priceを追加（quantityは設定しない）
         subscription_item = stripe.SubscriptionItem.create(
@@ -70,12 +77,36 @@ def add_metered_price_to_subscription(subscription_id, price_id=None):
             price=price_id
         )
         
-        print(f"従量課金Price {price_id} をサブスクリプション {subscription_id} に追加しました")
-        return subscription
+        print(f"従量課金Price {price_id} をサブスクリプション {subscription_id} に追加しました (SubscriptionItem: {subscription_item['id']})")
+        return {
+            'success': True,
+            'message': f"Price {price_id} を追加しました",
+            'subscription_item_id': subscription_item['id'],
+            'subscription': subscription
+        }
         
+    except stripe.error.InvalidRequestError as e:
+        if "already using that Price" in str(e):
+            print(f"Price {price_id} は既にサブスクリプション {subscription_id} で使用されています")
+            return {
+                'success': False,
+                'error': 'PRICE_ALREADY_EXISTS',
+                'message': f"Price {price_id} は既に使用されています"
+            }
+        else:
+            print(f"従量課金Price追加エラー: {e}")
+            return {
+                'success': False,
+                'error': 'STRIPE_ERROR',
+                'message': str(e)
+            }
     except Exception as e:
         print(f"従量課金Price追加エラー: {e}")
-        raise e
+        return {
+            'success': False,
+            'error': 'UNKNOWN_ERROR',
+            'message': str(e)
+        }
 
 def ensure_metered_price_in_subscription(subscription_id, price_id=None):
     """サブスクリプションに従量課金Priceが含まれていることを確認し、なければ追加する"""
@@ -88,10 +119,17 @@ def ensure_metered_price_in_subscription(subscription_id, price_id=None):
         subscription = stripe.Subscription.retrieve(subscription_id)
         
         # 既に同じPriceが追加されているかチェック
+        existing_item = None
         for item in subscription['items']['data']:
             if item['price']['id'] == price_id:
-                print(f"Price {price_id} は既にサブスクリプション {subscription_id} に含まれています")
-                return subscription
+                existing_item = item
+                print(f"Price {price_id} は既にサブスクリプション {subscription_id} に含まれています (SubscriptionItem: {item['id']})")
+                return {
+                    'success': True,
+                    'message': f"Price {price_id} は既に含まれています",
+                    'subscription_item_id': item['id'],
+                    'subscription': subscription
+                }
         
         # 従量課金Priceを追加（quantityは設定しない）
         subscription_item = stripe.SubscriptionItem.create(
@@ -99,11 +137,34 @@ def ensure_metered_price_in_subscription(subscription_id, price_id=None):
             price=price_id
         )
         
-        print(f"従量課金Price {price_id} をサブスクリプション {subscription_id} に追加しました")
+        print(f"従量課金Price {price_id} をサブスクリプション {subscription_id} に追加しました (SubscriptionItem: {subscription_item['id']})")
         
-        # 更新されたサブスクリプションを返す
-        return stripe.Subscription.retrieve(subscription_id)
+        return {
+            'success': True,
+            'message': f"Price {price_id} を追加しました",
+            'subscription_item_id': subscription_item['id'],
+            'subscription': subscription
+        }
         
+    except stripe.error.InvalidRequestError as e:
+        if "already using that Price" in str(e):
+            print(f"Price {price_id} は既にサブスクリプション {subscription_id} で使用されています")
+            return {
+                'success': False,
+                'error': 'PRICE_ALREADY_EXISTS',
+                'message': f"Price {price_id} は既に使用されています"
+            }
+        else:
+            print(f"従量課金Price確認・追加エラー: {e}")
+            return {
+                'success': False,
+                'error': 'STRIPE_ERROR',
+                'message': str(e)
+            }
     except Exception as e:
         print(f"従量課金Price確認・追加エラー: {e}")
-        raise e 
+        return {
+            'success': False,
+            'error': 'UNKNOWN_ERROR',
+            'message': str(e)
+        } 

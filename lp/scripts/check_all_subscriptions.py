@@ -39,11 +39,12 @@ def check_and_fix_all_subscriptions(metered_price_id):
             else:
                 print(f"  ❌ Meter付き従量課金Priceが不足 - 自動追加中...")
                 result = ensure_metered_price_in_subscription(sub.id, metered_price_id)
-                if result:
-                    print(f"  ✅ 自動追加成功")
+                if result.get('success'):
+                    print(f"  ✅ 自動追加成功: {result.get('message', '')}")
                     fixed_count += 1
                 else:
-                    print(f"  ❌ 自動追加失敗")
+                    error_msg = result.get('message', '不明なエラー')
+                    print(f"  ❌ 自動追加失敗: {error_msg}")
                     error_count += 1
         else:
             print(f"  ⚠️ 非アクティブなサブスクリプション (スキップ)")
