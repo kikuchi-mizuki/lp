@@ -170,6 +170,10 @@ def init_db():
         conn.commit()
         print("✅ 企業ユーザー専用最小限データベースの初期化が完了しました")
         
+        # user_statesテーブルの初期化
+        from models.user_state import init_user_states_table
+        init_user_states_table()
+        
     except Exception as e:
         print(f"❌ データベース初期化エラー: {e}")
         if conn:
