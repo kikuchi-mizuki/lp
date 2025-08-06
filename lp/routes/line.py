@@ -1026,7 +1026,7 @@ def line_webhook():
                                                 traceback.print_exc()
                                                 send_line_message(event['replyToken'], [{"type": "text", "text": "ようこそ！AIコレクションズへ\n\n「追加」と入力してコンテンツを追加してください。"}])
                                                 set_user_state(user_id, 'welcome_sent')
-                                        else:
+                                    else:
                                             print(f'[DEBUG] 未決済確認: user_id={user_id}, status={payment_check["subscription_status"]}')
                                             # 制限メッセージを送信
                                             restricted_message = get_restricted_message()
