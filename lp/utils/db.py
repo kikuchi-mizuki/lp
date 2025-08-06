@@ -5,8 +5,9 @@ from psycopg2.extras import RealDictCursor
 
 DATABASE_URL = os.getenv('DATABASE_URL', 'database.db')
 
+
 def get_db_connection():
-    """データベース接続を取得"""
+    """データベース接続を取得（改善版）"""
     database_url = os.getenv('RAILWAY_DATABASE_URL') or os.getenv('DATABASE_URL')
     
     print(f'[DEBUG] 環境変数確認: RAILWAY_DATABASE_URL={os.getenv("RAILWAY_DATABASE_URL")}, DATABASE_URL={os.getenv("DATABASE_URL")}')
@@ -19,7 +20,21 @@ def get_db_connection():
     
     if database_url and database_url.startswith('postgresql://'):
         # PostgreSQL接続
-        return psycopg2.connect(database_url)
+        try:
+            return psycopg2.connect(database_url)
+        except Exception as e:
+            print(f'[ERROR] PostgreSQL接続エラー: {e}')
+            # フォールバック: ローカルPostgreSQL
+            try:
+                return psycopg2.connect(
+                    host="localhost",
+                    database="ai_collections",
+                    user="postgres",
+                    password="password"
+                )
+            except:
+                # 最終フォールバック: SQLite
+                return sqlite3.connect('database.db')
     elif database_url and database_url.startswith('sqlite://'):
         # SQLite接続（URL形式）
         db_path = database_url.replace('sqlite://', '')
@@ -39,6 +54,7 @@ def get_db_connection():
         except:
             # PostgreSQL接続に失敗した場合はSQLiteを使用
             return sqlite3.connect('database.db')
+
 
 def get_db_type():
     """データベースタイプを取得（postgresql または sqlite）"""

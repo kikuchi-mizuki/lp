@@ -7,15 +7,12 @@ import traceback
 import time
 from datetime import datetime, timedelta
 from utils.db import get_db_connection
-# from services.cancellation_service import record_cancellation  # 削除された関数
 from services.stripe_service import check_subscription_status
 import re
 from services.subscription_period_service import SubscriptionPeriodService
 import json
 
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
-
-# LINE関連のサービス層
 
 def send_line_message(reply_token, messages):
     """LINEメッセージ送信（複数メッセージ対応）"""
@@ -139,386 +136,142 @@ def send_line_message(reply_token, messages):
             f.write(traceback.format_exc() + '\n')
 
 def send_welcome_with_buttons(reply_token):
-    print(f'[DEBUG] send_welcome_with_buttons開始: reply_token={reply_token}')
-    LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
-    
-    if not LINE_CHANNEL_ACCESS_TOKEN:
-        print('❌ LINE_CHANNEL_ACCESS_TOKENが設定されていません')
-        return
-    
-    headers = {
-        'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}',
-        'Content-Type': 'application/json'
+    """ウェルカムメッセージ（ボタン付き）"""
+    welcome_message = {
+        "type": "template",
+        "altText": "AI Collections へようこそ",
+        "template": {
+            "type": "buttons",
+            "title": "AI Collections へようこそ",
+            "text": "AI予定秘書、AI経理秘書、AIタスクコンシェルジュの3つのサービスをご利用いただけます。",
+            "thumbnailImageUrl": "https://ai-collections.herokuapp.com/static/images/logo.png",
+            "imageAspectRatio": "rectangle",
+            "imageSize": "cover",
+            "imageBackgroundColor": "#FFFFFF",
+            "actions": [
+                {
+                    "type": "message",
+                    "label": "コンテンツ追加",
+                    "text": "追加"
+                },
+                {
+                    "type": "message",
+                    "label": "利用状況確認",
+                    "text": "状態"
+                },
+                {
+                    "type": "message",
+                    "label": "解約",
+                    "text": "解約"
+                },
+                {
+                    "type": "message",
+                    "label": "ヘルプ",
+                    "text": "ヘルプ"
+                }
+            ]
+        }
     }
-    
-    # より親しみやすく、わかりやすい案内文
-    data = {
-        'replyToken': reply_token,
-        'messages': [
-            {
-                "type": "text",
-                "text": "🎉 ようこそ！AIコレクションズへ\n\n✨ あなたのビジネスをサポートする3つのAIサービス：\n\n📅 AI予定秘書\n• スケジュール管理を自動化\n• 会議調整を効率化\n\n💰 AI経理秘書\n• 見積書・請求書を自動作成\n• 経理作業を大幅短縮\n\n📝 AIタスクコンシェルジュ\n• タスク管理を最適化\n• 優先順位を自動設定\n\n💡 まずは「追加」と入力して、使ってみたいサービスを選んでください！\n\n📋 料金：月額3,900円（1週間無料トライアル）\n🎁 追加コンテンツ：1個目は無料、2個目以降は1,500円"
-            }
-        ]
-    }
-    
-    try:
-        print(f'[DEBUG] LINE API送信開始: data={data}')
-        response = requests.post('https://api.line.me/v2/bot/message/reply', headers=headers, json=data, timeout=10)
-        
-        if response.status_code == 400:
-            print(f'[DEBUG] LINE API 400エラー詳細: {response.text}')
-            print(f'[DEBUG] LINE API レスポンスヘッダー: {response.headers}')
-            print(f'[DEBUG] LINE API リクエストデータ: {data}')
-            
-            # 400エラーの詳細を解析
-            try:
-                error_detail = response.json()
-                print(f'[DEBUG] LINE API エラー詳細JSON: {error_detail}')
-                if 'message' in error_detail:
-                    if 'reply token' in error_detail['message'].lower():
-                        print(f'[DEBUG] replyTokenエラー: {error_detail["message"]}')
-                        # replyTokenエラーの場合は、再試行せずにエラーとして処理
-                        raise Exception(f'replyTokenエラー: {error_detail["message"]}')
-            except Exception as parse_error:
-                if 'replyTokenエラー' in str(parse_error):
-                    raise parse_error
-                print(f'[DEBUG] LINE API エラー詳細（JSON解析失敗）: {response.text}')
-            
-            # 400エラーだがreplyTokenエラーでない場合は、エラーとして処理
-            print(f'[DEBUG] 400エラーが発生しましたが、replyTokenは既に使用済みのため再試行しません')
-        
-        response.raise_for_status()
-        print(f'[DEBUG] LINE API送信成功: status_code={response.status_code}')
-        print('[DEBUG] send_welcome_with_buttons送信処理完了')
-    except Exception as e:
-        print(f'LINEテンプレートメッセージ送信エラー: {e}')
-        if hasattr(e, 'response') and e.response is not None:
-            print(f'LINE API エラー詳細: {e.response.text}')
-        traceback.print_exc()
-        with open('error.log', 'a', encoding='utf-8') as f:
-            f.write('LINEテンプレートメッセージ送信エラー: ' + str(e) + '\n')
-            if hasattr(e, 'response') and e.response is not None:
-                f.write(f'LINE API エラー詳細: {e.response.text}\n')
-            f.write(traceback.format_exc() + '\n')
+    send_line_message(reply_token, [welcome_message])
 
 def send_welcome_with_buttons_push(user_id):
-    """LINEユーザーIDに直接案内文を送信（pushメッセージ）"""
-    print(f'[DEBUG] send_welcome_with_buttons_push開始: user_id={user_id}')
-    LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
-    
-    if not LINE_CHANNEL_ACCESS_TOKEN:
-        print('❌ LINE_CHANNEL_ACCESS_TOKENが設定されていません')
-        return False
-    
-    headers = {
-        'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}',
-        'Content-Type': 'application/json'
-    }
-    data = {
-        'to': user_id,
-        'messages': [
-            {
-                "type": "text",
-                "text": "🎉 ようこそ！AIコレクションズへ\n\n✨ あなたのビジネスをサポートする3つのAIサービス：\n\n📅 AI予定秘書\n• スケジュール管理を自動化\n• 会議調整を効率化\n\n💰 AI経理秘書\n• 見積書・請求書を自動作成\n• 経理作業を大幅短縮\n\n📝 AIタスクコンシェルジュ\n• タスク管理を最適化\n• 優先順位を自動設定\n\n💡 まずは「追加」と入力して、使ってみたいサービスを選んでください！\n\n📋 料金：月額3,900円（1週間無料トライアル）\n🎁 追加コンテンツ：1個目は無料、2個目以降は1,500円"
-            },
-            {
-                "type": "template",
-                "altText": "メニュー",
-                "template": {
-                    "type": "buttons",
-                    "title": "メニュー",
-                    "text": "ご希望の機能を選択してください。",
-                    "actions": [
-                        {
-                            "type": "message",
-                            "label": "コンテンツ追加",
-                            "text": "追加"
-                        },
-                        {
-                            "type": "message",
-                            "label": "利用状況確認",
-                            "text": "状態"
-                        },
-                        {
-                            "type": "message",
-                            "label": "解約",
-                            "text": "解約"
-                        },
-                        {
-                            "type": "message",
-                            "label": "ヘルプ",
-                            "text": "ヘルプ"
-                        }
-                    ]
+    """プッシュメッセージでウェルカムメッセージ（ボタン付き）"""
+    welcome_message = {
+        "type": "template",
+        "altText": "AI Collections へようこそ",
+        "template": {
+            "type": "buttons",
+            "title": "AI Collections へようこそ",
+            "text": "AI予定秘書、AI経理秘書、AIタスクコンシェルジュの3つのサービスをご利用いただけます。",
+            "thumbnailImageUrl": "https://ai-collections.herokuapp.com/static/images/logo.png",
+            "imageAspectRatio": "rectangle",
+            "imageSize": "cover",
+            "imageBackgroundColor": "#FFFFFF",
+            "actions": [
+                {
+                    "type": "message",
+                    "label": "コンテンツ追加",
+                    "text": "追加"
+                },
+                {
+                    "type": "message",
+                    "label": "利用状況確認",
+                    "text": "状態"
+                },
+                {
+                    "type": "message",
+                    "label": "解約",
+                    "text": "解約"
+                },
+                {
+                    "type": "message",
+                    "label": "ヘルプ",
+                    "text": "ヘルプ"
                 }
-            }
-        ]
+            ]
+        }
+    }
+    
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}'
+    }
+    
+    push_data = {
+        'to': user_id,
+        'messages': [welcome_message]
     }
     
     try:
-        response = requests.post('https://api.line.me/v2/bot/message/push', headers=headers, json=data, timeout=10)
-        response.raise_for_status()
-        print(f'[DEBUG] LINE pushメッセージ送信成功: status_code={response.status_code}')
-        return True
-    except Exception as e:
-        print(f'LINE pushメッセージ送信エラー: {e}')
-        if hasattr(e, 'response') and e.response is not None:
-            print(f'LINE API エラー詳細: {e.response.text}')
-        traceback.print_exc()
-        return False
-
-def create_rich_menu():
-    rich_menu = {
-        "size": {"width": 2500, "height": 843},
-        "selected": True,
-        "name": "AIコレクションズ メニュー",
-        "chatBarText": "メニュー",
-        "areas": [
-            {
-                "bounds": {"x": 0, "y": 0, "width": 500, "height": 843},
-                "action": {"type": "postback", "data": "action=add_content", "label": "追加"}
-            },
-            {
-                "bounds": {"x": 500, "y": 0, "width": 500, "height": 843},
-                "action": {"type": "postback", "data": "action=cancel_content", "label": "解約"}
-            },
-            {
-                "bounds": {"x": 1000, "y": 0, "width": 500, "height": 843},
-                "action": {"type": "postback", "data": "action=check_status", "label": "状態"}
-            },
-            {
-                "bounds": {"x": 1500, "y": 0, "width": 500, "height": 843},
-                "action": {"type": "postback", "data": "action=help", "label": "ヘルプ"}
-            },
-            {
-                "bounds": {"x": 2000, "y": 0, "width": 500, "height": 843},
-                "action": {"type": "postback", "data": "action=share", "label": "友達に紹介"}
-            }
-        ]
-    }
-    headers = {
-        'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}',
-        'Content-Type': 'application/json'
-    }
-    response = requests.post('https://api.line.me/v2/bot/richmenu', headers=headers, json=rich_menu)
-    response.raise_for_status()
-    return response.json()['richMenuId']
-
-def set_rich_menu_image(rich_menu_id, image_path='static/images/richmenu.png'):
-    """リッチメニューに画像を設定"""
-    try:
-        # リッチメニュー画像を生成
-        from PIL import Image, ImageDraw, ImageFont
-        import io
-        
-        # 画像を生成
-        width, height = 2500, 843
-        image = Image.new('RGB', (width, height), color='white')
-        draw = ImageDraw.Draw(image)
-        
-        # フォント設定（デフォルトフォントを使用）
-        try:
-            font = ImageFont.truetype("arial.ttf", 60)
-        except:
-            font = ImageFont.load_default()
-        
-        # メニュー項目を描画
-        menu_items = [
-            ("追加", (200, 200)),
-            ("状態", (700, 200)),
-            ("解約", (1200, 200)),
-            ("メニュー", (1700, 200))
-        ]
-        
-        for text, pos in menu_items:
-            draw.text(pos, text, fill='black', font=font)
-        
-        # 画像をバイトデータに変換
-        img_byte_arr = io.BytesIO()
-        image.save(img_byte_arr, format='PNG')
-        img_byte_arr = img_byte_arr.getvalue()
-        
-        headers = {
-            'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}',
-            'Content-Type': 'image/png'
-        }
-        
         response = requests.post(
-            f'https://api.line.me/v2/bot/richmenu/{rich_menu_id}/content',
+            'https://api.line.me/v2/bot/message/push',
             headers=headers,
-            data=img_byte_arr
+            data=json.dumps(push_data)
         )
         
         if response.status_code == 200:
-            print(f"リッチメニュー画像設定成功: {rich_menu_id}")
-            return True
+            print(f'[DEBUG] プッシュメッセージ送信成功: {user_id}')
         else:
-            print(f"リッチメニュー画像設定失敗: {response.status_code} - {response.text}")
-            return False
-            
+            print(f'[DEBUG] プッシュメッセージ送信失敗: {response.status_code}, {response.text}')
     except Exception as e:
-        print(f"リッチメニュー画像設定エラー: {e}")
-        return False
-
-def set_default_rich_menu(rich_menu_id):
-    """デフォルトリッチメニューを設定"""
-    try:
-        headers = {
-            'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}',
-            'Content-Type': 'application/json'
-        }
-        
-        response = requests.post(
-            f'https://api.line.me/v2/bot/user/all/richmenu/{rich_menu_id}',
-            headers=headers
-        )
-        
-        if response.status_code == 200:
-            print(f"デフォルトリッチメニュー設定成功: {rich_menu_id}")
-            return True
-        else:
-            print(f"デフォルトリッチメニュー設定失敗: {response.status_code} - {response.text}")
-            return False
-            
-    except Exception as e:
-        print(f"デフォルトリッチメニュー設定エラー: {e}")
-        return False
-
-def delete_all_rich_menus():
-    """既存のリッチメニューをすべて削除"""
-    try:
-        headers = {
-            'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}'
-        }
-        
-        response = requests.get('https://api.line.me/v2/bot/richmenu/list', headers=headers)
-        
-        if response.status_code == 200:
-            richmenus = response.json().get('richmenus', [])
-            for rm in richmenus:
-                delete_response = requests.delete(f'https://api.line.me/v2/bot/richmenu/{rm["richMenuId"]}', headers=headers)
-                if delete_response.status_code == 200:
-                    print(f"リッチメニュー削除成功: {rm['richMenuId']}")
-                else:
-                    print(f"リッチメニュー削除失敗: {rm['richMenuId']} - {delete_response.status_code}")
-            print(f"既存のリッチメニュー削除完了: {len(richmenus)}件")
-        else:
-            print(f"リッチメニュー一覧取得失敗: {response.status_code}")
-            
-    except Exception as e:
-        print(f"リッチメニュー削除エラー: {e}")
-
-def setup_rich_menu():
-    import time
-    delete_all_rich_menus()
-    rich_menu_id = create_rich_menu()
-    time.sleep(1)  # 作成直後に1秒待機
-    set_rich_menu_image(rich_menu_id)
-    set_default_rich_menu(rich_menu_id)
-    return rich_menu_id 
+        print(f'[DEBUG] プッシュメッセージ送信エラー: {e}')
 
 def handle_add_content(reply_token, user_id_db, stripe_subscription_id):
+    """コンテンツ追加メニュー表示"""
     try:
-        print(f'[DEBUG] handle_add_content開始: user_id_db={user_id_db}, stripe_subscription_id={stripe_subscription_id}')
-        print(f'[DEBUG] reply_token: {reply_token}')
+        # サブスクリプション状態をチェック
+        subscription_status = check_subscription_status(stripe_subscription_id)
+        is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
         
-        # 企業紐付け完了後のため、制限チェックは不要
-        # 通常のコンテンツ選択メニューを表示
-        content_menu = {
-            "type": "template",
-            "altText": "コンテンツ選択メニュー",
-            "template": {
-                "type": "buttons",
-                "title": "コンテンツ選択メニュー",
-                "text": "利用したいコンテンツを選択してください。\n\n1個目無料、2個目以降1,500円/件",
-                "actions": [
-                    {
-                        "type": "message",
-                        "label": "AI予定秘書",
-                        "text": "1"
-                    },
-                    {
-                        "type": "message",
-                        "label": "AI経理秘書",
-                        "text": "2"
-                    },
-                    {
-                        "type": "message",
-                        "label": "AIタスクコンシェルジュ",
-                        "text": "3"
-                    }
-                ]
-            }
-        }
-        print(f'[DEBUG] コンテンツ選択メニュー送信開始')
-        send_line_message(reply_token, [content_menu])
-        print(f'[DEBUG] コンテンツ選択メニュー送信完了')
-    except Exception as e:
-        print(f'[DEBUG] コンテンツ選択メニューエラー: {e}')
-        import traceback
-        traceback.print_exc()
-        print(f'[DEBUG] エラー時の代替メッセージ送信開始')
-        send_line_message(reply_token, [{"type": "text", "text": "エラーが発生しました。しばらく時間をおいて再度お試しください。"}])
-        print(f'[DEBUG] エラー時の代替メッセージ送信完了')
-
-def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, content_number):
-    try:
-        # check_subscription_status関数をインポート
-        from services.stripe_service import check_subscription_status
+        # 利用可能なコンテンツを定義
+        available_contents = [
+            {'name': 'AI予定秘書', 'description': 'スケジュール管理をAIがサポート'},
+            {'name': 'AI経理秘書', 'description': '経理作業をAIが効率化'},
+            {'name': 'AIタスクコンシェルジュ', 'description': 'タスク管理をAIが最適化'}
+        ]
         
-        content_info = {
-            '1': {
-                'name': 'AI予定秘書',
-                'price': 1500,
-                "description": '日程調整のストレスから解放される、スケジュール管理の相棒',
-                'usage': 'Googleカレンダーと連携し、LINEで予定の追加・確認・空き時間の提案まで。調整のやりとりに追われる時間を、もっとクリエイティブに使えるように。',
-                'url': 'https://lp-production-9e2c.up.railway.app/schedule',
-                'line_url': 'https://line.me/R/ti/p/@ai_schedule_secretary'
-            },
-            '2': {
-                'name': 'AI経理秘書',
-                'price': 1500,
-                "description": '打合せ後すぐ送れる、スマートな請求書作成アシスタント',
-                'usage': 'LINEで項目を送るだけで、見積書や請求書を即作成。営業から事務処理までを一気通貫でスムーズに。',
-                'url': 'https://lp-production-9e2c.up.railway.app/accounting',
-                'line_url': 'https://line.me/R/ti/p/@ai_accounting_secretary'
-            },
-            '3': {
-                'name': 'AIタスクコンシェルジュ',
-                'price': 1500,
-                "description": '今日やるべきことを、ベストなタイミングで',
-                'usage': '登録したタスクを空き時間に自動で配置し、理想的な1日をAIが提案。「やりたいのにできない」を、「自然にこなせる」毎日に。',
-                'url': 'https://lp-production-9e2c.up.railway.app/task',
-                'line_url': 'https://line.me/R/ti/p/@ai_task_concierge'
-            }
-        }
-        if content_number not in content_info:
-            send_line_message(reply_token, [{"type": "text", "text": "無効な選択です。1-3の数字で選択してください。"}])
-            return
-        content = content_info[str(content_number)]
-        # 全コンテンツの合計数を取得
-        conn_count = get_db_connection()
-        c_count = conn_count.cursor()
+        # 既に追加されているコンテンツを確認
+        conn = get_db_connection()
+        c = conn.cursor()
         
         # データベースタイプに応じて適切なプレースホルダーを使用
         from utils.db import get_db_type
         db_type = get_db_type()
         placeholder = '%s' if db_type == 'postgresql' else '?'
         
-        # PostgreSQL用のプレースホルダーを使用
-        c_count.execute(f'SELECT COUNT(*) FROM usage_logs WHERE user_id = {placeholder}', (user_id_db,))
-        total_usage_count = c_count.fetchone()[0]
+        # 使用量ログを確認
+        c.execute(f'SELECT COUNT(*) FROM usage_logs WHERE user_id = {placeholder}', (user_id_db,))
+        total_usage_count = c.fetchone()[0]
         
         # デバッグ用：実際のusage_logsを確認
-        c_count.execute(f'SELECT id, content_type, created_at FROM usage_logs WHERE user_id = {placeholder} ORDER BY created_at', (user_id_db,))
-        all_logs = c_count.fetchall()
+        c.execute(f'SELECT id, content_type, created_at FROM usage_logs WHERE user_id = {placeholder} ORDER BY created_at', (user_id_db,))
+        all_logs = c.fetchall()
         print(f'[DEBUG] 全usage_logs: {all_logs}')
         
         # 同じコンテンツの追加回数を確認
-        c_count.execute(f'SELECT COUNT(*) FROM usage_logs WHERE user_id = {placeholder} AND content_type = {placeholder}', (user_id_db, content['name']))
-        same_content_count = c_count.fetchone()[0]
-        conn_count.close()
+        c.execute(f'SELECT COUNT(*) FROM usage_logs WHERE user_id = {placeholder} AND content_type = {placeholder}', (user_id_db, content['name']))
+        same_content_count = c.fetchone()[0]
+        conn.close()
         
         print(f'[DEBUG] total_usage_count: {total_usage_count}')
         print(f'[DEBUG] same_content_count: {same_content_count}')
@@ -602,32 +355,570 @@ def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, co
         else:
             price_message = f"料金：1,500円（{current_count}個目、月額料金に追加）"
             print(f'[DEBUG] 2個目以降のコンテンツ追加: is_free={is_free}, current_count={current_count}')
-        confirm_message = {
+        
+        # コンテンツ選択メニューを表示
+        content_selection_message = {
             "type": "template",
-            "altText": "選択内容の確認",
+            "altText": "コンテンツ選択",
             "template": {
                 "type": "buttons",
-                "title": "選択内容の確認",
-                "text": f"コンテンツ：{content['name']}\n{price_message}\n\n追加しますか？",
+                "title": "コンテンツ選択",
+                "text": "追加したいコンテンツを選択してください：\n\n1. AI予定秘書\n2. AI経理秘書\n3. AIタスクコンシェルジュ",
                 "actions": [
                     {
                         "type": "message",
-                        "label": "はい、追加する",
-                        "text": "はい"
+                        "label": "AI予定秘書",
+                        "text": "1"
                     },
                     {
                         "type": "message",
-                        "label": "いいえ、キャンセル",
-                        "text": "いいえ"
+                        "label": "AI経理秘書",
+                        "text": "2"
+                    },
+                    {
+                        "type": "message",
+                        "label": "AIタスクコンシェルジュ",
+                        "text": "3"
                     }
                 ]
             }
         }
-        send_line_message(reply_token, [confirm_message])
+        send_line_message(reply_token, [content_selection_message])
         
     except Exception as e:
-        print(f'コンテンツ選択エラー: {e}')
+        print(f'コンテンツ追加メニュー表示エラー: {e}')
         send_line_message(reply_token, [{"type": "text", "text": "❌ エラーが発生しました。しばらく時間をおいて再度お試しください。"}])
+
+def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, content_number):
+    """コンテンツ選択処理"""
+    try:
+        # コンテンツ番号からコンテンツ名を取得
+        content_mapping = {
+            '1': 'AI予定秘書',
+            '2': 'AI経理秘書', 
+            '3': 'AIタスクコンシェルジュ'
+        }
+        
+        content_type = content_mapping.get(content_number)
+        if not content_type:
+            return {
+                'success': False,
+                'error': '無効なコンテンツ番号です'
+            }
+        
+        # データベースタイプに応じて適切なプレースホルダーを使用
+        from utils.db import get_db_type
+        db_type = get_db_type()
+        placeholder = '%s' if db_type == 'postgresql' else '?'
+        
+        # 解約対象のコンテンツを取得
+        c.execute(f'''
+            SELECT id, content_type, is_free, stripe_usage_record_id 
+            FROM usage_logs 
+            WHERE user_id = {placeholder} AND content_type = {placeholder}
+            ORDER BY created_at DESC
+            LIMIT 1
+        ''', (user_id_db, content_type))
+        
+        usage_log = c.fetchone()
+        if not usage_log:
+            return {
+                'success': False,
+                'error': f'{content_type}は追加されていません'
+            }
+        
+        usage_id, content_type, is_free, stripe_usage_record_id = usage_log
+        
+        # 解約処理
+        # 1. usage_logsテーブルから削除
+        c.execute(f'DELETE FROM usage_logs WHERE id = {placeholder}', (usage_id,))
+        
+        # 2. StripeのUsage Recordを削除（課金済みの場合）
+        if stripe_usage_record_id and not is_free:
+            try:
+                stripe.UsageRecord.delete(stripe_usage_record_id)
+                print(f'[DEBUG] Stripe Usage Record削除: {stripe_usage_record_id}')
+            except Exception as e:
+                print(f'[DEBUG] Stripe Usage Record削除エラー: {e}')
+        
+        conn.commit()
+        conn.close()
+        
+        print(f'[DEBUG] 解約処理完了: user_id={user_id_db}, content_type={content_type}')
+        
+        return {
+            'success': True,
+            'content_type': content_type
+        }
+        
+    except Exception as e:
+        print(f'[ERROR] 解約確認処理エラー: {e}')
+        import traceback
+        traceback.print_exc()
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+def get_welcome_message():
+    return "ようこそ！LINE連携が完了しました。"
+
+def get_not_registered_message():
+    return "ご登録情報が見つかりません。LPからご登録ください。"
+
+def handle_cancel_request(reply_token, user_id_db, stripe_subscription_id):
+    """解約リクエスト処理"""
+    try:
+        subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+        items = subscription['items']['data']
+        
+        # サブスクリプション状態をチェック
+        subscription_status = check_subscription_status(stripe_subscription_id)
+        is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
+        
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # データベースタイプに応じて適切なプレースホルダーを使用
+        from utils.db import get_db_type
+        db_type = get_db_type()
+        placeholder = '%s' if db_type == 'postgresql' else '?'
+        
+        # 実際に追加されたコンテンツを取得
+        c.execute(f'SELECT content_type, is_free FROM usage_logs WHERE user_id = {placeholder} ORDER BY created_at', (user_id_db,))
+        added_contents = c.fetchall()
+        conn.close()
+        
+        print(f'[DEBUG] 解約対象コンテンツ取得: user_id={user_id_db}, count={len(added_contents)}')
+        for content in added_contents:
+            print(f'[DEBUG] コンテンツ: {content}')
+        
+        content_choices = []
+        choice_index = 1
+        
+        # 実際に追加されたコンテンツのみを表示
+        for content_type, is_free in added_contents:
+            if content_type in ['AI予定秘書', 'AI経理秘書', 'AIタスクコンシェルジュ']:
+                if is_free:
+                    display_price = '無料'
+                else:
+                    display_price = '1,500円'
+                
+                content_choices.append({
+                    'index': choice_index,
+                    'type': content_type,
+                    'price': display_price,
+                    'is_free': is_free
+                })
+                choice_index += 1
+        
+        if not content_choices:
+            # 解約対象のコンテンツがない場合
+            no_content_message = {
+                "type": "template",
+                "altText": "解約対象なし",
+                "template": {
+                    "type": "buttons",
+                    "title": "解約対象なし",
+                    "text": "現在、解約可能なコンテンツはありません。\n\nコンテンツを追加してから解約してください。",
+                    "actions": [
+                        {
+                            "type": "message",
+                            "label": "コンテンツ追加",
+                            "text": "追加"
+                        },
+                        {
+                            "type": "message",
+                            "label": "メニューに戻る",
+                            "text": "メニュー"
+                        }
+                    ]
+                }
+            }
+            send_line_message(reply_token, [no_content_message])
+            return
+        
+        # 解約メニューを表示
+        cancel_menu_text = "解約したいコンテンツを選択してください：\n\n"
+        for choice in content_choices:
+            cancel_menu_text += f"{choice['index']}. {choice['type']} ({choice['price']})\n"
+        
+        cancel_menu_message = {
+            "type": "template",
+            "altText": "解約メニュー",
+            "template": {
+                "type": "buttons",
+                "title": "解約メニュー",
+                "text": cancel_menu_text,
+                "actions": [
+                    {
+                        "type": "message",
+                        "label": "メニューに戻る",
+                        "text": "メニュー"
+                    }
+                ]
+            }
+        }
+        send_line_message(reply_token, [cancel_menu_message])
+        
+    except Exception as e:
+        print(f'[ERROR] 解約リクエスト処理エラー: {e}')
+        import traceback
+        traceback.print_exc()
+        send_line_message(reply_token, [{"type": "text", "text": "❌ エラーが発生しました。しばらく時間をおいて再度お試しください。"}])
+
+def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, selection_text):
+    """解約選択処理"""
+    try:
+        # Stripeの設定は既にapp.pyで行われているため、ここでは不要
+        
+        subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+        items = subscription['items']['data']
+        
+        # 実際に追加されたコンテンツを取得
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # データベースタイプに応じて適切なプレースホルダーを使用
+        db_type = get_db_type()
+        placeholder = '%s' if db_type == 'postgresql' else '?'
+        
+        c.execute(f'SELECT id, content_type, is_free FROM usage_logs WHERE user_id = {placeholder} ORDER BY created_at', (user_id_db,))
+        added_contents = c.fetchall()
+        
+        # 選択された番号を解析（AI技術を活用した高度な数字抽出処理）
+        numbers = smart_number_extraction(selection_text)
+        valid_numbers, invalid_reasons, duplicates = validate_selection_numbers(numbers, len(added_contents))
+        selected_indices = valid_numbers
+        
+        print(f'[DEBUG] 選択テキスト: {selection_text}')
+        print(f'[DEBUG] 抽出された数字: {numbers}')
+        print(f'[DEBUG] 有効な選択インデックス: {selected_indices}')
+        print(f'[DEBUG] 最大選択可能数: {len(added_contents)}')
+        
+        if invalid_reasons:
+            print(f'[DEBUG] 無効な入力: {invalid_reasons}')
+        if duplicates:
+            print(f'[DEBUG] 重複除去: {duplicates}')
+        
+        # LINEユーザーIDを事前に取得
+        line_user_id = None
+        c.execute(f'SELECT line_user_id FROM users WHERE id = {placeholder}', (user_id_db,))
+        line_result = c.fetchone()
+        if line_result and line_result[0]:
+            line_user_id = line_result[0]
+        
+        cancelled = []
+        choice_index = 1
+        
+        # 実際に追加されたコンテンツの処理
+        for usage_id, content_type, is_free in added_contents:
+            if content_type in ['AI予定秘書', 'AI経理秘書', 'AIタスクコンシェルジュ']:
+                print(f'[DEBUG] 処理中: choice_index={choice_index}, content_type={content_type}, usage_id={usage_id}')
+                if choice_index in selected_indices:
+                    # まずstripe_usage_record_idを取得（削除前に）
+                    stripe_usage_record_id = None
+                    if not is_free:
+                        c.execute('SELECT stripe_usage_record_id FROM usage_logs WHERE id = %s', (usage_id,))
+                        result = c.fetchone()
+                        if result and result[0]:
+                            stripe_usage_record_id = result[0]
+                    
+                    # データベースからusage_logsを削除
+                    c.execute('DELETE FROM usage_logs WHERE id = %s', (usage_id,))
+                    cancelled.append(content_type)
+                    print(f'[DEBUG] 解約処理: content_type={content_type}, usage_id={usage_id}')
+                    
+                    # StripeのInvoice Itemを削除（有料コンテンツの場合）
+                    if stripe_usage_record_id:
+                        try:
+                            print(f'[DEBUG] Stripe InvoiceItem削除開始: {stripe_usage_record_id}')
+                            
+                            # StripeのInvoice Itemを削除
+                            invoice_item = stripe.InvoiceItem.retrieve(stripe_usage_record_id)
+                            invoice_item.delete()
+                            print(f'[DEBUG] Stripe InvoiceItem削除成功: {stripe_usage_record_id}')
+                        
+                        except Exception as e:
+                            print(f'[DEBUG] Stripe InvoiceItem削除エラー: {e}')
+                            # エラーが発生しても処理は続行
+                choice_index += 1
+        
+        print(f'[DEBUG] 解約対象コンテンツ数: {len(cancelled)}')
+        print(f'[DEBUG] 解約対象: {cancelled}')
+        
+        # データベースの変更をコミット
+        conn.commit()
+        conn.close()
+        
+        if cancelled:
+            # サブスクリプション状態をチェック
+            subscription_status = check_subscription_status(stripe_subscription_id)
+            is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
+            
+            # 1通目: 解約完了のテキストメッセージ
+            cancel_text_message = {
+                "type": "text",
+                "text": f"以下のコンテンツの解約を受け付けました：\n\n" + "\n".join([f"• {content}" for content in cancelled])
+            }
+            send_line_message(reply_token, [cancel_text_message])
+            
+            # 2通目: 公式LINE利用制限メッセージ
+            line_restriction_message = {
+                "type": "template",
+                "altText": "公式LINEの利用制限",
+                "template": {
+                    "type": "buttons",
+                    "title": "公式LINEの利用制限",
+                    "text": f"解約されたコンテンツの公式LINEは利用できなくなります。\n\n解約されたコンテンツ：\n" + "\n".join([f"• {content}" for content in cancelled]),
+                    "thumbnailImageUrl": "https://ai-collections.herokuapp.com/static/images/logo.png",
+                    "imageAspectRatio": "rectangle",
+                    "imageSize": "cover",
+                    "imageBackgroundColor": "#FFFFFF",
+                    "actions": [
+                        {
+                            "type": "message",
+                            "label": "他のコンテンツ追加",
+                            "text": "追加"
+                        },
+                        {
+                            "type": "message",
+                            "label": "利用状況確認",
+                            "text": "状態"
+                        }
+                    ]
+                }
+            }
+            
+            # push_messageで2通目のメッセージを送信
+            if line_user_id:
+                headers = {
+                    'Content-Type': 'application/json',
+                    'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}'
+                }
+                
+                push_data = {
+                    'to': line_user_id,
+                    'messages': [line_restriction_message]
+                }
+                
+                response = requests.post(
+                    'https://api.line.me/v2/bot/message/push',
+                    headers=headers,
+                    data=json.dumps(push_data)
+                )
+                
+                if response.status_code == 200:
+                    print(f'[DEBUG] 2通目の公式LINE制限メッセージ送信成功: {line_user_id}')
+                else:
+                    print(f'[DEBUG] 2通目の公式LINE制限メッセージ送信失敗: {response.status_code}, {response.text}')
+            
+            # 3通目: アクションボタン（push_messageで送信）
+            cancel_buttons_message = {
+                "type": "template",
+                "altText": "次のアクションを選択",
+                "template": {
+                    "type": "buttons",
+                    "title": "次のアクション",
+                    "text": "何か他にお手伝いできることはありますか？",
+                    "actions": [
+                        {
+                            "type": "message",
+                            "label": "他のコンテンツ追加",
+                            "text": "追加"
+                        },
+                        {
+                            "type": "message",
+                            "label": "利用状況確認",
+                            "text": "状態"
+                        },
+                        {
+                            "type": "message",
+                            "label": "メニューに戻る",
+                            "text": "メニュー"
+                        }
+                    ]
+                }
+            }
+            
+            # push_messageで3通目のボタンメッセージを送信
+            if line_user_id:
+                push_data = {
+                    'to': line_user_id,
+                    'messages': [cancel_buttons_message]
+                }
+                
+                response = requests.post(
+                    'https://api.line.me/v2/bot/message/push',
+                    headers=headers,
+                    data=json.dumps(push_data)
+                )
+                
+                if response.status_code == 200:
+                    print(f'[DEBUG] 3通目のボタンメッセージ送信成功: {line_user_id}')
+                else:
+                    print(f'[DEBUG] 3通目のボタンメッセージ送信失敗: {response.status_code}, {response.text}')
+            else:
+                print(f'[DEBUG] LINEユーザーIDが見つかりません: user_id_db={user_id_db}')
+            
+            # 請求期間についての説明を別メッセージで送信（push_messageで送信）
+            if is_trial_period:
+                period_message = {
+                    "type": "text",
+                    "text": "トライアル期間中は料金が発生しません。"
+                }
+            else:
+                period_message = {
+                    "type": "text",
+                    "text": "請求期間終了まで利用可能です。"
+                }
+            
+            # push_messageで3通目のメッセージを送信
+            if line_user_id:
+                push_data = {
+                    'to': line_user_id,
+                    'messages': [period_message]
+                }
+                
+                response = requests.post(
+                    'https://api.line.me/v2/bot/message/push',
+                    headers=headers,
+                    data=json.dumps(push_data)
+                )
+                
+                if response.status_code == 200:
+                    print(f'[DEBUG] 3通目の期間説明メッセージ送信成功: {line_user_id}')
+                else:
+                    print(f'[DEBUG] 3通目の期間説明メッセージ送信失敗: {response.status_code}, {response.text}')
+            
+            # ユーザー状態をリセット
+            from models.user_state import clear_user_state
+            if line_user_id:
+                clear_user_state(line_user_id)
+                print(f'[DEBUG] ユーザー状態リセット: {line_user_id}')
+        else:
+            send_line_message(reply_token, [{"type": "text", "text": "有効な番号が選択されませんでした。もう一度お試しください。"}])
+    
+    except Exception as e:
+        print(f'[ERROR] 解約選択処理エラー: {e}')
+        import traceback
+        traceback.print_exc()
+        send_line_message(reply_token, [{"type": "text", "text": "❌ エラーが発生しました。しばらく時間をおいて再度お試しください。"}])
+
+def handle_subscription_cancel(reply_token, user_id_db, stripe_subscription_id):
+    """サブスクリプション全体の解約処理"""
+    try:
+        # サブスクリプション状態をチェック
+        subscription_status = check_subscription_status(stripe_subscription_id)
+        is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
+        
+        if is_trial_period:
+            # トライアル期間中の場合は、期間終了時に解約
+            try:
+                stripe.Subscription.modify(
+                    stripe_subscription_id,
+                    cancel_at_period_end=True
+                )
+                cancel_message = {
+                    "type": "template",
+                    "altText": "サブスクリプション解約予定",
+                    "template": {
+                        "type": "buttons",
+                        "title": "サブスクリプション解約予定",
+                        "text": "サブスクリプションが期間終了時に解約予定になりました。\n\nトライアル期間終了までご利用いただけます。",
+                        "actions": [
+                            {
+                                "type": "message",
+                                "label": "メニューに戻る",
+                                "text": "メニュー"
+                            }
+                        ]
+                    }
+                }
+                send_line_message(reply_token, [cancel_message])
+            except Exception as e:
+                print(f'[DEBUG] Stripe解約エラー: {e}')
+                error_message = {
+                    "type": "text",
+                    "text": "❌ 解約処理中にエラーが発生しました。しばらく時間をおいて再度お試しください。"
+                }
+                send_line_message(reply_token, [error_message])
+        else:
+            # 通常期間の場合は、即座に解約
+            try:
+                stripe.Subscription.delete(stripe_subscription_id)
+                cancel_message = {
+                    "type": "template",
+                    "altText": "サブスクリプション解約完了",
+                    "template": {
+                        "type": "buttons",
+                        "title": "サブスクリプション解約完了",
+                        "text": "サブスクリプションを解約しました。\n\nご利用ありがとうございました。",
+                        "actions": [
+                            {
+                                "type": "message",
+                                "label": "メニューに戻る",
+                                "text": "メニュー"
+                            }
+                        ]
+                    }
+                }
+                send_line_message(reply_token, [cancel_message])
+            except Exception as e:
+                print(f'[DEBUG] Stripe解約エラー: {e}')
+                error_message = {
+                    "type": "text",
+                    "text": "❌ 解約処理中にエラーが発生しました。しばらく時間をおいて再度お試しください。"
+                }
+                send_line_message(reply_token, [error_message])
+    
+    except Exception as e:
+        print(f'[ERROR] サブスクリプション解約処理エラー: {e}')
+        import traceback
+        traceback.print_exc()
+        send_line_message(reply_token, [{"type": "text", "text": "❌ エラーが発生しました。しばらく時間をおいて再度お試しください。"}])
+
+def handle_cancel_menu(reply_token, user_id_db, stripe_subscription_id):
+    """解約メニュー表示"""
+    try:
+        # サブスクリプション状態をチェック
+        subscription_status = check_subscription_status(stripe_subscription_id)
+        is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
+        
+        # 解約メニューを表示
+        cancel_menu_message = {
+            "type": "template",
+            "altText": "解約メニュー",
+            "template": {
+                "type": "buttons",
+                "title": "解約メニュー",
+                "text": "どの解約をご希望ですか？",
+                "actions": [
+                    {
+                        "type": "message",
+                        "label": "サブスクリプション全体を解約",
+                        "text": "サブスクリプション解約"
+                    },
+                    {
+                        "type": "message",
+                        "label": "コンテンツを個別解約",
+                        "text": "コンテンツ解約"
+                    },
+                    {
+                        "type": "message",
+                        "label": "メニューに戻る",
+                        "text": "メニュー"
+                    }
+                ]
+            }
+        }
+        send_line_message(reply_token, [cancel_menu_message])
+        
+    except Exception as e:
+        print(f'[ERROR] 解約メニュー表示エラー: {e}')
+        import traceback
+        traceback.print_exc()
+        send_line_message(reply_token, [{"type": "text", "text": "❌ 解約メニューの表示に失敗しました。しばらく時間をおいて再度お試しください。"}])
 
 def handle_cancel_confirmation(user_id, content_number):
     """解約確認処理"""
@@ -827,789 +1118,8 @@ def handle_content_confirmation(user_id, content_type):
             'error': f'コンテンツ確認処理エラー: {str(e)}'
         }
 
-def handle_cancel_request(reply_token, user_id_db, stripe_subscription_id):
-    try:
-        subscription = stripe.Subscription.retrieve(stripe_subscription_id)
-        items = subscription['items']['data']
-        
-        # サブスクリプション状態をチェック
-        subscription_status = check_subscription_status(stripe_subscription_id)
-        is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
-        
-        conn = get_db_connection()
-        c = conn.cursor()
-        
-        # データベースタイプに応じて適切なプレースホルダーを使用
-        from utils.db import get_db_type
-        db_type = get_db_type()
-        placeholder = '%s' if db_type == 'postgresql' else '?'
-        
-        # 実際に追加されたコンテンツを取得
-        c.execute(f'SELECT content_type, is_free FROM usage_logs WHERE user_id = {placeholder} ORDER BY created_at', (user_id_db,))
-        added_contents = c.fetchall()
-        conn.close()
-        
-        print(f'[DEBUG] 解約対象コンテンツ取得: user_id={user_id_db}, count={len(added_contents)}')
-        for content in added_contents:
-            print(f'[DEBUG] コンテンツ: {content}')
-        
-        content_choices = []
-        choice_index = 1
-        
-        # 実際に追加されたコンテンツのみを表示
-        for content_type, is_free in added_contents:
-            if content_type in ['AI予定秘書', 'AI経理秘書', 'AIタスクコンシェルジュ']:
-                if is_free:
-                    display_price = '無料'
-                else:
-                    display_price = '1,500円'
-                content_choices.append(f"{choice_index}. {content_type}（{display_price}）")
-                print(f'[DEBUG] 解約選択肢: {choice_index}. {content_type}（{display_price}）')
-                choice_index += 1
-        
-        if not content_choices:
-            # コンテンツが存在しない場合のメッセージを改善
-            no_content_message = {
-                "type": "template",
-                "altText": "解約できるコンテンツがありません",
-                "template": {
-                    "type": "buttons",
-                    "title": "解約できるコンテンツがありません",
-                    "text": "現在利用中のコンテンツはありません。\n\nまずはコンテンツを追加してみませんか？",
-                    "actions": [
-                        {
-                            "type": "message",
-                            "label": "📚 コンテンツを追加",
-                            "text": "追加"
-                        },
-                        {
-                            "type": "message",
-                            "label": "🏠 メニューに戻る",
-                            "text": "メニュー"
-                        }
-                    ]
-                }
-            }
-            send_line_message(reply_token, [no_content_message])
-            return
-        
-        choice_message = "\n".join(content_choices)
-        send_line_message(reply_token, [{"type": "text", "text": f"どのコンテンツを解約されますか？\n\n{choice_message}\n\n📝 選び方は自由です！\n• 数字で選ぶ：1、2、3\n• 日本語で選ぶ：一、二、三\n• 番号で選ぶ：1番目、2番目\n• 複数選ぶ：1,2 や 1 2 など\n\nお気軽に選んでください 😊"}])
-    except Exception as e:
-        send_line_message(reply_token, [{"type": "text", "text": "😅 申し訳ございません。\n\nコンテンツの情報を取得できませんでした。\n\nしばらく時間をおいて、もう一度お試しください。"}])
-
-def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, selection_text):
-    try:
-        # Stripeの設定は既にapp.pyで行われているため、ここでは不要
-        
-        subscription = stripe.Subscription.retrieve(stripe_subscription_id)
-        items = subscription['items']['data']
-        
-        # 実際に追加されたコンテンツを取得
-        conn = get_db_connection()
-        c = conn.cursor()
-        
-        # データベースタイプに応じて適切なプレースホルダーを使用
-        db_type = get_db_type()
-        placeholder = '%s' if db_type == 'postgresql' else '?'
-        
-        c.execute(f'SELECT id, content_type, is_free FROM usage_logs WHERE user_id = {placeholder} ORDER BY created_at', (user_id_db,))
-        added_contents = c.fetchall()
-        
-        # 選択された番号を解析（AI技術を活用した高度な数字抽出処理）
-        numbers = smart_number_extraction(selection_text)
-        valid_numbers, invalid_reasons, duplicates = validate_selection_numbers(numbers, len(added_contents))
-        selected_indices = valid_numbers
-        
-        print(f'[DEBUG] 選択テキスト: {selection_text}')
-        print(f'[DEBUG] 抽出された数字: {numbers}')
-        print(f'[DEBUG] 有効な選択インデックス: {selected_indices}')
-        print(f'[DEBUG] 最大選択可能数: {len(added_contents)}')
-        
-        if invalid_reasons:
-            print(f'[DEBUG] 無効な入力: {invalid_reasons}')
-        if duplicates:
-            print(f'[DEBUG] 重複除去: {duplicates}')
-        
-        # LINEユーザーIDを事前に取得
-        line_user_id = None
-        c.execute(f'SELECT line_user_id FROM users WHERE id = {placeholder}', (user_id_db,))
-        line_result = c.fetchone()
-        if line_result and line_result[0]:
-            line_user_id = line_result[0]
-        
-        cancelled = []
-        choice_index = 1
-        
-        # 実際に追加されたコンテンツの処理
-        for usage_id, content_type, is_free in added_contents:
-            if content_type in ['AI予定秘書', 'AI経理秘書', 'AIタスクコンシェルジュ']:
-                print(f'[DEBUG] 処理中: choice_index={choice_index}, content_type={content_type}, usage_id={usage_id}')
-                if choice_index in selected_indices:
-                    # まずstripe_usage_record_idを取得（削除前に）
-                    stripe_usage_record_id = None
-                    if not is_free:
-                        c.execute('SELECT stripe_usage_record_id FROM usage_logs WHERE id = %s', (usage_id,))
-                        result = c.fetchone()
-                        if result and result[0]:
-                            stripe_usage_record_id = result[0]
-                    
-                    # 解約履歴を記録
-                    # record_cancellation(user_id_db, content_type)  # 削除された関数
-                    
-                    # データベースからusage_logsを削除
-                    c.execute('DELETE FROM usage_logs WHERE id = %s', (usage_id,))
-                    cancelled.append(content_type)
-                    print(f'[DEBUG] 解約処理: content_type={content_type}, usage_id={usage_id}')
-                    
-                    # StripeのInvoice Itemを削除（有料コンテンツの場合）
-                    if stripe_usage_record_id:
-                        try:
-                            print(f'[DEBUG] Stripe InvoiceItem削除開始: {stripe_usage_record_id}')
-                            
-                            # StripeのInvoice Itemを削除
-                            invoice_item = stripe.InvoiceItem.retrieve(stripe_usage_record_id)
-                            invoice_item.delete()
-                            print(f'[DEBUG] Stripe InvoiceItem削除成功: {stripe_usage_record_id}')
-                        except Exception as e:
-                            print(f'[DEBUG] Stripe InvoiceItem削除エラー: {e}')
-                            # エラーが発生しても処理は続行
-                choice_index += 1
-        
-        print(f'[DEBUG] 解約対象コンテンツ数: {len(cancelled)}')
-        print(f'[DEBUG] 解約対象: {cancelled}')
-        
-        # データベースの変更をコミット
-        conn.commit()
-        conn.close()
-        
-        if cancelled:
-            # サブスクリプション状態をチェック
-            subscription_status = check_subscription_status(stripe_subscription_id)
-            is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
-            
-            # 1通目: 解約完了のテキストメッセージ
-            cancel_text_message = {
-                "type": "text",
-                "text": f"以下のコンテンツの解約を受け付けました：\n\n" + "\n".join([f"• {content}" for content in cancelled])
-            }
-            send_line_message(reply_token, [cancel_text_message])
-            
-            # 2通目: 公式LINE利用制限メッセージ
-            line_restriction_message = {
-                "type": "template",
-                "altText": "公式LINEの利用制限",
-                "template": {
-                    "type": "buttons",
-                    "title": "公式LINEの利用制限",
-                    "text": f"解約されたコンテンツの公式LINEは利用できなくなります。\n\n解約されたコンテンツ：\n" + "\n".join([f"• {content}" for content in cancelled]),
-                    "thumbnailImageUrl": "https://ai-collections.herokuapp.com/static/images/logo.png",
-                    "imageAspectRatio": "rectangle",
-                    "imageSize": "cover",
-                    "imageBackgroundColor": "#FFFFFF",
-                    "actions": [
-                        {
-                            "type": "message",
-                            "label": "他のコンテンツ追加",
-                            "text": "追加"
-                        },
-                        {
-                            "type": "message",
-                            "label": "利用状況確認",
-                            "text": "状態"
-                        }
-                    ]
-                }
-            }
-            
-            # push_messageで2通目のメッセージを送信
-            if line_user_id:
-
-                
-                headers = {
-                    'Content-Type': 'application/json',
-                    'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}'
-                }
-                
-                push_data = {
-                    'to': line_user_id,
-                    'messages': [line_restriction_message]
-                }
-                
-                response = requests.post(
-                    'https://api.line.me/v2/bot/message/push',
-                    headers=headers,
-                    data=json.dumps(push_data)
-                )
-                
-                if response.status_code == 200:
-                    print(f'[DEBUG] 2通目の公式LINE制限メッセージ送信成功: {line_user_id}')
-                else:
-                    print(f'[DEBUG] 2通目の公式LINE制限メッセージ送信失敗: {response.status_code}, {response.text}')
-            
-            # 3通目: アクションボタン（push_messageで送信）
-            cancel_buttons_message = {
-                "type": "template",
-                "altText": "次のアクションを選択",
-                "template": {
-                    "type": "buttons",
-                    "title": "次のアクション",
-                    "text": "何か他にお手伝いできることはありますか？",
-                    "actions": [
-                        {
-                            "type": "message",
-                            "label": "他のコンテンツ追加",
-                            "text": "追加"
-                        },
-                        {
-                            "type": "message",
-                            "label": "利用状況確認",
-                            "text": "状態"
-                        },
-                        {
-                            "type": "message",
-                            "label": "メニューに戻る",
-                            "text": "メニュー"
-                        }
-                    ]
-                }
-            }
-            
-            # push_messageで3通目のボタンメッセージを送信
-            if line_user_id:
-                push_data = {
-                    'to': line_user_id,
-                    'messages': [cancel_buttons_message]
-                }
-                
-                response = requests.post(
-                    'https://api.line.me/v2/bot/message/push',
-                    headers=headers,
-                    data=json.dumps(push_data)
-                )
-                
-                if response.status_code == 200:
-                    print(f'[DEBUG] 3通目のボタンメッセージ送信成功: {line_user_id}')
-                else:
-                    print(f'[DEBUG] 3通目のボタンメッセージ送信失敗: {response.status_code}, {response.text}')
-            else:
-                print(f'[DEBUG] LINEユーザーIDが見つかりません: user_id_db={user_id_db}')
-            
-            # 請求期間についての説明を別メッセージで送信（push_messageで送信）
-            if is_trial_period:
-                period_message = {
-                    "type": "text",
-                    "text": "トライアル期間中は料金が発生しません。"
-                }
-            else:
-                period_message = {
-                    "type": "text",
-                    "text": "請求期間終了まで利用可能です。"
-                }
-            
-            # push_messageで3通目のメッセージを送信
-            if line_user_id:
-                push_data = {
-                    'to': line_user_id,
-                    'messages': [period_message]
-                }
-                
-                response = requests.post(
-                    'https://api.line.me/v2/bot/message/push',
-                    headers=headers,
-                    data=json.dumps(push_data)
-                )
-                
-                if response.status_code == 200:
-                    print(f'[DEBUG] 3通目の期間説明メッセージ送信成功: {line_user_id}')
-                else:
-                    print(f'[DEBUG] 3通目の期間説明メッセージ送信失敗: {response.status_code}, {response.text}')
-            
-            # ユーザー状態をリセット
-            from models.user_state import clear_user_state
-            if line_user_id:
-                clear_user_state(line_user_id)
-                print(f'[DEBUG] ユーザー状態リセット: {line_user_id}')
-        else:
-            send_line_message(reply_token, [{"type": "text", "text": "有効な番号が選択されませんでした。もう一度お試しください。"}])
-    except Exception as e:
-        print(f'[ERROR] 解約処理エラー: {e}')
-        import traceback
-        traceback.print_exc()
-        send_line_message(reply_token, [{"type": "text", "text": "❌ 解約処理に失敗しました。しばらく時間をおいて再度お試しください。"}])
-
-def handle_subscription_cancel(reply_token, user_id_db, stripe_subscription_id):
-    """サブスクリプション全体を解約"""
-    try:
-        # サブスクリプション状態をチェック
-        subscription_status = check_subscription_status(stripe_subscription_id)
-        is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
-        
-        if is_trial_period:
-            # トライアル期間中は即時解約
-            subscription = stripe.Subscription.modify(
-                stripe_subscription_id,
-                cancel_at_period_end=False
-            )
-            subscription = stripe.Subscription.cancel(stripe_subscription_id)
-            cancel_message_text = "サブスクリプション全体の解約を受け付けました。\n\nトライアル期間中のため、即座に解約されます。"
-        else:
-            # 通常期間は期間終了時に解約予定
-            subscription = stripe.Subscription.modify(
-                stripe_subscription_id,
-                cancel_at_period_end=True
-            )
-            cancel_message_text = "サブスクリプション全体の解約を受け付けました。\n\n請求期間終了まで全てのサービスをご利用いただけます。"
-        
-        # 1週間以内に追加された課金予定のコンテンツをキャンセル
-        one_week_ago = datetime.now() - timedelta(days=7)
-        conn = get_db_connection()
-        c = conn.cursor()
-        
-        # 1週間以内の課金予定コンテンツを取得（Stripe Invoice Item削除用）
-        c.execute('''
-            SELECT id, content_type, created_at, stripe_usage_record_id 
-            FROM usage_logs 
-            WHERE user_id = %s AND pending_charge = TRUE AND created_at > %s
-        ''', (user_id_db, one_week_ago))
-        recent_pending = c.fetchall()
-        
-        # StripeのInvoice Itemを削除
-        stripe_cancelled_count = 0
-        for usage_id, content_type, created_at, stripe_usage_record_id in recent_pending:
-            if stripe_usage_record_id:
-                try:
-                    print(f'[DEBUG] Stripe InvoiceItem削除開始: {stripe_usage_record_id}')
-                    invoice_item = stripe.InvoiceItem.retrieve(stripe_usage_record_id)
-                    invoice_item.delete()
-                    print(f'[DEBUG] Stripe InvoiceItem削除成功: {stripe_usage_record_id}')
-                    stripe_cancelled_count += 1
-                except Exception as e:
-                    print(f'[DEBUG] Stripe InvoiceItem削除エラー: {e}')
-        
-        # 1週間以内の課金予定をキャンセル（pending_chargeをFalseに設定）
-        c.execute('''
-            UPDATE usage_logs 
-            SET pending_charge = FALSE 
-            WHERE user_id = %s AND pending_charge = TRUE AND created_at > %s
-        ''', (user_id_db, one_week_ago))
-        cancelled_count = c.rowcount
-        
-        # 1週間以上前のコンテンツは削除
-        c.execute('DELETE FROM usage_logs WHERE user_id = %s AND created_at <= %s', (user_id_db, one_week_ago))
-        deleted_count = c.rowcount
-        
-        conn.commit()
-        conn.close()
-        
-        print(f'[DEBUG] 解約処理: user_id={user_id_db}, cancelled_count={cancelled_count}, deleted_count={deleted_count}, is_trial={is_trial_period}')
-        
-        # キャンセルされたコンテンツの情報をメッセージに追加
-        if cancelled_count > 0:
-            cancel_message_text += f"\n\n1週間以内に追加された{cancelled_count}個のコンテンツの課金がキャンセルされました。"
-        if stripe_cancelled_count > 0:
-            cancel_message_text += f"\n\nStripeから{stripe_cancelled_count}個のInvoice Itemが削除されました。"
-        
-        print(f'[DEBUG] サブスクリプション解約: user_id={user_id_db}, deleted_count={deleted_count}, is_trial={is_trial_period}')
-        
-        # 解約確認メッセージを送信
-        cancel_message = {
-            "type": "template",
-            "altText": "サブスクリプション解約完了",
-            "template": {
-                "type": "buttons",
-                "title": "サブスクリプション解約完了",
-                "text": cancel_message_text,
-                "actions": [
-                    {
-                        "type": "message",
-                        "label": "メニューに戻る",
-                        "text": "メニュー"
-                    }
-                ]
-            }
-        }
-        send_line_message(reply_token, [cancel_message])
-        
-    except Exception as e:
-        print(f'[ERROR] サブスクリプション解約エラー: {e}')
-        import traceback
-        traceback.print_exc()
-        send_line_message(reply_token, [{"type": "text", "text": "❌ サブスクリプション解約に失敗しました。しばらく時間をおいて再度お試しください。"}])
-
-def handle_cancel_menu(reply_token, user_id_db, stripe_subscription_id):
-    """解約メニューを表示"""
-    try:
-        # サブスクリプション状態をチェック
-        subscription_status = check_subscription_status(stripe_subscription_id)
-        
-        if not subscription_status.get('is_active', False):
-            if subscription_status.get('status') == 'canceled':
-                # サブスクリプションが解約済み
-                payment_message = {
-                    "type": "template",
-                    "altText": "サブスクリプション解約済み",
-                    "template": {
-                        "type": "buttons",
-                        "title": "サブスクリプション解約済み",
-                        "text": "サブスクリプションが解約されています。\n\n新しいサブスクリプションを開始してください。",
-                        "actions": [
-                            {
-                                "type": "uri",
-                                "label": "決済画面へ",
-                                "uri": "https://lp-production-9e2c.up.railway.app"
-                            }
-                        ]
-                    }
-                }
-                send_line_message(reply_token, [payment_message])
-                return
-            elif subscription_status.get('cancel_at_period_end', False):
-                # 期間終了時に解約予定
-                payment_message = {
-                    "type": "template",
-                    "altText": "サブスクリプション解約予定",
-                    "template": {
-                        "type": "buttons",
-                        "title": "サブスクリプション解約予定",
-                        "text": "サブスクリプションが期間終了時に解約予定です。\n\nサブスクリプションを更新してください。",
-                        "actions": [
-                            {
-                                "type": "uri",
-                                "label": "決済画面へ",
-                                "uri": "https://lp-production-9e2c.up.railway.app"
-                            }
-                        ]
-                    }
-                }
-                send_line_message(reply_token, [payment_message])
-                return
-            else:
-                # その他の無効な状態
-                payment_message = {
-                    "type": "template",
-                    "altText": "サブスクリプション無効",
-                    "template": {
-                        "type": "buttons",
-                        "title": "サブスクリプション無効",
-                        "text": "サブスクリプションが無効な状態です。\n\n有効なサブスクリプションが必要です。",
-                        "actions": [
-                            {
-                                "type": "uri",
-                                "label": "決済画面へ",
-                                "uri": "https://lp-production-9e2c.up.railway.app"
-                            }
-                        ]
-                    }
-                }
-                send_line_message(reply_token, [payment_message])
-                return
-        
-        # サブスクリプションが有効な場合、通常の解約メニューを表示
-        cancel_menu_message = {
-            "type": "template",
-            "altText": "解約メニュー",
-            "template": {
-                "type": "buttons",
-                "title": "解約メニュー",
-                "text": "どの解約をご希望ですか？",
-                "actions": [
-                    {
-                        "type": "message",
-                        "label": "サブスクリプション全体を解約",
-                        "text": "サブスクリプション解約"
-                    },
-                    {
-                        "type": "message",
-                        "label": "コンテンツを個別解約",
-                        "text": "コンテンツ解約"
-                    },
-                    {
-                        "type": "message",
-                        "label": "メニューに戻る",
-                        "text": "メニュー"
-                    }
-                ]
-            }
-        }
-        send_line_message(reply_token, [cancel_menu_message])
-        
-    except Exception as e:
-        print(f'[ERROR] 解約メニュー表示エラー: {e}')
-        import traceback
-        traceback.print_exc()
-        send_line_message(reply_token, [{"type": "text", "text": "❌ 解約メニューの表示に失敗しました。しばらく時間をおいて再度お試しください。"}])
-
-def get_welcome_message():
-    return "ようこそ！LINE連携が完了しました。"
-
-def get_not_registered_message():
-    return "ご登録情報が見つかりません。LPからご登録ください。" 
-
-def extract_numbers_from_text(text):
-    """AI技術を活用した高度な数字抽出処理"""
-    import re
-    
-    # 基本的な数字抽出
-    numbers = re.findall(r'\d+', text)
-    
-    # 日本語の数字表現も対応（一、二、三など）
-    japanese_numbers = {
-        '一': 1, '二': 2, '三': 3, '四': 4, '五': 5,
-        '六': 6, '七': 7, '八': 8, '九': 9, '十': 10,
-        '十一': 11, '十二': 12, '十三': 13, '十四': 14, '十五': 15,
-        '十六': 16, '十七': 17, '十八': 18, '十九': 19, '二十': 20
-    }
-    
-    # 日本語数字を検索
-    for japanese, arabic in japanese_numbers.items():
-        if japanese in text:
-            numbers.append(str(arabic))
-    
-    # 漢数字の複合表現（二十一、二十二など）
-    for i in range(21, 31):
-        japanese = f"二十{['', '一', '二', '三', '四', '五', '六', '七', '八', '九'][i % 10]}"
-        if japanese in text:
-            numbers.append(str(i))
-    
-    # 全角数字の対応
-    fullwidth_numbers = {
-        '０': '0', '１': '1', '２': '2', '３': '3', '４': '4',
-        '５': '5', '６': '6', '７': '7', '８': '8', '９': '9'
-    }
-    
-    for fullwidth, halfwidth in fullwidth_numbers.items():
-        if fullwidth in text:
-            numbers.append(halfwidth)
-    
-    # 英語の数字表現
-    english_numbers = {
-        'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5,
-        'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10
-    }
-    
-    text_lower = text.lower()
-    for english, arabic in english_numbers.items():
-        if english in text_lower:
-            numbers.append(str(arabic))
-    
-    # 重複を除去してソート
-    unique_numbers = list(set(numbers))
-    unique_numbers.sort(key=lambda x: int(x))
-    
-    return unique_numbers
-
-def validate_selection_numbers(numbers, max_count):
-    """選択された数字が有効かチェック（AI技術を活用）"""
-    valid_numbers = []
-    invalid_reasons = []
-    
-    for num in numbers:
-        try:
-            num_int = int(num)
-            if 1 <= num_int <= max_count:
-                valid_numbers.append(num_int)
-            else:
-                invalid_reasons.append(f'{num_int} (範囲外: 1-{max_count})')
-                print(f'[DEBUG] 無効な番号: {num_int} (範囲外: 1-{max_count})')
-        except ValueError:
-            invalid_reasons.append(f'{num} (無効な数字形式)')
-            print(f'[DEBUG] 無効な数字形式: {num}')
-    
-    # 重複チェック
-    duplicates = []
-    seen = set()
-    for num in valid_numbers:
-        if num in seen:
-            duplicates.append(num)
-        else:
-            seen.add(num)
-    
-    if duplicates:
-        print(f'[DEBUG] 重複した番号: {duplicates}')
-        # 重複を除去
-        valid_numbers = list(seen)
-    
-    return valid_numbers, invalid_reasons, duplicates
-
-def smart_number_extraction(text):
-    """AI技術を活用したスマートな数字抽出"""
-    # 基本的な数字抽出
-    numbers = extract_numbers_from_text(text)
-    
-    # 文脈を考慮した数字抽出
-    # 「1番目」「2番目」などの表現に対応
-    import re
-    ordinal_patterns = [
-        r'(\d+)番目',
-        r'(\d+)つ目',
-        r'(\d+)個目',
-        r'(\d+)つめ',
-        r'(\d+)個め'
-    ]
-    
-    for pattern in ordinal_patterns:
-        matches = re.findall(pattern, text)
-        for match in matches:
-            if match not in numbers:
-                numbers.append(match)
-    
-    # 「最初」「二番目」などの表現に対応
-    ordinal_japanese = {
-        '最初': '1', '一番目': '1', '一つ目': '1', '一個目': '1',
-        '二番目': '2', '二つ目': '2', '二個目': '2',
-        '三番目': '3', '三つ目': '3', '三個目': '3',
-        '四番目': '4', '四つ目': '4', '四個目': '4',
-        '五番目': '5', '五つ目': '5', '五個目': '5'
-    }
-    
-    for japanese, arabic in ordinal_japanese.items():
-        if japanese in text and arabic not in numbers:
-            numbers.append(arabic)
-    
-    # 重複を除去してソート
-    unique_numbers = list(set(numbers))
-    unique_numbers.sort(key=lambda x: int(x))
-    
-    return unique_numbers
-
-def process_pending_charges(user_id_db, stripe_subscription_id):
-    """1週間後に課金予定のコンテンツを実際に課金する"""
-    try:
-        # 1週間前の日時を計算
-        one_week_ago = datetime.now() - timedelta(days=7)
-        
-        # データベースから1週間前に追加された課金予定のコンテンツを取得
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute('''
-            SELECT id, content_type, created_at 
-            FROM usage_logs 
-            WHERE user_id = %s AND pending_charge = TRUE AND created_at <= %s
-            ORDER BY created_at ASC
-        ''', (user_id_db, one_week_ago))
-        pending_charges = c.fetchall()
-        conn.close()
-        
-        if not pending_charges:
-            return {"status": "no_pending", "message": "課金予定のコンテンツがありません"}
-        
-        print(f'[DEBUG] 実際の課金対象: {len(pending_charges)}個のコンテンツ')
-        for charge in pending_charges:
-            print(f'[DEBUG] 課金実行: {charge[1]}')
-        
-        # Stripeで課金処理
-        try:
-            # stripe.api_keyはapp.pyで既に設定済み
-            
-            subscription = stripe.Subscription.retrieve(stripe_subscription_id)
-            
-            # 従量課金アイテムを取得（¥1,500の従量課金）
-            usage_item = None
-            for item in subscription['items']['data']:
-                if item['price']['id'] == 'price_1Rog1nIxg6C5hAVdnqB5MJiT':  # ¥1,500の従量課金Price ID
-                    usage_item = item
-                    break
-            
-            # 従量課金アイテムが見つからない場合は、使用量が記録されているアイテムを使用
-            if not usage_item:
-                for item in subscription['items']['data']:
-                    usage_records = stripe.SubscriptionItem.list_usage_record_summaries(
-                        item['id'],
-                        limit=1
-                    )
-                    if usage_records.data and usage_records.data[0].total_usage > 0:
-                        usage_item = item
-                        print(f'[WARN] 従量課金アイテムが見つからないため、使用量が記録されているアイテムを使用: {item["id"]}')
-                        break
-            
-            if not usage_item:
-                return {"status": "error", "message": "従量課金アイテムが見つかりません"}
-            
-            # 各コンテンツに対して課金
-            total_charged = 0
-            charged_details = []
-            conn = get_db_connection()
-            c = conn.cursor()
-            
-            for charge in pending_charges:
-                log_id, content_type, created_at = charge
-                try:
-                    # Stripeの使用量記録を作成
-                    usage_record = stripe.SubscriptionItem.create_usage_record(
-                        usage_item['id'],
-                        quantity=1,
-                        timestamp=int(created_at.timestamp()),
-                        action='increment'
-                    )
-                    
-                    # データベースを更新
-                    c.execute('''
-                        UPDATE usage_logs 
-                        SET is_free = FALSE, pending_charge = FALSE, stripe_usage_record_id = %s 
-                        WHERE id = %s
-                    ''', (usage_record.id, log_id))
-                    
-                    total_charged += 1
-                    charged_details.append(content_type)
-                    print(f'[DEBUG] 課金完了: {content_type}, usage_record_id={usage_record.id}')
-                    
-                except Exception as e:
-                    print(f'[DEBUG] 課金エラー: {content_type}, error={e}')
-                    continue
-            
-            conn.commit()
-            conn.close()
-            
-            return {
-                "status": "success", 
-                "message": f"{total_charged}個のコンテンツを課金しました",
-                "charged_count": total_charged,
-                "charged_details": charged_details
-            }
-            
-        except Exception as e:
-            print(f'[DEBUG] Stripe課金エラー: {e}')
-            return {"status": "stripe_error", "message": f"Stripe課金エラー: {str(e)}"}
-            
-    except Exception as e:
-        print(f'[DEBUG] 課金処理エラー: {e}')
-        return {"status": "error", "message": f"課金処理でエラーが発生しました: {e}"}
-
-def check_user_access_with_period(user_id, content_type):
-    """
-    契約期間を考慮したユーザーアクセスチェック（cancellation_history使用）
-    """
-    try:
-        from services.cancellation_period_service import CancellationPeriodService
-        
-        # cancellation_historyテーブルでチェック
-        period_service = CancellationPeriodService()
-        is_accessible, message = period_service.check_user_access_local(user_id, content_type)
-        
-        # ローカルデータがない場合はStripe APIで同期を試行
-        if not is_accessible and "コンテンツが追加されていません" not in message:
-            conn = get_db_connection()
-            c = conn.cursor()
-            c.execute('SELECT stripe_subscription_id FROM users WHERE id = %s', (user_id,))
-            result = c.fetchone()
-            conn.close()
-            
-            if result and result[0]:
-                # Stripe APIで同期して再チェック
-                period_service.update_subscription_period(user_id, content_type, result[0])
-                is_accessible, message = period_service.check_user_access_local(user_id, content_type)
-        
-        return is_accessible, message
-        
-    except Exception as e:
-        print(f"データベースエラー: {e}")
-        return False, "データベースエラーが発生しました"
-
 def handle_status_check(reply_token, user_id_db):
-    """
-    ユーザーの利用状況を確認してLINEメッセージで返す（企業中心統合対応）
-    """
+    """ユーザーの利用状況を確認してLINEメッセージで返す"""
     try:
         # LINEユーザーIDを直接使用
         line_user_id = user_id_db
@@ -1653,6 +1163,7 @@ def handle_status_check(reply_token, user_id_db):
                     subscription_status = "解約済み"
                 elif subscription.status == 'past_due':
                     subscription_status = "支払い遅延"
+            
             except Exception as e:
                 print(f'[DEBUG] Stripe API エラー: {e}')
                 subscription_status = "確認エラー"
@@ -1707,9 +1218,79 @@ def handle_status_check(reply_token, user_id_db):
         send_line_message(reply_token, [{"type": "text", "text": status_message}])
         
     except Exception as e:
-        print(f'[DEBUG] 利用状況確認エラー: {e}')
-        error_message = "利用状況の確認中にエラーが発生しました。しばらく時間をおいて再度お試しください。"
-        send_line_message(reply_token, [{"type": "text", "text": error_message}])
-    finally:
-        if 'conn' in locals():
-            conn.close()
+        print(f'[ERROR] 利用状況確認エラー: {e}')
+        import traceback
+        traceback.print_exc()
+        send_line_message(reply_token, [{"type": "text", "text": "❌ エラーが発生しました。しばらく時間をおいて再度お試しください。"}])
+
+def extract_numbers_from_text(text):
+    """AI技術を活用した高度な数字抽出処理"""
+    import re
+    
+    # 基本的な数字抽出
+    numbers = re.findall(r'\d+', text)
+    
+    # 日本語の数字表現も対応（一、二、三など）
+    japanese_numbers = {
+        '一': 1, '二': 2, '三': 3, '四': 4, '五': 5,
+        '六': 6, '七': 7, '八': 8, '九': 9, '十': 10,
+        '十一': 11, '十二': 12, '十三': 13, '十四': 14, '十五': 15,
+        '十六': 16, '十七': 17, '十八': 18, '十九': 19, '二十': 20
+    }
+    
+    for japanese, number in japanese_numbers.items():
+        if japanese in text:
+            numbers.append(str(number))
+    
+    # 重複を除去してソート
+    unique_numbers = list(set(numbers))
+    unique_numbers.sort(key=int)
+    
+    return unique_numbers
+
+def validate_selection_numbers(numbers, max_count):
+    """選択された数字の検証"""
+    valid_numbers = []
+    invalid_reasons = []
+    duplicates = []
+    
+    for num_str in numbers:
+        try:
+            num = int(num_str)
+            if num < 1:
+                invalid_reasons.append(f"{num}は1未満です")
+            elif num > max_count:
+                invalid_reasons.append(f"{num}は最大値{max_count}を超えています")
+            elif num in valid_numbers:
+                duplicates.append(num)
+            else:
+                valid_numbers.append(num)
+        except ValueError:
+            invalid_reasons.append(f"{num_str}は有効な数字ではありません")
+    
+    return valid_numbers, invalid_reasons, duplicates
+
+def smart_number_extraction(text):
+    """AI技術を活用した高度な数字抽出処理"""
+    import re
+    
+    # 基本的な数字抽出
+    numbers = re.findall(r'\d+', text)
+    
+    # 日本語の数字表現も対応（一、二、三など）
+    japanese_numbers = {
+        '一': 1, '二': 2, '三': 3, '四': 4, '五': 5,
+        '六': 6, '七': 7, '八': 8, '九': 9, '十': 10,
+        '十一': 11, '十二': 12, '十三': 13, '十四': 14, '十五': 15,
+        '十六': 16, '十七': 17, '十八': 18, '十九': 19, '二十': 20
+    }
+    
+    for japanese, number in japanese_numbers.items():
+        if japanese in text:
+            numbers.append(str(number))
+    
+    # 重複を除去してソート
+    unique_numbers = list(set(numbers))
+    unique_numbers.sort(key=int)
+    
+    return unique_numbers 

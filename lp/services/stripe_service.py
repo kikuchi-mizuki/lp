@@ -24,7 +24,7 @@ def check_subscription_status(stripe_subscription_id):
     try:
         subscription = stripe.Subscription.retrieve(stripe_subscription_id)
         status = subscription['status']
-        cancel_at_period_end = subscription.get('cancel_at_period_end', False)
+        cancel_at_period_end = subscription.get('cancel_at_period_end', False) if subscription else False
         
         print(f'[DEBUG] サブスクリプション状態: status={status}, cancel_at_period_end={cancel_at_period_end}')
         
