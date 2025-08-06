@@ -650,7 +650,9 @@ def line_webhook():
                         if current_state is None:
                             print(f'[DEBUG] ユーザー状態がNone、案内文を送信: user_id={user_id}')
                         elif current_state == 'welcome_sent':
-                            print(f'[DEBUG] 既に案内文送信済み、スキップ: user_id={user_id}')
+                            print(f'[DEBUG] 既に案内文送信済み、メニューを表示: user_id={user_id}')
+                            # メニューメッセージを送信
+                            send_line_message(event['replyToken'], [get_menu_message()])
                             conn.close()
                             continue
                         
