@@ -10,9 +10,11 @@ from services.line_service import (
     handle_cancel_selection, handle_subscription_cancel, handle_cancel_menu,
     handle_status_check, send_welcome_with_buttons, get_welcome_message,
     get_not_registered_message, extract_numbers_from_text, validate_selection_numbers,
-    smart_number_extraction, handle_cancel_confirmation, handle_content_confirmation
+    smart_number_extraction, handle_cancel_confirmation, handle_content_confirmation,
+    handle_add_content_company, handle_status_check_company, handle_cancel_menu_company,
+    handle_content_confirmation_company
 )
-from utils.message_templates import get_menu_message, get_help_message, get_default_message
+from utils.message_templates import get_menu_message, get_help_message, get_default_message, get_help_message_company
 from utils.db import get_db_connection
 from models.user_state import get_user_state, set_user_state, clear_user_state, init_user_states_table
 from services.user_service import is_paid_user, is_paid_user_company_centric, get_restricted_message, is_paid_user_by_email, update_line_user_id_for_email
@@ -724,30 +726,30 @@ def line_webhook():
                             set_user_state(user_id, 'welcome_sent')
                             send_line_message(event['replyToken'], [get_menu_message()])
                         elif text == 'ヘルプ':
-                            send_line_message(event['replyToken'], get_help_message())
+                            send_line_message(event['replyToken'], get_help_message_company())
                         elif text == '状態':
-                            handle_status_check(event['replyToken'], company_id)
+                            handle_status_check_company(event['replyToken'], company_id)
                         else:
                             send_line_message(event['replyToken'], [{"type": "text", "text": "1〜3の数字でコンテンツを選択してください。\n\nまたは「メニュー」でメインメニューに戻ります。"}])
                         continue
-                    # 解約関連のコマンドを優先処理
-                    elif text == '解約':
-                        print(f'[DEBUG] 解約コマンド受信: user_id={user_id}')
-                        handle_cancel_menu(event['replyToken'], company_id, stripe_subscription_id)
+                    # 削除関連のコマンドを優先処理
+                    elif text == '削除':
+                        print(f'[DEBUG] 削除コマンド受信: user_id={user_id}')
+                        handle_cancel_menu_company(event['replyToken'], company_id, stripe_subscription_id)
                     elif text == 'サブスクリプション解約':
                         handle_subscription_cancel(event['replyToken'], company_id, stripe_subscription_id)
                     elif text == 'コンテンツ解約':
                         set_user_state(user_id, 'cancel_select')
                         handle_cancel_request(event['replyToken'], company_id, stripe_subscription_id)
                     elif state == 'cancel_select':
-                        print(f'[DEBUG] 解約選択処理: user_id={user_id}, state={state}, text={text}')
+                        print(f'[DEBUG] 削除選択処理: user_id={user_id}, state={state}, text={text}')
                         
-                        # 解約対象のコンテンツを選択
+                        # 削除対象のコンテンツを選択
                         if text in ['1', '2', '3']:
-                            print(f'[DEBUG] 解約対象コンテンツ選択: text={text}')
-                            # 解約確認状態に設定
+                            print(f'[DEBUG] 削除対象コンテンツ選択: text={text}')
+                            # 削除確認状態に設定
                             set_user_state(user_id, f'cancel_confirm_{text}')
-                            # 解約確認メッセージを送信
+                            # 削除確認メッセージを送信
                             handle_cancel_selection(event['replyToken'], company_id, stripe_subscription_id, text)
                             continue
                         # 「メニュー」コマンドの場合は状態をリセットしてメニューを表示
@@ -758,13 +760,13 @@ def line_webhook():
                         # 主要なコマンドの場合は通常の処理に切り替え
                         elif text == '追加':
                             set_user_state(user_id, 'add_select')
-                            handle_add_content(event['replyToken'], company_id, stripe_subscription_id)
+                            handle_add_content_company(event['replyToken'], company_id, stripe_subscription_id)
                             continue
                         elif text == '状態':
-                            handle_status_check(event['replyToken'], company_id)
+                            handle_status_check_company(event['replyToken'], company_id)
                             continue
                         elif text == 'ヘルプ':
-                            send_line_message(event['replyToken'], get_help_message())
+                            send_line_message(event['replyToken'], get_help_message_company())
                             continue
                         else:
                             # AI技術を活用した高度な数字抽出関数を使用して処理
@@ -778,8 +780,7 @@ def line_webhook():
                             db_type = get_db_type()
                             placeholder = '%s' if db_type == 'postgresql' else '?'
                             
-                            c.execute(f'SELECT COUNT(*) FROM usage_logs WHERE user_id = {placeholder} AND content_type IN ({placeholder}, {placeholder}, {placeholder})', 
-                                     (company_id, 'AI予定秘書', 'AI経理秘書', 'AIタスクコンシェルジュ'))
+                            c.execute(f'SELECT COUNT(*) FROM company_subscriptions WHERE company_id = {placeholder} AND subscription_status = "active"', (company_id,))
                             content_count = c.fetchone()[0]
                             conn.close()
                             
@@ -799,18 +800,18 @@ def line_webhook():
                         print(f'[DEBUG] 追加コマンド受信: user_id={user_id}, state={state}')
                         set_user_state(user_id, 'add_select')
                         print(f'[DEBUG] ユーザー状態をadd_selectに設定: user_id={user_id}')
-                        print(f'[DEBUG] handle_add_content呼び出し開始: replyToken={event["replyToken"]}, company_id={company_id}, stripe_subscription_id={stripe_subscription_id}')
-                        handle_add_content(event['replyToken'], company_id, stripe_subscription_id)
-                        print(f'[DEBUG] handle_add_content呼び出し完了')
+                        print(f'[DEBUG] handle_add_content_company呼び出し開始: replyToken={event["replyToken"]}, company_id={company_id}, stripe_subscription_id={stripe_subscription_id}')
+                        handle_add_content_company(event['replyToken'], company_id, stripe_subscription_id)
+                        print(f'[DEBUG] handle_add_content_company呼び出し完了')
                     elif text == 'メニュー' and state != 'cancel_select':
                         print(f'[DEBUG] メニューコマンド受信: user_id={user_id}, state={state}')
                         send_line_message(event['replyToken'], [get_menu_message()])
                     elif text == 'ヘルプ' and state != 'cancel_select':
                         print(f'[DEBUG] ヘルプコマンド受信: user_id={user_id}, state={state}')
-                        send_line_message(event['replyToken'], get_help_message())
+                        send_line_message(event['replyToken'], get_help_message_company())
                     elif text == '状態' and state != 'cancel_select':
                         print(f'[DEBUG] 状態コマンド受信: user_id={user_id}, state={state}')
-                        handle_status_check(event['replyToken'], company_id)
+                        handle_status_check_company(event['replyToken'], company_id)
                     elif state and state.startswith('confirm_'):
                         # 確認状態での処理
                         if text.lower() in ['はい', 'yes', 'y']:
@@ -847,8 +848,8 @@ def line_webhook():
                             
                             if content_number in content_info:
                                 content = content_info[content_number]
-                                # コンテンツを追加
-                                result = handle_content_confirmation(company_id, content['name'])
+                                # 企業ユーザー専用：コンテンツを追加
+                                result = handle_content_confirmation_company(company_id, content['name'])
                                 if result['success']:
                                     # 企業登録フォームへのリンクを含むメッセージ
                                     registration_url = result.get('registration_url', '')
@@ -1121,43 +1122,49 @@ def line_webhook():
             conn.close()
         # リッチメニューのpostbackイベントの処理
         if event.get('type') == 'postback':
-                                     user_id = event['source']['userId']
-                                     postback_data = event['postback']['data']
-                                     conn = get_db_connection()
-                                     c = conn.cursor()
-                                     c.execute('SELECT id, stripe_subscription_id, line_user_id FROM users WHERE line_user_id = %s', (user_id,))
-                                     user = c.fetchone()
-                                     if not user:
-                                         send_line_message(event['replyToken'], [{"type": "text", "text": get_not_registered_message()}])
-                                         conn.close()
-                                     user_id_db = user[0]
-                                     stripe_subscription_id = user[1]
-                                     # postbackデータに基づいて処理
-                                     if postback_data == 'action=add_content':
-                                         set_user_state(user_id, 'add_select')
-                                         handle_add_content(event['replyToken'], user_id_db, stripe_subscription_id)
-                                     elif postback_data == 'action=check_status':
-                                         handle_status_check(event['replyToken'], user_id_db)
-                                     elif postback_data == 'action=cancel_content':
-                                         handle_cancel_menu(event['replyToken'], user_id_db, stripe_subscription_id)
-                                     elif postback_data == 'action=help':
-                                         send_line_message(event['replyToken'], get_help_message())
-                                     elif postback_data == 'action=share':
-                                         share_message = """📢 友達に紹介
+            user_id = event['source']['userId']
+            postback_data = event['postback']['data']
+            conn = get_db_connection()
+            c = conn.cursor()
+            
+            # 企業ユーザー専用：companiesテーブルから企業情報を取得
+            c.execute('SELECT id, company_name, stripe_subscription_id FROM companies WHERE line_user_id = %s', (user_id,))
+            company = c.fetchone()
+            
+            if not company:
+                send_line_message(event['replyToken'], [{"type": "text", "text": "企業登録が完了していません。LPで企業登録を行ってください。"}])
+                conn.close()
+                return jsonify({'status': 'ok'})
+                
+            company_id, company_name, stripe_subscription_id = company
+            
+            # postbackデータに基づいて処理
+            if postback_data == 'action=add_content':
+                set_user_state(user_id, 'add_select')
+                # 企業ユーザー専用：company_idを使用
+                handle_add_content_company(event['replyToken'], company_id, stripe_subscription_id)
+            elif postback_data == 'action=check_status':
+                handle_status_check_company(event['replyToken'], company_id)
+            elif postback_data == 'action=cancel_content':
+                handle_cancel_menu_company(event['replyToken'], company_id, stripe_subscription_id)
+            elif postback_data == 'action=help':
+                send_line_message(event['replyToken'], get_help_message_company())
+            elif postback_data == 'action=share':
+                share_message = """📢 友達に紹介
 
 AIコレクションズをご利用いただき、ありがとうございます！
 
 🤝 友達にもおすすめしませんか？
-• 1個目のコンテンツは無料
-• 月額5,000円で複数のAIツールを利用可能
-• 従量課金で必要な分だけ追加
+• 基本料金月額3,900円
+• 追加コンテンツ1件1,500円
+• 企業向けAIツールを効率的に利用
 
 🔗 紹介URL：
 https://lp-production-9e2c.up.railway.app
 
 友達が登録すると、あなたにも特典があります！"""
-                                         send_line_message(event['replyToken'], [{"type": "text", "text": share_message}])
-                                     conn.close()
+                send_line_message(event['replyToken'], [{"type": "text", "text": share_message}])
+            conn.close()
     except Exception as e:
         traceback.print_exc()
     return jsonify({'status': 'ok'}) 

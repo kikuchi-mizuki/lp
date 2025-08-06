@@ -1294,3 +1294,291 @@ def smart_number_extraction(text):
     unique_numbers.sort(key=int)
     
     return unique_numbers 
+
+def handle_add_content_company(reply_token, company_id, stripe_subscription_id):
+    """企業ユーザー専用：コンテンツ追加メニュー表示"""
+    try:
+        # サブスクリプション状態をチェック
+        subscription_status = check_subscription_status(stripe_subscription_id)
+        is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
+        
+        # 利用可能なコンテンツを定義
+        available_contents = [
+            {'name': 'AI予定秘書', 'description': 'スケジュール管理をAIがサポート'},
+            {'name': 'AI経理秘書', 'description': '経理作業をAIが効率化'},
+            {'name': 'AIタスクコンシェルジュ', 'description': 'タスク管理をAIが最適化'}
+        ]
+        
+        # 既に追加されているコンテンツを確認
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # データベースタイプに応じて適切なプレースホルダーを使用
+        from utils.db import get_db_type
+        db_type = get_db_type()
+        placeholder = '%s' if db_type == 'postgresql' else '?'
+        
+        # 企業のサブスクリプション数を確認
+        c.execute(f'SELECT COUNT(*) FROM company_subscriptions WHERE company_id = {placeholder} AND subscription_status = "active"', (company_id,))
+        total_subscription_count = c.fetchone()[0]
+        
+        # 企業のLINEアカウント数を確認
+        c.execute(f'SELECT COUNT(*) FROM company_line_accounts WHERE company_id = {placeholder} AND status = "active"', (company_id,))
+        total_line_account_count = c.fetchone()[0]
+        
+        conn.close()
+        
+        print(f'[DEBUG] 企業コンテンツ追加: company_id={company_id}, total_subscription_count={total_subscription_count}, total_line_account_count={total_line_account_count}')
+        
+        # コンテンツ選択メニューを作成
+        actions = []
+        for i, content in enumerate(available_contents, 1):
+            actions.append({
+                "type": "postback",
+                "label": f"{i}. {content['name']}",
+                "data": f"content_selection={i}"
+            })
+        
+        # 戻るボタンを追加
+        actions.append({
+            "type": "message",
+            "label": "戻る",
+            "text": "メニュー"
+        })
+        
+        message = {
+            "type": "template",
+            "altText": "コンテンツ追加メニュー",
+            "template": {
+                "type": "buttons",
+                "title": "追加するコンテンツを選択",
+                "text": f"現在の利用状況：\n• サブスクリプション：{total_subscription_count}件\n• LINEアカウント：{total_line_account_count}件\n\n追加したいコンテンツを選択してください：",
+                "actions": actions
+            }
+        }
+        
+        send_line_message(reply_token, [message])
+        
+    except Exception as e:
+        print(f'[DEBUG] 企業コンテンツ追加エラー: {e}')
+        import traceback
+        traceback.print_exc()
+        send_line_message(reply_token, [{"type": "text", "text": "コンテンツ追加処理でエラーが発生しました。"}])
+
+def handle_status_check_company(reply_token, company_id):
+    """企業ユーザー専用：利用状況確認"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # データベースタイプに応じて適切なプレースホルダーを使用
+        from utils.db import get_db_type
+        db_type = get_db_type()
+        placeholder = '%s' if db_type == 'postgresql' else '?'
+        
+        # 企業基本情報を取得
+        c.execute(f'SELECT company_name, email FROM companies WHERE id = {placeholder}', (company_id,))
+        company_info = c.fetchone()
+        
+        if not company_info:
+            send_line_message(reply_token, [{"type": "text", "text": "企業情報が見つかりません。"}])
+            conn.close()
+            return
+            
+        company_name, email = company_info
+        
+        # サブスクリプション情報を取得
+        c.execute(f'''
+            SELECT content_type, subscription_status, base_price, additional_price, total_price, current_period_end 
+            FROM company_subscriptions 
+            WHERE company_id = {placeholder}
+        ''', (company_id,))
+        subscriptions = c.fetchall()
+        
+        # LINEアカウント情報を取得
+        c.execute(f'''
+            SELECT content_type, status, line_channel_id 
+            FROM company_line_accounts 
+            WHERE company_id = {placeholder}
+        ''', (company_id,))
+        line_accounts = c.fetchall()
+        
+        conn.close()
+        
+        # 利用状況メッセージを作成
+        status_message = f"🏢 {company_name}\n📧 {email}\n\n"
+        
+        if subscriptions:
+            status_message += "📊 サブスクリプション状況：\n"
+            total_monthly_cost = 0
+            for sub in subscriptions:
+                content_type, status, base_price, additional_price, total_price, period_end = sub
+                status_message += f"• {content_type}: {status}\n"
+                status_message += f"  料金: {total_price:,}円/月\n"
+                if period_end:
+                    status_message += f"  次回請求: {period_end.strftime('%Y/%m/%d')}\n"
+                total_monthly_cost += total_price
+            status_message += f"\n💰 月額合計: {total_monthly_cost:,}円\n\n"
+        else:
+            status_message += "📊 サブスクリプション: なし\n\n"
+        
+        if line_accounts:
+            status_message += "📱 LINEアカウント状況：\n"
+            for account in line_accounts:
+                content_type, status, line_channel_id = account
+                status_message += f"• {content_type}: {status}\n"
+        else:
+            status_message += "📱 LINEアカウント: なし\n"
+        
+        send_line_message(reply_token, [{"type": "text", "text": status_message}])
+        
+    except Exception as e:
+        print(f'[DEBUG] 企業利用状況確認エラー: {e}')
+        import traceback
+        traceback.print_exc()
+        send_line_message(reply_token, [{"type": "text", "text": "利用状況確認でエラーが発生しました。"}])
+
+def handle_cancel_menu_company(reply_token, company_id, stripe_subscription_id):
+    """企業ユーザー専用：コンテンツ削除メニュー表示"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # データベースタイプに応じて適切なプレースホルダーを使用
+        from utils.db import get_db_type
+        db_type = get_db_type()
+        placeholder = '%s' if db_type == 'postgresql' else '?'
+        
+        # アクティブなサブスクリプションを取得
+        c.execute(f'''
+            SELECT content_type, total_price 
+            FROM company_subscriptions 
+            WHERE company_id = {placeholder} AND subscription_status = "active"
+        ''', (company_id,))
+        active_subscriptions = c.fetchall()
+        
+        conn.close()
+        
+        if not active_subscriptions:
+            send_line_message(reply_token, [{"type": "text", "text": "削除可能なコンテンツがありません。"}])
+            return
+        
+        # 削除メニューを作成
+        actions = []
+        for i, (content_type, total_price) in enumerate(active_subscriptions, 1):
+            actions.append({
+                "type": "postback",
+                "label": f"{i}. {content_type} ({total_price:,}円/月)",
+                "data": f"cancel_selection={content_type}"
+            })
+        
+        # 戻るボタンを追加
+        actions.append({
+            "type": "message",
+            "label": "戻る",
+            "text": "メニュー"
+        })
+        
+        message = {
+            "type": "template",
+            "altText": "コンテンツ削除メニュー",
+            "template": {
+                "type": "buttons",
+                "title": "削除するコンテンツを選択",
+                "text": f"現在のアクティブなコンテンツ：{len(active_subscriptions)}件\n\n削除したいコンテンツを選択してください：",
+                "actions": actions
+            }
+        }
+        
+        send_line_message(reply_token, [message])
+        
+    except Exception as e:
+        print(f'[DEBUG] 企業コンテンツ削除メニューエラー: {e}')
+        import traceback
+        traceback.print_exc()
+        send_line_message(reply_token, [{"type": "text", "text": "コンテンツ削除メニューでエラーが発生しました。"}])
+
+def get_help_message_company():
+    """企業ユーザー専用：ヘルプメッセージ"""
+    return """🤖 AIコレクションズ 企業向けヘルプ
+
+📋 利用可能なコマンド：
+• 「追加」- 新しいコンテンツを追加
+• 「状態」- 現在の利用状況を確認
+• 「削除」- コンテンツを削除
+• 「メニュー」- メインメニューを表示
+
+💰 料金体系：
+• 基本料金：月額3,900円
+• 追加コンテンツ：1件1,500円/月
+
+📞 サポート：
+ご不明な点がございましたら、お気軽にお問い合わせください。""" 
+
+def handle_content_confirmation_company(company_id, content_type):
+    """企業ユーザー専用：コンテンツ確認処理"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # データベースタイプに応じて適切なプレースホルダーを使用
+        from utils.db import get_db_type
+        db_type = get_db_type()
+        placeholder = '%s' if db_type == 'postgresql' else '?'
+        
+        # 既存のサブスクリプション数を確認
+        c.execute(f'SELECT COUNT(*) FROM company_subscriptions WHERE company_id = {placeholder} AND subscription_status = "active"', (company_id,))
+        existing_count = c.fetchone()[0]
+        
+        # 料金計算
+        base_price = 3900
+        additional_price_per_content = 1500
+        
+        if existing_count == 0:
+            # 初回コンテンツ（基本料金のみ）
+            total_price = base_price
+        else:
+            # 追加コンテンツ（基本料金 + 追加料金）
+            total_price = base_price + (existing_count * additional_price_per_content)
+        
+        # 新しいサブスクリプションを作成
+        c.execute(f'''
+            INSERT INTO company_subscriptions 
+            (company_id, content_type, subscription_status, base_price, additional_price, total_price, current_period_end) 
+            VALUES ({placeholder}, {placeholder}, 'active', {placeholder}, {placeholder}, {placeholder}, DATE_ADD(NOW(), INTERVAL 1 MONTH))
+        ''', (company_id, content_type, base_price, additional_price_per_content, total_price))
+        
+        # 新しいLINEアカウントを作成
+        line_channel_id = f"company_{company_id}_{content_type}_{int(time.time())}"
+        c.execute(f'''
+            INSERT INTO company_line_accounts 
+            (company_id, content_type, line_channel_id, status) 
+            VALUES ({placeholder}, {placeholder}, {placeholder}, 'active')
+        ''', (company_id, content_type, line_channel_id))
+        
+        conn.commit()
+        conn.close()
+        
+        return {
+            'success': True,
+            'company_id': company_id,
+            'content_type': content_type,
+            'total_price': total_price,
+            'line_channel_id': line_channel_id
+        }
+        
+    except Exception as e:
+        print(f'[DEBUG] 企業コンテンツ確認エラー: {e}')
+        import traceback
+        traceback.print_exc()
+        if conn:
+            conn.rollback()
+        return {
+            'success': False,
+            'error': str(e)
+        }
+    finally:
+        if c:
+            c.close()
+        if conn:
+            conn.close() 
