@@ -109,23 +109,12 @@ def stripe_webhook():
                         company_id = unlinked_company[0]
                         print(f'[DEBUG] 未紐付け企業データ発見: company_id={company_id}')
                         
-                        # 既存のLINEユーザーIDをクリア（重複回避）
-                        c.execute('UPDATE companies SET line_user_id = NULL WHERE line_user_id IS NOT NULL')
+                        # 企業データにLINEユーザーIDを設定（user_idではなく、後でLINE連携時に設定）
+                        # ここでは企業データを準備するだけ
+                        print(f'[DEBUG] 企業データ準備完了: company_id={company_id}, email={email}')
                         
-                        # 企業データにLINEユーザーIDを設定
-                        c.execute('UPDATE companies SET line_user_id = %s WHERE id = %s', (user_id, company_id))
-                        conn.commit()
-                        print(f'[DEBUG] 企業データ自動更新完了: user_id={user_id}, company_id={company_id}')
-                        
-                        # 案内メッセージを送信
-                        try:
-                            from services.line_service import send_welcome_with_buttons_push
-                            send_welcome_with_buttons_push(user_id)
-                            print(f'[DEBUG] 決済完了時の自動案内文送信完了: user_id={user_id}')
-                        except Exception as e:
-                            print(f'[DEBUG] 決済完了時の自動案内文送信エラー: {e}')
-                            import traceback
-                            traceback.print_exc()
+                        # 案内メッセージはLINE連携時に送信
+                        print(f'[DEBUG] LINE連携待ち状態: email={email}')
                     else:
                         print(f'[DEBUG] 未紐付け企業データが見つかりません: email={email}')
             else:
@@ -141,7 +130,7 @@ def stripe_webhook():
                     RETURNING id
                 ''', (company_name, f"company_{user_id}", email, subscription_id))
                 company_id = c.fetchone()[0]
-                print(f'[DEBUG] 企業データ作成: company_id={company_id}, company_name={company_name}')
+                print(f'[DEBUG] 企業データ作成: company_id={company_id}, company_name={company_name}, email={email}')
                 
                 # company_paymentsテーブルにも決済データを作成
                 c.execute('''
