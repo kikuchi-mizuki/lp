@@ -185,7 +185,7 @@ def is_paid_user_company_centric(line_user_id):
         print(f'[DEBUG] line_user_idカラム情報: {column_info}')
         
         c.execute('''
-            SELECT id, company_name, stripe_subscription_id, status
+            SELECT id, company_name, email, status
             FROM companies 
             WHERE line_user_id = %s::text
         ''', (line_user_id,))
@@ -203,13 +203,13 @@ def is_paid_user_company_centric(line_user_id):
                 'redirect_url': 'https://line.me/R/ti/p/@ai_collections'
             }
         
-        company_id, company_name, stripe_subscription_id, status = result
-        print(f'[DEBUG] 企業情報取得: company_id={company_id}, company_name={company_name}, stripe_subscription_id={stripe_subscription_id}, status={status}')
+        company_id, company_name, email, status = result
+        print(f'[DEBUG] 企業情報取得: company_id={company_id}, company_name={company_name}, email={email}, status={status}')
         
         # 企業の決済状況をチェック
         c.execute('''
             SELECT subscription_status, current_period_end
-            FROM company_payments 
+            FROM company_subscriptions 
             WHERE company_id = %s 
             ORDER BY created_at DESC 
             LIMIT 1
