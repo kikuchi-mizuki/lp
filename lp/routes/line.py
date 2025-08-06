@@ -991,10 +991,22 @@ def line_webhook():
                             # 企業データとの紐付け処理
                             print(f'[DEBUG] 企業データ紐付け処理開始: user_id={user_id}, email={normalized_email}')
                             
-                            # メールアドレスで企業データを検索
+                            # メールアドレスで企業データを検索（emailフィールドを使用）
                             c.execute('SELECT id, company_name, stripe_subscription_id FROM companies WHERE email = %s', (normalized_email,))
                             company = c.fetchone()
-                            print(f'[DEBUG] companiesテーブル検索結果: {company}')
+                            print(f'[DEBUG] companiesテーブル検索結果（email）: {company}')
+                            
+                            if not company:
+                                # emailで見つからない場合、stripe_subscription_idで検索
+                                print(f'[DEBUG] emailで企業データが見つからないため、stripe_subscription_idで検索: email={normalized_email}')
+                                c.execute('SELECT stripe_subscription_id FROM users WHERE email = %s', (normalized_email,))
+                                user_result = c.fetchone()
+                                
+                                if user_result and user_result[0]:
+                                    stripe_subscription_id = user_result[0]
+                                    c.execute('SELECT id, company_name, stripe_subscription_id FROM companies WHERE stripe_subscription_id = %s', (stripe_subscription_id,))
+                                    company = c.fetchone()
+                                    print(f'[DEBUG] companiesテーブル検索結果（stripe_subscription_id）: {company}')
                             
                             if company:
                                 company_id, company_name, stripe_subscription_id = company

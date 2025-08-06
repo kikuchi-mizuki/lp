@@ -141,6 +141,7 @@ def stripe_webhook():
                 conn.commit()
                 print(f'新規ユーザー登録完了: email={email}, customer_id={customer_id}, subscription_id={subscription_id}')
                 print(f'企業データ作成完了: company_id={company_id}, company_name={company_name}')
+                print(f'[IMPORTANT] 企業データ準備完了 - LINE連携待ち: email={email}, company_id={company_id}')
             
             # 従量課金アイテムを追加
             try:
