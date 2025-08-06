@@ -903,11 +903,13 @@ def line_webhook():
                             send_line_message(event['replyToken'], [{"type": "text", "text": "「はい」または「いいえ」で回答してください。\n\n📱 または「メニュー」でメインメニューに戻ります。"}])
                     elif '@' in text and '.' in text and len(text) < 100:
                         print(f'[DEBUG] メールアドレス連携処理開始: user_id={user_id}, text={text}')
-                    def normalize_email(email):
-                        email = email.strip().lower()
-                        email = unicodedata.normalize('NFKC', email)
-                        return email
-                    normalized_email = normalize_email(text)
+                        
+                        def normalize_email(email):
+                            email = email.strip().lower()
+                            email = unicodedata.normalize('NFKC', email)
+                            return email
+                        
+                        normalized_email = normalize_email(text)
                     print(f'[DEBUG] 正規化後のメールアドレス: {normalized_email}')
                     
                     # 1. usersテーブルでメールアドレスを検索

@@ -6,11 +6,11 @@ import stripe
 import traceback
 import time
 from datetime import datetime, timedelta
-from utils.db import get_db_connection
-# from services.cancellation_service import record_cancellation  # 削除された関数
-from services.stripe_service import check_subscription_status
+from lp.utils.db import get_db_connection
+# from lp.services.cancellation_service import record_cancellation  # 削除された関数
+from lp.services.stripe_service import check_subscription_status
 import re
-from services.subscription_period_service import SubscriptionPeriodService
+from lp.services.subscription_period_service import SubscriptionPeriodService
 import json
 
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
@@ -203,6 +203,11 @@ def send_welcome_with_buttons_push(user_id):
     """LINEユーザーIDに直接案内文を送信（pushメッセージ）"""
     print(f'[DEBUG] send_welcome_with_buttons_push開始: user_id={user_id}')
     LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
+    
+    if not LINE_CHANNEL_ACCESS_TOKEN:
+        print('❌ LINE_CHANNEL_ACCESS_TOKENが設定されていません')
+        return False
+    
     headers = {
         'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}',
         'Content-Type': 'application/json'
@@ -252,11 +257,13 @@ def send_welcome_with_buttons_push(user_id):
         response = requests.post('https://api.line.me/v2/bot/message/push', headers=headers, json=data, timeout=10)
         response.raise_for_status()
         print(f'[DEBUG] LINE pushメッセージ送信成功: status_code={response.status_code}')
+        return True
     except Exception as e:
         print(f'LINE pushメッセージ送信エラー: {e}')
         if hasattr(e, 'response') and e.response is not None:
             print(f'LINE API エラー詳細: {e.response.text}')
         traceback.print_exc()
+        return False
 
 def create_rich_menu():
     rich_menu = {
@@ -450,7 +457,7 @@ def handle_add_content(reply_token, user_id_db, stripe_subscription_id):
 def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, content_number):
     try:
         # check_subscription_status関数をインポート
-        from services.stripe_service import check_subscription_status
+        from lp.services.stripe_service import check_subscription_status
         
         content_info = {
             '1': {
@@ -487,7 +494,7 @@ def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, co
         c_count = conn_count.cursor()
         
         # データベースタイプに応じて適切なプレースホルダーを使用
-        from utils.db import get_db_type
+        from lp.utils.db import get_db_type
         db_type = get_db_type()
         placeholder = '%s' if db_type == 'postgresql' else '?'
         
@@ -635,7 +642,7 @@ def handle_cancel_confirmation(user_id, content_number):
             }
         
         # データベースタイプに応じて適切なプレースホルダーを使用
-        from utils.db import get_db_type
+        from lp.utils.db import get_db_type
         db_type = get_db_type()
         placeholder = '%s' if db_type == 'postgresql' else '?'
         
@@ -695,7 +702,6 @@ def handle_content_confirmation(user_id, content_type):
         c = conn.cursor()
         
         # データベースタイプに応じて適切なプレースホルダーを使用
-        from utils.db import get_db_type
         db_type = get_db_type()
         placeholder = '%s' if db_type == 'postgresql' else '?'
         
@@ -826,7 +832,7 @@ def handle_cancel_request(reply_token, user_id_db, stripe_subscription_id):
         c = conn.cursor()
         
         # データベースタイプに応じて適切なプレースホルダーを使用
-        from utils.db import get_db_type
+        from lp.utils.db import get_db_type
         db_type = get_db_type()
         placeholder = '%s' if db_type == 'postgresql' else '?'
         
@@ -896,7 +902,6 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
         c = conn.cursor()
         
         # データベースタイプに応じて適切なプレースホルダーを使用
-        from utils.db import get_db_type
         db_type = get_db_type()
         placeholder = '%s' if db_type == 'postgresql' else '?'
         
@@ -1113,7 +1118,7 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
                     print(f'[DEBUG] 3通目の期間説明メッセージ送信失敗: {response.status_code}, {response.text}')
             
             # ユーザー状態をリセット
-            from models.user_state import clear_user_state
+            from lp.models.user_state import clear_user_state
             if line_user_id:
                 clear_user_state(line_user_id)
                 print(f'[DEBUG] ユーザー状態リセット: {line_user_id}')
@@ -1568,7 +1573,7 @@ def check_user_access_with_period(user_id, content_type):
     契約期間を考慮したユーザーアクセスチェック（cancellation_history使用）
     """
     try:
-        from services.cancellation_period_service import CancellationPeriodService
+        from lp.services.cancellation_period_service import CancellationPeriodService
         
         # cancellation_historyテーブルでチェック
         period_service = CancellationPeriodService()
