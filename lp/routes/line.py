@@ -631,7 +631,7 @@ def line_webhook():
                     company_name = company[1]
                     
                     # stripe_subscription_idはcompany_subscriptionsテーブルから取得
-                    c.execute('SELECT stripe_subscription_id FROM company_subscriptions WHERE company_id = %s AND subscription_status = "active" LIMIT 1', (company_id,))
+                    c.execute('SELECT stripe_subscription_id FROM company_subscriptions WHERE company_id = %s AND subscription_status = %s LIMIT 1', (company_id, 'active'))
                     subscription = c.fetchone()
                     stripe_subscription_id = subscription[0] if subscription else None
                     
@@ -698,7 +698,7 @@ def line_webhook():
                             print(f'[DEBUG] 企業データ発見: company_id={company_id}, company_name={company_name}')
                             
                             # stripe_subscription_idはcompany_subscriptionsテーブルから取得
-                            c.execute('SELECT stripe_subscription_id FROM company_subscriptions WHERE company_id = %s AND subscription_status = "active" LIMIT 1', (company_id,))
+                            c.execute('SELECT stripe_subscription_id FROM company_subscriptions WHERE company_id = %s AND subscription_status = %s LIMIT 1', (company_id, 'active'))
                             subscription = c.fetchone()
                             stripe_subscription_id = subscription[0] if subscription else None
                             
@@ -821,7 +821,7 @@ def line_webhook():
                             db_type = get_db_type()
                             placeholder = '%s' if db_type == 'postgresql' else '?'
                             
-                            c.execute(f'SELECT COUNT(*) FROM company_subscriptions WHERE company_id = {placeholder} AND subscription_status = "active"', (company_id,))
+                            c.execute(f'SELECT COUNT(*) FROM company_subscriptions WHERE company_id = {placeholder} AND subscription_status = {placeholder}', (company_id, 'active'))
                             content_count = c.fetchone()[0]
                             conn.close()
                             
@@ -973,7 +973,7 @@ def line_webhook():
                             print(f'[DEBUG] 企業データ発見: company_id={company_id}, company_name={company_name}')
                             
                             # stripe_subscription_idはcompany_subscriptionsテーブルから取得
-                            c.execute('SELECT stripe_subscription_id FROM company_subscriptions WHERE company_id = %s AND subscription_status = "active" LIMIT 1', (company_id,))
+                            c.execute('SELECT stripe_subscription_id FROM company_subscriptions WHERE company_id = %s AND subscription_status = %s LIMIT 1', (company_id, 'active'))
                             subscription = c.fetchone()
                             stripe_subscription_id = subscription[0] if subscription else None
                             
@@ -1046,7 +1046,7 @@ def line_webhook():
             company_id, company_name = company
             
             # stripe_subscription_idはcompany_subscriptionsテーブルから取得
-            c.execute('SELECT stripe_subscription_id FROM company_subscriptions WHERE company_id = %s AND subscription_status = "active" LIMIT 1', (company_id,))
+            c.execute('SELECT stripe_subscription_id FROM company_subscriptions WHERE company_id = %s AND subscription_status = %s LIMIT 1', (company_id, 'active'))
             subscription = c.fetchone()
             stripe_subscription_id = subscription[0] if subscription else None
             

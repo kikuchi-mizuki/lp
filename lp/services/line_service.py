@@ -1319,7 +1319,7 @@ def handle_add_content_company(reply_token, company_id, stripe_subscription_id):
         placeholder = '%s' if db_type == 'postgresql' else '?'
         
         # 企業のサブスクリプション数を確認
-        c.execute(f'SELECT COUNT(*) FROM company_subscriptions WHERE company_id = {placeholder} AND subscription_status = "active"', (company_id,))
+        c.execute(f'SELECT COUNT(*) FROM company_subscriptions WHERE company_id = {placeholder} AND subscription_status = {placeholder}', (company_id, 'active'))
         total_subscription_count = c.fetchone()[0]
         
         # 企業のLINEアカウント数を確認
@@ -1453,8 +1453,8 @@ def handle_cancel_menu_company(reply_token, company_id, stripe_subscription_id):
         c.execute(f'''
             SELECT content_type, total_price 
             FROM company_subscriptions 
-            WHERE company_id = {placeholder} AND subscription_status = "active"
-        ''', (company_id,))
+            WHERE company_id = {placeholder} AND subscription_status = {placeholder}
+        ''', (company_id, 'active'))
         active_subscriptions = c.fetchall()
         
         conn.close()
@@ -1527,7 +1527,7 @@ def handle_content_confirmation_company(company_id, content_type):
         placeholder = '%s' if db_type == 'postgresql' else '?'
         
         # 既存のサブスクリプション数を確認
-        c.execute(f'SELECT COUNT(*) FROM company_subscriptions WHERE company_id = {placeholder} AND subscription_status = "active"', (company_id,))
+        c.execute(f'SELECT COUNT(*) FROM company_subscriptions WHERE company_id = {placeholder} AND subscription_status = {placeholder}', (company_id, 'active'))
         existing_count = c.fetchone()[0]
         
         # 料金計算
