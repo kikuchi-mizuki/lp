@@ -1,0 +1,271 @@
+LINEメッセージ送信エラー: 401 Client Error: Unauthorized for url: https://api.line.me/v2/bot/message/reply
+Traceback (most recent call last):
+  File "/Users/kikuchimizuki/Desktop/aicollections/lp/lp/services/line_service.py", line 652, in handle_content_confirmation
+    elif subscription_status['cancel_at_period_end']:
+         ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+KeyError: 'cancel_at_period_end'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/kikuchimizuki/Desktop/aicollections/lp/lp/services/line_service.py", line 43, in send_line_message
+    response.raise_for_status()
+  File "/opt/anaconda3/lib/python3.12/site-packages/requests/models.py", line 1021, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 401 Client Error: Unauthorized for url: https://api.line.me/v2/bot/message/reply
+
+LINEメッセージ送信エラー: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+Traceback (most recent call last):
+  File "/Users/kikuchimizuki/Desktop/aicollections/lp/lp/services/line_service.py", line 652, in handle_content_confirmation
+    elif subscription_status['cancel_at_period_end']:
+         ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+KeyError: 'cancel_at_period_end'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/kikuchimizuki/Desktop/aicollections/lp/lp/services/line_service.py", line 43, in send_line_message
+    response.raise_for_status()
+  File "/opt/anaconda3/lib/python3.12/site-packages/requests/models.py", line 1021, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+
+LINEメッセージ送信エラー: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+Traceback (most recent call last):
+  File "/Users/kikuchimizuki/Desktop/aicollections/lp/lp/services/line_service.py", line 43, in send_line_message
+    response.raise_for_status()
+  File "/opt/anaconda3/lib/python3.12/site-packages/requests/models.py", line 1021, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+
+LINEメッセージ送信エラー: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+Traceback (most recent call last):
+  File "/Users/kikuchimizuki/Desktop/aicollections/lp/lp/services/line_service.py", line 661, in handle_content_confirmation
+    elif subscription_status['cancel_at_period_end']:
+         ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+KeyError: 'cancel_at_period_end'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/kikuchimizuki/Desktop/aicollections/lp/lp/services/line_service.py", line 43, in send_line_message
+    response.raise_for_status()
+  File "/opt/anaconda3/lib/python3.12/site-packages/requests/models.py", line 1021, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+
+LINEメッセージ送信エラー: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+Traceback (most recent call last):
+  File "/Users/kikuchimizuki/Desktop/aicollections/lp/lp/services/line_service.py", line 724, in handle_content_confirmation
+    content = content_info[content_number]
+              ~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+KeyError: 1
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/kikuchimizuki/Desktop/aicollections/lp/lp/services/line_service.py", line 43, in send_line_message
+    response.raise_for_status()
+  File "/opt/anaconda3/lib/python3.12/site-packages/requests/models.py", line 1021, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+
+LINEメッセージ送信エラー: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+Traceback (most recent call last):
+  File "/Users/kikuchimizuki/Desktop/aicollections/lp/lp/services/line_service.py", line 729, in handle_content_confirmation
+    c_count.execute('SELECT COUNT(*) FROM usage_logs WHERE user_id = %s', (user_id_db,))
+sqlite3.OperationalError: near "%": syntax error
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/kikuchimizuki/Desktop/aicollections/lp/lp/services/line_service.py", line 43, in send_line_message
+    response.raise_for_status()
+  File "/opt/anaconda3/lib/python3.12/site-packages/requests/models.py", line 1021, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+
+LINEメッセージ送信エラー: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+Traceback (most recent call last):
+  File "/Users/kikuchimizuki/Desktop/aicollections/lp/lp/services/line_service.py", line 43, in send_line_message
+    response.raise_for_status()
+  File "/opt/anaconda3/lib/python3.12/site-packages/requests/models.py", line 1021, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+
+LINEメッセージ送信エラー: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+Traceback (most recent call last):
+  File "/Users/kikuchimizuki/Desktop/aicollections/lp/lp/services/line_service.py", line 43, in send_line_message
+    response.raise_for_status()
+  File "/opt/anaconda3/lib/python3.12/site-packages/requests/models.py", line 1021, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+
+LINEメッセージ送信エラー: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+Traceback (most recent call last):
+  File "/Users/kikuchimizuki/Desktop/aicollections/lp/lp/services/line_service.py", line 43, in send_line_message
+    response.raise_for_status()
+  File "/opt/anaconda3/lib/python3.12/site-packages/requests/models.py", line 1021, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+
+LINEメッセージ送信エラー: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+Traceback (most recent call last):
+  File "/Users/kikuchimizuki/Desktop/aicollections/lp/lp/services/line_service.py", line 43, in send_line_message
+    response.raise_for_status()
+  File "/opt/anaconda3/lib/python3.12/site-packages/requests/models.py", line 1021, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+
+LINEメッセージ送信エラー: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+Traceback (most recent call last):
+  File "/Users/kikuchimizuki/Desktop/aicollections/lp/lp/services/line_service.py", line 43, in send_line_message
+    response.raise_for_status()
+  File "/opt/anaconda3/lib/python3.12/site-packages/requests/models.py", line 1021, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+
+LINEメッセージ送信エラー: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+Traceback (most recent call last):
+  File "/Users/kikuchimizuki/Desktop/aicollections/lp/lp/services/line_service.py", line 43, in send_line_message
+    response.raise_for_status()
+  File "/opt/anaconda3/lib/python3.12/site-packages/requests/models.py", line 1021, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+
+LINEメッセージ送信エラー: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+Traceback (most recent call last):
+  File "/Users/kikuchimizuki/Desktop/aicollections/lp/lp/services/line_service.py", line 43, in send_line_message
+    response.raise_for_status()
+  File "/opt/anaconda3/lib/python3.12/site-packages/requests/models.py", line 1021, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+
+LINEメッセージ送信エラー: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+Traceback (most recent call last):
+  File "/Users/kikuchimizuki/Desktop/aicollections/lp/lp/services/line_service.py", line 43, in send_line_message
+    response.raise_for_status()
+  File "/opt/anaconda3/lib/python3.12/site-packages/requests/models.py", line 1021, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+
+LINEメッセージ送信エラー: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+Traceback (most recent call last):
+  File "/Users/kikuchimizuki/Desktop/aicollections/lp/lp/services/line_service.py", line 43, in send_line_message
+    response.raise_for_status()
+  File "/opt/anaconda3/lib/python3.12/site-packages/requests/models.py", line 1021, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+
+LINEメッセージ送信エラー: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+Traceback (most recent call last):
+  File "/Users/kikuchimizuki/Desktop/aicollections/lp/lp/services/line_service.py", line 43, in send_line_message
+    response.raise_for_status()
+  File "/opt/anaconda3/lib/python3.12/site-packages/requests/models.py", line 1021, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+
+LINEメッセージ送信エラー: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+Traceback (most recent call last):
+  File "/Users/kikuchimizuki/Desktop/aicollections/lp/lp/services/line_service.py", line 662, in handle_content_confirmation
+    elif subscription_status['cancel_at_period_end']:
+         ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+KeyError: 'cancel_at_period_end'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/kikuchimizuki/Desktop/aicollections/lp/lp/services/line_service.py", line 43, in send_line_message
+    response.raise_for_status()
+  File "/opt/anaconda3/lib/python3.12/site-packages/requests/models.py", line 1021, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+
+LINEメッセージ送信エラー: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+Traceback (most recent call last):
+  File "/Users/kikuchimizuki/Desktop/aicollections/lp/lp/services/line_service.py", line 662, in handle_content_confirmation
+    elif subscription_status['cancel_at_period_end']:
+         ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+KeyError: 'cancel_at_period_end'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/kikuchimizuki/Desktop/aicollections/lp/lp/services/line_service.py", line 43, in send_line_message
+    response.raise_for_status()
+  File "/opt/anaconda3/lib/python3.12/site-packages/requests/models.py", line 1021, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+
+LINEメッセージ送信エラー: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+Traceback (most recent call last):
+  File "/Users/kikuchimizuki/Desktop/aicollections/lp/lp/services/line_service.py", line 662, in handle_content_confirmation
+    elif subscription_status['cancel_at_period_end']:
+         ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+KeyError: 'cancel_at_period_end'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/kikuchimizuki/Desktop/aicollections/lp/lp/services/line_service.py", line 43, in send_line_message
+    response.raise_for_status()
+  File "/opt/anaconda3/lib/python3.12/site-packages/requests/models.py", line 1021, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+
+LINEメッセージ送信エラー: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+Traceback (most recent call last):
+  File "/Users/kikuchimizuki/Desktop/aicollections/lp/lp/services/line_service.py", line 662, in handle_content_confirmation
+    elif subscription_status['cancel_at_period_end']:
+         ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+KeyError: 'cancel_at_period_end'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/kikuchimizuki/Desktop/aicollections/lp/lp/services/line_service.py", line 43, in send_line_message
+    response.raise_for_status()
+  File "/opt/anaconda3/lib/python3.12/site-packages/requests/models.py", line 1021, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+
+LINEメッセージ送信エラー: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+Traceback (most recent call last):
+  File "/Users/kikuchimizuki/Desktop/aicollections/lp/lp/services/line_service.py", line 43, in send_line_message
+    response.raise_for_status()
+  File "/opt/anaconda3/lib/python3.12/site-packages/requests/models.py", line 1021, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+
+LINEメッセージ送信エラー: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+Traceback (most recent call last):
+  File "/Users/kikuchimizuki/Desktop/aicollections/lp/lp/services/line_service.py", line 385, in handle_add_content
+    elif subscription_status['cancel_at_period_end']:
+         ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+KeyError: 'cancel_at_period_end'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/kikuchimizuki/Desktop/aicollections/lp/lp/services/line_service.py", line 43, in send_line_message
+    response.raise_for_status()
+  File "/opt/anaconda3/lib/python3.12/site-packages/requests/models.py", line 1021, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+
+LINEメッセージ送信エラー: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+Traceback (most recent call last):
+  File "/Users/kikuchimizuki/Desktop/aicollections/lp/lp/services/line_service.py", line 43, in send_line_message
+    response.raise_for_status()
+  File "/opt/anaconda3/lib/python3.12/site-packages/requests/models.py", line 1021, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+
+LINEメッセージ送信エラー: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+Traceback (most recent call last):
+  File "/Users/kikuchimizuki/Desktop/aicollections/lp/lp/services/line_service.py", line 43, in send_line_message
+    response.raise_for_status()
+  File "/opt/anaconda3/lib/python3.12/site-packages/requests/models.py", line 1021, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://api.line.me/v2/bot/message/reply
+
