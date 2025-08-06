@@ -3,320 +3,227 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI予定秘書複製 - 企業登録</title>
+    <title>企業向けAIコレクションズ - 登録</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            margin: 0;
-            padding: 20px;
             min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
+        .registration-container {
             background: white;
-            border-radius: 15px;
+            border-radius: 20px;
             box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            overflow: hidden;
-        }
-        .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 30px;
-            text-align: center;
-        }
-        .header h1 {
-            margin: 0;
-            font-size: 2em;
-            font-weight: 300;
-        }
-        .header p {
-            margin: 10px 0 0 0;
-            opacity: 0.9;
-        }
-        .form-container {
             padding: 40px;
+            margin: 50px auto;
+            max-width: 600px;
         }
-        .form-group {
-            margin-bottom: 25px;
-        }
-        label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 600;
-            color: #333;
-        }
-        input[type="text"], textarea {
-            width: 100%;
-            padding: 12px 15px;
-            border: 2px solid #e1e5e9;
-            border-radius: 8px;
+        .form-control {
+            border-radius: 10px;
+            border: 2px solid #e9ecef;
+            padding: 15px;
             font-size: 16px;
-            transition: border-color 0.3s ease;
-            box-sizing: border-box;
+            transition: all 0.3s ease;
         }
-        input[type="text"]:focus, textarea:focus {
-            outline: none;
+        .form-control:focus {
             border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
         }
-        .required {
-            color: #e74c3c;
-        }
-        .optional {
-            color: #7f8c8d;
-            font-size: 0.9em;
-        }
-        .submit-btn {
+        .btn-primary {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 15px 30px;
             border: none;
-            border-radius: 8px;
+            border-radius: 10px;
+            padding: 15px 30px;
             font-size: 18px;
             font-weight: 600;
-            cursor: pointer;
-            width: 100%;
-            transition: transform 0.2s ease;
+            transition: all 0.3s ease;
         }
-        .submit-btn:hover {
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        .content-card {
+            border: 2px solid #e9ecef;
+            border-radius: 15px;
+            padding: 20px;
+            margin: 10px 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .content-card:hover {
+            border-color: #667eea;
             transform: translateY(-2px);
         }
-        .submit-btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
+        .content-card.selected {
+            border-color: #667eea;
+            background-color: #f8f9ff;
         }
-        .progress {
-            display: none;
-            margin-top: 20px;
-            padding: 20px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            border-left: 4px solid #667eea;
-        }
-        .progress h3 {
-            margin: 0 0 15px 0;
-            color: #333;
-        }
-        .step {
-            margin: 10px 0;
-            padding: 10px;
-            background: white;
-            border-radius: 5px;
-            border-left: 3px solid #ddd;
-        }
-        .step.completed {
-            border-left-color: #27ae60;
-            background: #f8fff9;
-        }
-        .step.current {
-            border-left-color: #667eea;
-            background: #f0f4ff;
-        }
-        .step.error {
-            border-left-color: #e74c3c;
-            background: #fff8f8;
-        }
-        .result {
-            display: none;
-            margin-top: 20px;
-            padding: 20px;
-            background: #f8fff9;
-            border-radius: 8px;
-            border-left: 4px solid #27ae60;
-        }
-        .result h3 {
-            margin: 0 0 15px 0;
-            color: #27ae60;
-        }
-        .result-item {
-            margin: 10px 0;
-            padding: 10px;
-            background: white;
-            border-radius: 5px;
-        }
-        .result-label {
-            font-weight: 600;
-            color: #333;
-        }
-        .result-value {
+        .price {
+            font-size: 24px;
+            font-weight: bold;
             color: #667eea;
-            word-break: break-all;
+        }
+        .features {
+            list-style: none;
+            padding: 0;
+        }
+        .features li {
+            padding: 5px 0;
+            color: #666;
+        }
+        .features li:before {
+            content: "✓";
+            color: #28a745;
+            font-weight: bold;
+            margin-right: 10px;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <h1>🤖 AI予定秘書複製</h1>
-            <p>企業情報を入力して、AI予定秘書を自動複製します</p>
-        </div>
-        
-        <div class="form-container">
-            <form id="companyForm">
-                <div class="form-group">
-                    <label for="company_name">
-                        企業名 <span class="required">*</span>
-                    </label>
-                    <input type="text" id="company_name" name="company_name" required 
-                           placeholder="例: 株式会社サンプル">
-                </div>
-                
-                <div class="form-group">
-                    <label for="line_channel_id">
-                        LINEチャネルID <span class="optional">（オプション）</span>
-                    </label>
-                    <input type="text" id="line_channel_id" name="line_channel_id" 
-                           placeholder="例: 2007858939">
-                </div>
-                
-                <div class="form-group">
-                    <label for="line_access_token">
-                        LINEチャネルアクセストークン <span class="optional">（オプション）</span>
-                    </label>
-                    <input type="text" id="line_access_token" name="line_access_token" 
-                           placeholder="例: 7DrmRKzZYZRT7uHBgKB7i8OMfaCDtSOBFWMTfW6v6pdB4ZyhqTwbGEOKxuFe+9ndg9Zvk59k8+NdLL/dUj/rhgj7jn76K4M8fk8EhmpSCEdbfssoNzvwxzAO2mV7UoWCFO7yH/KuCEC4Ngp5Qe6M1AdB04t89/1O/w1cDnyilFU=">
-                </div>
-                
-                <div class="form-group">
-                    <label for="line_channel_secret">
-                        LINEチャネルシークレット <span class="optional">（オプション）</span>
-                    </label>
-                    <input type="text" id="line_channel_secret" name="line_channel_secret" 
-                           placeholder="例: 915352d9dd5bbd718a3127e4c89ff528">
-                </div>
-                
-                <button type="submit" class="submit-btn" id="submitBtn">
-                    🚀 AI予定秘書を複製開始
-                </button>
-            </form>
-            
-            <div class="progress" id="progress">
-                <h3>🔄 複製進行状況</h3>
-                <div class="step" id="step1">📝 企業情報をデータベースに保存中...</div>
-                <div class="step" id="step2">🔄 Railwayプロジェクトを複製中...</div>
-                <div class="step" id="step3">⚙️ 環境変数を自動設定中...</div>
-                <div class="step" id="step4">🔧 GitHub Actionsワークフローを作成中...</div>
-                <div class="step" id="step5">🚀 デプロイを開始中...</div>
-                <div class="step" id="step6">⏳ デプロイ完了を待機中...</div>
-                <div class="step" id="step7">🔗 Webhook URLを更新中...</div>
-                <div class="step" id="step8">📱 LINE Developers Consoleに設定中...</div>
-                <div class="step" id="step9">🧪 動作確認中...</div>
+        <div class="registration-container">
+            <div class="text-center mb-4">
+                <h1 class="mb-3">
+                    <i class="fas fa-building text-primary"></i>
+                    企業向けAIコレクションズ
+                </h1>
+                <p class="text-muted">専用LINEアカウントでAIサービスを導入</p>
             </div>
-            
-            <div class="result" id="result">
-                <h3>🎉 複製完了！</h3>
-                <div class="result-item">
-                    <div class="result-label">企業ID:</div>
-                    <div class="result-value" id="resultCompanyId"></div>
-                </div>
-                <div class="result-item">
-                    <div class="result-label">RailwayプロジェクトURL:</div>
-                    <div class="result-value" id="resultProjectUrl"></div>
-                </div>
-                <div class="result-item">
-                    <div class="result-label">Webhook URL:</div>
-                    <div class="result-value" id="resultWebhookUrl"></div>
-                </div>
-                <div class="result-item">
-                    <div class="result-label">設定保存状況:</div>
-                    <div class="result-value" id="resultSettingsSaved"></div>
-                </div>
-                <div class="result-item">
-                    <div class="result-label">次の手順:</div>
-                    <div class="result-value">
-                        <ol>
-                            <li>Railwayダッシュボードでプロジェクトを開く</li>
-                            <li>環境変数を手動で設定</li>
-                            <li>GitHub Actionsワークフローを手動実行</li>
-                            <li>デプロイ完了を確認</li>
-                            <li>LINE Webhook URLを設定</li>
-                        </ol>
+
+            <form id="companyRegistrationForm" method="POST" action="/company-registration">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="company_name" class="form-label">
+                            <i class="fas fa-building"></i> 企業名 *
+                        </label>
+                        <input type="text" class="form-control" id="company_name" name="company_name" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="email" class="form-label">
+                            <i class="fas fa-envelope"></i> メールアドレス *
+                        </label>
+                        <input type="email" class="form-control" id="email" name="email" required>
                     </div>
                 </div>
-            </div>
+
+                <div class="mb-4">
+                    <label class="form-label">
+                        <i class="fas fa-robot"></i> 導入するAIサービス *
+                    </label>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="content-card" data-content="AI予定秘書">
+                                <div class="text-center">
+                                    <i class="fas fa-calendar-alt fa-2x text-primary mb-2"></i>
+                                    <h5>AI予定秘書</h5>
+                                    <div class="price">¥3,900/月</div>
+                                </div>
+                                <ul class="features">
+                                    <li>予定管理の自動化</li>
+                                    <li>会議調整の効率化</li>
+                                    <li>リマインダー機能</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="content-card" data-content="AI経理秘書">
+                                <div class="text-center">
+                                    <i class="fas fa-calculator fa-2x text-success mb-2"></i>
+                                    <h5>AI経理秘書</h5>
+                                    <div class="price">¥3,900/月</div>
+                                </ul>
+                                <ul class="features">
+                                    <li>経理業務の自動化</li>
+                                    <li>請求書処理の効率化</li>
+                                    <li>財務レポート作成</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="content-card" data-content="AIタスクコンシェルジュ">
+                                <div class="text-center">
+                                    <i class="fas fa-tasks fa-2x text-warning mb-2"></i>
+                                    <h5>AIタスクコンシェルジュ</h5>
+                                    <div class="price">¥3,900/月</div>
+                                </div>
+                                <ul class="features">
+                                    <li>タスク管理の最適化</li>
+                                    <li>プロジェクト進捗管理</li>
+                                    <li>チーム連携の強化</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <input type="hidden" id="selected_content" name="content_type" required>
+                </div>
+
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>導入メリット:</strong>
+                    <ul class="mb-0 mt-2">
+                        <li>企業専用のLINE公式アカウントを自動作成</li>
+                        <li>従業員全員がLINEでAIサービスを利用可能</li>
+                        <li>解約時は自動でデータ削除・LINEアカウント停止</li>
+                        <li>月額3,900円で複数サービスを追加可能</li>
+                    </ul>
+                </div>
+
+                <div class="text-center">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="fas fa-credit-card"></i>
+                        決済に進む
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        document.getElementById('companyForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
+        // コンテンツ選択機能
+        document.querySelectorAll('.content-card').forEach(card => {
+            card.addEventListener('click', function() {
+                // 他のカードの選択を解除
+                document.querySelectorAll('.content-card').forEach(c => c.classList.remove('selected'));
+                
+                // このカードを選択
+                this.classList.add('selected');
+                
+                // 隠しフィールドに選択されたコンテンツを設定
+                const contentType = this.getAttribute('data-content');
+                document.getElementById('selected_content').value = contentType;
+            });
+        });
+
+        // フォーム送信前のバリデーション
+        document.getElementById('companyRegistrationForm').addEventListener('submit', function(e) {
+            const selectedContent = document.getElementById('selected_content').value;
             
-            const submitBtn = document.getElementById('submitBtn');
-            const progress = document.getElementById('progress');
-            const result = document.getElementById('result');
+            if (!selectedContent) {
+                e.preventDefault();
+                alert('AIサービスを選択してください。');
+                return;
+            }
             
-            // フォーム送信を無効化
-            submitBtn.disabled = true;
-            submitBtn.textContent = '🔄 処理中...';
+            // フォームデータを確認
+            const companyName = document.getElementById('company_name').value;
+            const email = document.getElementById('email').value;
             
-            // 進行状況を表示
-            progress.style.display = 'block';
-            result.style.display = 'none';
+            if (!companyName || !email) {
+                e.preventDefault();
+                alert('企業名とメールアドレスを入力してください。');
+                return;
+            }
             
-            // フォームデータを取得
-            const formData = new FormData(this);
+            // 確認ダイアログ
+            const confirmMessage = `以下の内容で決済を進めますか？\n\n企業名: ${companyName}\nメールアドレス: ${email}\n選択サービス: ${selectedContent}\n\n月額料金: ¥3,900`;
             
-            try {
-                // 各ステップを順次実行
-                await updateStep(1, 'completed', '✅ 企業情報をデータベースに保存完了');
-                
-                const response = await fetch('/company/register', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    // 成功時の処理
-                    await updateStep(2, 'completed', '✅ Railwayプロジェクト複製完了');
-                    await updateStep(3, 'completed', '⚠️ 環境変数設定（手動設定が必要）');
-                    await updateStep(4, 'completed', '✅ GitHub Actionsワークフロー作成完了');
-                    await updateStep(5, 'completed', '⚠️ デプロイ開始（手動設定が必要）');
-                    await updateStep(6, 'completed', '⚠️ デプロイ完了（手動確認が必要）');
-                    await updateStep(7, 'completed', '⚠️ Webhook URL更新（手動設定が必要）');
-                    await updateStep(8, 'completed', '⚠️ LINE Webhook設定（手動設定が必要）');
-                    await updateStep(9, 'completed', '⚠️ 動作確認（手動確認が必要）');
-                    
-                    // 結果を表示
-                    document.getElementById('resultCompanyId').textContent = data.company_id;
-                    document.getElementById('resultProjectUrl').textContent = data.project_url || '未設定';
-                    document.getElementById('resultWebhookUrl').textContent = data.webhook_url || '未設定';
-                    document.getElementById('resultSettingsSaved').textContent = data.settings_saved ? '✅ 保存完了' : '❌ 保存失敗';
-                    
-                    result.style.display = 'block';
-                    submitBtn.textContent = '🎉 複製完了！';
-                    
-                } else {
-                    // エラー時の処理
-                    throw new Error(data.error || '不明なエラーが発生しました');
-                }
-                
-            } catch (error) {
-                console.error('Error:', error);
-                
-                // エラー表示
-                const currentStep = document.querySelector('.step.current');
-                if (currentStep) {
-                    currentStep.className = 'step error';
-                    currentStep.textContent = `❌ エラー: ${error.message}`;
-                }
-                
-                submitBtn.textContent = '❌ エラーが発生しました';
-                submitBtn.disabled = false;
+            if (!confirm(confirmMessage)) {
+                e.preventDefault();
             }
         });
-        
-        async function updateStep(stepNumber, status, message) {
-            const step = document.getElementById(`step${stepNumber}`);
-            step.className = `step ${status}`;
-            step.textContent = message;
-            
-            // 少し待機して進行状況を表示
-            await new Promise(resolve => setTimeout(resolve, 1000));
-        }
     </script>
 </body>
 </html> 

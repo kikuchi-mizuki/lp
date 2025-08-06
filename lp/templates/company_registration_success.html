@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>企業登録完了 - LINEアカウント設定</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <title>企業向けAIコレクションズ - 登録完了</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         body {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -13,73 +13,50 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
         .success-container {
-            background: rgba(255, 255, 255, 0.95);
+            background: white;
             border-radius: 20px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-            backdrop-filter: blur(10px);
-            margin: 2rem auto;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 40px;
+            margin: 50px auto;
             max-width: 800px;
         }
-        .success-header {
-            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-            color: white;
-            padding: 2rem;
-            border-radius: 20px 20px 0 0;
+        .success-icon {
+            font-size: 80px;
+            color: #28a745;
+            margin-bottom: 20px;
+        }
+        .line-qr {
+            border: 2px solid #e9ecef;
+            border-radius: 15px;
+            padding: 20px;
             text-align: center;
+            margin: 20px 0;
         }
-        .success-body {
-            padding: 2rem;
-        }
-        .step-indicator {
-            display: flex;
-            justify-content: center;
-            margin-bottom: 2rem;
-        }
-        .step {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: #e9ecef;
-            color: #6c757d;
+        .qr-code {
+            width: 200px;
+            height: 200px;
+            margin: 0 auto;
+            background: #f8f9fa;
+            border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-weight: bold;
-            margin: 0 0.5rem;
-            position: relative;
-        }
-        .step.completed {
-            background: #28a745;
-            color: white;
-        }
-        .step::after {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 100%;
-            width: 50px;
-            height: 2px;
-            background: #e9ecef;
-            transform: translateY(-50%);
-        }
-        .step:last-child::after {
-            display: none;
-        }
-        .step.completed::after {
-            background: #28a745;
+            font-size: 12px;
+            color: #666;
         }
         .info-card {
-            background: #f8f9fa;
-            border-left: 4px solid #28a745;
-            padding: 1rem;
-            border-radius: 10px;
-            margin-bottom: 1.5rem;
+            background: #f8f9ff;
+            border: 2px solid #e9ecef;
+            border-radius: 15px;
+            padding: 20px;
+            margin: 15px 0;
         }
         .btn-success {
             background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
             border: none;
             border-radius: 10px;
-            padding: 0.75rem 2rem;
+            padding: 15px 30px;
+            font-size: 18px;
             font-weight: 600;
             transition: all 0.3s ease;
         }
@@ -87,257 +64,118 @@
             transform: translateY(-2px);
             box-shadow: 0 10px 20px rgba(40, 167, 69, 0.3);
         }
-        .progress-bar {
-            height: 8px;
-            border-radius: 4px;
-            background: #e9ecef;
-            overflow: hidden;
-            margin: 1rem 0;
+        .step-list {
+            list-style: none;
+            padding: 0;
         }
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #28a745, #20c997);
-            width: 100%;
-            animation: progress 2s ease-in-out;
+        .step-list li {
+            padding: 10px 0;
+            border-bottom: 1px solid #e9ecef;
         }
-        @keyframes progress {
-            0% { width: 0%; }
-            100% { width: 100%; }
+        .step-list li:last-child {
+            border-bottom: none;
+        }
+        .step-list li:before {
+            content: counter(step-counter);
+            counter-increment: step-counter;
+            background: #667eea;
+            color: white;
+            border-radius: 50%;
+            width: 25px;
+            height: 25px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+            margin-right: 15px;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="success-container">
-            <!-- ヘッダー -->
-            <div class="success-header">
-                <h1><i class="fas fa-check-circle"></i> 企業登録完了</h1>
-                <p class="mb-0">LINE公式アカウントの設定が正常に完了しました</p>
+            <div class="text-center mb-4">
+                <div class="success-icon">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <h1 class="mb-3">🎉 企業登録が完了しました！</h1>
+                <p class="text-muted">AIコレクションズの導入が完了しました</p>
             </div>
 
-            <!-- ステップインジケーター -->
-            <div class="step-indicator">
-                <div class="step completed">1</div>
-                <div class="step completed">2</div>
-                <div class="step">3</div>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="info-card">
+                        <h5><i class="fas fa-building text-primary"></i> 企業情報</h5>
+                        <p><strong>企業名:</strong> {{ company_data.company_name }}</p>
+                        <p><strong>メールアドレス:</strong> {{ company_data.email }}</p>
+                        <p><strong>選択サービス:</strong> {{ company_data.content_type }}</p>
+                        <p><strong>企業ID:</strong> {{ company_id }}</p>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="info-card">
+                        <h5><i class="fas fa-credit-card text-success"></i> 決済情報</h5>
+                        <p><strong>月額料金:</strong> ¥3,900</p>
+                        <p><strong>決済状況:</strong> <span class="badge bg-success">完了</span></p>
+                        <p><strong>次回請求日:</strong> {{ next_billing_date }}</p>
+                    </div>
+                </div>
             </div>
 
-            <!-- 成功メッセージ -->
-            <div class="success-body">
-                <div class="text-center mb-4">
-                    <i class="fas fa-check-circle text-success" style="font-size: 4rem;"></i>
-                    <h2 class="mt-3">登録が完了しました！</h2>
-                    <p class="text-muted">企業情報とLINE設定が正常に保存されました。</p>
-                </div>
-
-                <!-- 進行状況 -->
-                <div class="progress-bar">
-                    <div class="progress-fill"></div>
-                </div>
-
-                <!-- 次のステップ -->
-                <div class="info-card">
-                    <h5><i class="fas fa-rocket"></i> 次のステップ</h5>
-                    <ol class="mb-0">
-                        <li><strong>LINE公式アカウントの設定</strong>
-                            <ul>
-                                <li>LINE Developers ConsoleでWebhook URLを設定</li>
-                                <li>QRコードを企業に提供</li>
-                                <li>初期メッセージを設定</li>
-                            </ul>
-                        </li>
-                        <li><strong>Railwayへの自動デプロイ</strong>
-                            <ul>
-                                <li>専用のLINEボット環境を自動構築</li>
-                                <li>環境変数の自動設定</li>
-                                <li>SSL証明書の自動取得</li>
-                            </ul>
-                        </li>
-                        <li><strong>運用開始</strong>
-                            <ul>
-                                <li>LINE公式アカウントの運用開始</li>
-                                <li>ユーザーとの対話開始</li>
-                                <li>データ分析・レポート機能</li>
-                            </ul>
-                        </li>
-                    </ol>
-                </div>
-
-                <!-- 設定情報 -->
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="card">
-                            <div class="card-header">
-                                <h6><i class="fas fa-cog"></i> 設定情報</h6>
-                            </div>
-                            <div class="card-body">
-                                <p><strong>企業名:</strong> <span id="companyName">-</span></p>
-                                <p><strong>企業コード:</strong> <span id="companyCode">-</span></p>
-                                <p><strong>LINEチャネルID:</strong> <span id="channelId">-</span></p>
-                                <p><strong>Webhook URL:</strong> <span id="webhookUrl">-</span></p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="card">
-                            <div class="card-header">
-                                <h6><i class="fas fa-link"></i> アクセス情報</h6>
-                            </div>
-                            <div class="card-body">
-                                <p><strong>管理ダッシュボード:</strong> 
-                                    <a href="/company-dashboard" target="_blank">ダッシュボードを開く</a>
-                                </p>
-                                <p><strong>LINE Developers Console:</strong> 
-                                    <a href="https://developers.line.biz/" target="_blank">コンソールを開く</a>
-                                </p>
-                                <p><strong>Railway プロジェクト:</strong> 
-                                    <a href="https://railway.app/" target="_blank">Railwayを開く</a>
-                                </p>
-                            </div>
-                        </div>
+            <div class="line-qr">
+                <h5><i class="fas fa-qrcode text-primary"></i> LINE公式アカウント</h5>
+                <p class="text-muted">以下のQRコードをスキャンしてLINE公式アカウントを追加してください</p>
+                
+                {% if line_account.qr_code_url %}
+                <img src="{{ line_account.qr_code_url }}" alt="LINE QR Code" class="qr-code">
+                {% else %}
+                <div class="qr-code">
+                    <div>
+                        <i class="fas fa-qrcode fa-3x text-muted mb-2"></i><br>
+                        QRコード生成中...
                     </div>
                 </div>
+                {% endif %}
+                
+                <p class="mt-3">
+                    <strong>LINEチャンネルID:</strong> {{ line_account.line_channel_id }}
+                </p>
+            </div>
 
-                <!-- アクションボタン -->
-                <div class="text-center mt-4">
-                    <button class="btn btn-success btn-lg me-3" onclick="deployLineBot()">
-                        <i class="fas fa-rocket"></i> LINEボットをデプロイ
-                    </button>
-                    <button class="btn btn-outline-primary btn-lg" onclick="viewDashboard()">
-                        <i class="fas fa-chart-line"></i> ダッシュボードを表示
-                    </button>
-                </div>
+            <div class="alert alert-info">
+                <h6><i class="fas fa-info-circle"></i> 次のステップ</h6>
+                <ol class="step-list" style="counter-reset: step-counter;">
+                    <li>LINE公式アカウントを従業員に共有</li>
+                    <li>従業員がLINEでAIサービスを利用開始</li>
+                    <li>必要に応じて追加サービスを導入</li>
+                    <li>解約時は自動でデータ削除・LINEアカウント停止</li>
+                </ol>
+            </div>
 
-                <!-- 注意事項 -->
-                <div class="alert alert-info mt-4">
-                    <h6><i class="fas fa-info-circle"></i> 重要なお知らせ</h6>
-                    <ul class="mb-0">
-                        <li>LINE公式アカウントの設定は24時間以内に完了してください</li>
-                        <li>Webhook URLの設定は必須です</li>
-                        <li>デプロイには数分かかる場合があります</li>
-                        <li>ご不明な点がございましたら、サポートまでお問い合わせください</li>
-                    </ul>
-                </div>
+            <div class="alert alert-warning">
+                <h6><i class="fas fa-exclamation-triangle"></i> 重要な注意事項</h6>
+                <ul class="mb-0">
+                    <li>解約時は企業データとLINEアカウントが自動で削除されます</li>
+                    <li>追加サービスは月額3,900円で導入可能です</li>
+                    <li>サポートが必要な場合は公式LINEまでお問い合わせください</li>
+                </ul>
+            </div>
+
+            <div class="text-center mt-4">
+                <a href="/" class="btn btn-success">
+                    <i class="fas fa-home"></i>
+                    ホームに戻る
+                </a>
+                <a href="/company-dashboard" class="btn btn-outline-primary ms-2">
+                    <i class="fas fa-chart-line"></i>
+                    ダッシュボード
+                </a>
             </div>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        // ページ読み込み時の処理
-        document.addEventListener('DOMContentLoaded', function() {
-            // URLパラメータから情報を取得
-            const urlParams = new URLSearchParams(window.location.search);
-            const companyId = urlParams.get('company_id') || '{{ company_id }}';
-            
-            if (companyId && companyId !== 'None') {
-                // 企業情報を取得して表示
-                loadCompanyInfo(companyId);
-            } else {
-                console.error('企業IDが見つかりません');
-                document.getElementById('companyName').textContent = '企業IDが指定されていません';
-            }
-            
-            // ステップインジケーターを更新
-            updateStepIndicator(2);
-        });
-
-        function loadCompanyInfo(companyId) {
-            console.log('企業情報取得開始:', companyId);
-            
-            // 企業情報をAPIから取得
-            fetch(`/api/v1/company-registration/${companyId}`)
-                .then(response => {
-                    console.log('APIレスポンス:', response.status, response.statusText);
-                    return response.json();
-                })
-                .then(data => {
-                    console.log('APIデータ:', data);
-                    
-                    if (data.success) {
-                        const company = data.data;
-                        console.log('企業情報:', company);
-                        
-                        // 企業情報を表示
-                        document.getElementById('companyName').textContent = company.company_name || 'N/A';
-                        document.getElementById('companyCode').textContent = company.company_code || 'N/A';
-                        document.getElementById('channelId').textContent = company.line_channel_id || 'N/A';
-                        document.getElementById('webhookUrl').textContent = company.webhook_url || 'N/A';
-                        
-                        console.log('企業情報表示完了');
-                    } else {
-                        console.error('企業情報取得失敗:', data.error);
-                        document.getElementById('companyName').textContent = '取得エラー';
-                        document.getElementById('companyCode').textContent = '取得エラー';
-                        document.getElementById('channelId').textContent = '取得エラー';
-                        document.getElementById('webhookUrl').textContent = '取得エラー';
-                    }
-                })
-                .catch(error => {
-                    console.error('企業情報取得エラー:', error);
-                    document.getElementById('companyName').textContent = '通信エラー';
-                    document.getElementById('companyCode').textContent = '通信エラー';
-                    document.getElementById('channelId').textContent = '通信エラー';
-                    document.getElementById('webhookUrl').textContent = '通信エラー';
-                });
-        }
-
-        function deployLineBot() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const companyId = urlParams.get('company_id');
-            
-            if (!companyId) {
-                alert('企業IDが見つかりません');
-                return;
-            }
-            
-            // デプロイボタンを無効化
-            const deployBtn = event.target;
-            const originalText = deployBtn.innerHTML;
-            deployBtn.disabled = true;
-            deployBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> デプロイ中...';
-            
-            // デプロイAPIを呼び出し
-            fetch(`/api/v1/company-registration/${companyId}/deploy`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert('LINEボットのデプロイを開始しました！\n数分後に完了します。');
-                    // ステップインジケーターを更新
-                    updateStepIndicator(3);
-                } else {
-                    alert(`デプロイエラー: ${data.error}`);
-                }
-            })
-            .catch(error => {
-                alert(`通信エラー: ${error.message}`);
-            })
-            .finally(() => {
-                // ボタンを復活
-                deployBtn.disabled = false;
-                deployBtn.innerHTML = originalText;
-            });
-        }
-
-        function viewDashboard() {
-            window.open('/company-dashboard', '_blank');
-        }
-
-        function updateStepIndicator(step) {
-            const steps = document.querySelectorAll('.step');
-            steps.forEach((s, index) => {
-                if (index < step) {
-                    s.classList.add('completed');
-                } else {
-                    s.classList.remove('completed');
-                }
-            });
-        }
-    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html> 

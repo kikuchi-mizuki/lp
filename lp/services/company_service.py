@@ -10,6 +10,258 @@ from datetime import datetime, timedelta
 from utils.db import get_db_connection
 from services.stripe_service import check_subscription_status
 
+def check_company_restriction(line_channel_id, content_type):
+    """
+    企業ユーザーの解約制限チェック（最小限）
+    
+    Args:
+        line_channel_id (str): LINEチャンネルID
+        content_type (str): コンテンツタイプ（'AI予定秘書', 'AI経理秘書', 'AIタスクコンシェルジュ'）
+    
+    Returns:
+        dict: 制限状況の結果
+    """
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 1. LINEチャンネルIDで企業LINEアカウントを取得
+        c.execute('''
+            SELECT company_id, content_type, status 
+            FROM company_line_accounts 
+            WHERE line_channel_id = %s AND content_type = %s
+        ''', (line_channel_id, content_type))
+        
+        line_account = c.fetchone()
+        if not line_account:
+            return {
+                'is_restricted': True, 
+                'reason': 'line_account_not_found',
+                'message': '企業LINEアカウントが見つかりません'
+            }
+        
+        company_id, account_content_type, account_status = line_account
+        
+        # 2. LINEアカウントのステータスをチェック
+        if account_status != 'active':
+            return {
+                'is_restricted': True, 
+                'reason': 'line_account_inactive',
+                'message': 'LINEアカウントが停止されています'
+            }
+        
+        # 3. 企業のサブスクリプション状態をチェック
+        c.execute('''
+            SELECT subscription_status, current_period_end 
+            FROM company_subscriptions 
+            WHERE company_id = %s AND content_type = %s
+        ''', (company_id, content_type))
+        
+        subscription = c.fetchone()
+        if not subscription:
+            return {
+                'is_restricted': True, 
+                'reason': 'subscription_not_found',
+                'message': 'サブスクリプションが見つかりません'
+            }
+        
+        subscription_status, current_period_end = subscription
+        
+        # 4. サブスクリプション状態をチェック
+        if subscription_status not in ['active', 'trialing']:
+            return {
+                'is_restricted': True, 
+                'reason': 'subscription_inactive',
+                'message': 'サブスクリプションが停止されています'
+            }
+        
+        # 5. 利用期限をチェック
+        if current_period_end and current_period_end < datetime.now():
+            return {
+                'is_restricted': True, 
+                'reason': 'subscription_expired',
+                'message': 'サブスクリプションの利用期限が切れています'
+            }
+        
+        return {
+            'is_restricted': False, 
+            'reason': 'access_granted',
+            'message': '利用可能です'
+        }
+        
+    except Exception as e:
+        print(f"❌ 企業制限チェックエラー: {e}")
+        return {
+            'is_restricted': False,  # エラー時は制限しない（サービス継続）
+            'reason': 'error_occurred',
+            'message': 'システムエラーが発生しました'
+        }
+    finally:
+        if c:
+            c.close()
+        if conn:
+            conn.close()
+
+def get_company_by_line_channel_id(line_channel_id):
+    """
+    LINEチャンネルIDで企業情報を取得
+    """
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        c.execute('''
+            SELECT c.id, c.company_name, c.email, c.status
+            FROM companies c
+            JOIN company_line_accounts cla ON c.id = cla.company_id
+            WHERE cla.line_channel_id = %s
+        ''', (line_channel_id,))
+        
+        company = c.fetchone()
+        if company:
+            return {
+                'id': company[0],
+                'company_name': company[1],
+                'email': company[2],
+                'status': company[3]
+            }
+        return None
+        
+    except Exception as e:
+        print(f"❌ 企業情報取得エラー: {e}")
+        return None
+    finally:
+        if c:
+            c.close()
+        if conn:
+            conn.close()
+
+def get_company_line_accounts(company_id):
+    """
+    企業の全LINEアカウント情報を取得
+    """
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        c.execute('''
+            SELECT content_type, line_channel_id, line_channel_access_token, status
+            FROM company_line_accounts
+            WHERE company_id = %s
+        ''', (company_id,))
+        
+        accounts = c.fetchall()
+        return [
+            {
+                'content_type': account[0],
+                'line_channel_id': account[1],
+                'line_channel_access_token': account[2],
+                'status': account[3]
+            }
+            for account in accounts
+        ]
+        
+    except Exception as e:
+        print(f"❌ 企業LINEアカウント取得エラー: {e}")
+        return []
+    finally:
+        if c:
+            c.close()
+        if conn:
+            conn.close()
+
+def get_company_subscriptions(company_id):
+    """
+    企業の全サブスクリプション情報を取得
+    """
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        c.execute('''
+            SELECT content_type, subscription_status, current_period_end
+            FROM company_subscriptions
+            WHERE company_id = %s
+        ''', (company_id,))
+        
+        subscriptions = c.fetchall()
+        return [
+            {
+                'content_type': sub[0],
+                'subscription_status': sub[1],
+                'current_period_end': sub[2]
+            }
+            for sub in subscriptions
+        ]
+        
+    except Exception as e:
+        print(f"❌ 企業サブスクリプション取得エラー: {e}")
+        return []
+    finally:
+        if c:
+            c.close()
+        if conn:
+            conn.close()
+
+def cancel_company_content(company_id, content_type):
+    """
+    企業の特定コンテンツ解約処理（最小限）
+    """
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 1. LINEアカウントを停止
+        c.execute('''
+            UPDATE company_line_accounts 
+            SET status = 'inactive' 
+            WHERE company_id = %s AND content_type = %s
+        ''', (company_id, content_type))
+        
+        # 2. サブスクリプションを停止
+        c.execute('''
+            UPDATE company_subscriptions 
+            SET subscription_status = 'canceled' 
+            WHERE company_id = %s AND content_type = %s
+        ''', (company_id, content_type))
+        
+        # 3. 他のコンテンツが残っているかチェック
+        c.execute('''
+            SELECT COUNT(*) 
+            FROM company_subscriptions 
+            WHERE company_id = %s AND subscription_status = 'active'
+        ''', (company_id,))
+        
+        remaining_count = c.fetchone()[0]
+        
+        # 4. 全コンテンツが解約された場合、企業情報も削除
+        if remaining_count == 0:
+            c.execute('DELETE FROM companies WHERE id = %s', (company_id,))
+            company_deleted = True
+        else:
+            company_deleted = False
+        
+        conn.commit()
+        
+        return {
+            'company_id': company_id,
+            'content_type': content_type,
+            'status': 'canceled',
+            'remaining_contents': remaining_count,
+            'company_deleted': company_deleted
+        }
+        
+    except Exception as e:
+        print(f"❌ 企業コンテンツ解約エラー: {e}")
+        if conn:
+            conn.rollback()
+        return None
+    finally:
+        if c:
+            c.close()
+        if conn:
+            conn.close()
+
 class CompanyService:
     """企業管理サービス"""
     
