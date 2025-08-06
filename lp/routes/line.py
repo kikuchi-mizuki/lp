@@ -877,146 +877,146 @@ def line_webhook():
                             # 無効な入力の場合は確認を促す
                             send_line_message(event['replyToken'], [{"type": "text", "text": "「はい」または「いいえ」で回答してください。\n\n📱 または「メニュー」でメインメニューに戻ります。"}])
                     elif state and state.startswith('cancel_confirm_'):
-                            # 解約確認状態での処理
-                            if text.lower() in ['はい', 'yes', 'y']:
-                                # 解約確認状態からコンテンツ番号を取得
-                                content_number = state.split('_')[2]  # cancel_confirm_1 → 1
-                                
-                                # 解約処理を実行
-                                from services.line_service import handle_cancel_confirmation
-                                result = handle_cancel_confirmation(company_id, content_number)
-                                
-                                if result['success']:
+                        # 解約確認状態での処理
+                        if text.lower() in ['はい', 'yes', 'y']:
+                            # 解約確認状態からコンテンツ番号を取得
+                            content_number = state.split('_')[2]  # cancel_confirm_1 → 1
+                            
+                            # 解約処理を実行
+                            from services.line_service import handle_cancel_confirmation
+                            result = handle_cancel_confirmation(company_id, content_number)
+                            
+                            if result['success']:
                                     success_message = f"✅ コンテンツの解約が完了しました。\n\n�� 何かお手伝いできることはありますか？\n• 「追加」：他のコンテンツを追加\n• 「状態」：利用状況を確認\n• 「メニュー」：メインメニューに戻る\n• 「ヘルプ」：使い方を確認"
-                                    send_line_message(event['replyToken'], [{"type": "text", "text": success_message}])
-                                else:
-                                    error_message = f"❌ 解約処理に失敗しました: {result.get('error', '不明なエラー')}\n\n📱 「メニュー」と入力すると、メインメニューに戻れます。"
-                                    send_line_message(event['replyToken'], [{"type": "text", "text": error_message}])
-                                    
-                                    set_user_state(user_id, 'welcome_sent')
-                            elif text.lower() in ['いいえ', 'no', 'n']:
-                                # キャンセル処理
-                                send_line_message(event['replyToken'], [{"type": "text", "text": "解約をキャンセルしました。\n\n📱 何かお手伝いできることはありますか？\n• 「追加」：他のコンテンツを追加\n• 「状態」：利用状況を確認\n• 「メニュー」：メインメニューに戻る\n• 「ヘルプ」：使い方を確認"}])
-                                set_user_state(user_id, 'welcome_sent')
-                            elif text == 'メニュー':
-                                set_user_state(user_id, 'welcome_sent')
-                                send_line_message(event['replyToken'], [get_menu_message()])
+                                send_line_message(event['replyToken'], [{"type": "text", "text": success_message}])
                             else:
-                                # 無効な入力の場合は確認を促す
-                                send_line_message(event['replyToken'], [{"type": "text", "text": "「はい」または「いいえ」で回答してください。\n\n📱 または「メニュー」でメインメニューに戻ります。"}])
-                        elif '@' in text and '.' in text and len(text) < 100:
-                            print(f'[DEBUG] メールアドレス連携処理開始: user_id={user_id}, text={text}')
-                            def normalize_email(email):
-                                email = email.strip().lower()
-                                email = unicodedata.normalize('NFKC', email)
-                                return email
-                            normalized_email = normalize_email(text)
-                            print(f'[DEBUG] 正規化後のメールアドレス: {normalized_email}')
-                            
-                            # 1. usersテーブルでメールアドレスを検索
-                            c.execute('SELECT id, line_user_id FROM users WHERE email = %s', (normalized_email,))
-                            user = c.fetchone()
-                            print(f'[DEBUG] usersテーブル検索結果: {user}')
-                            
-                            if user:
-                                db_user_id, existing_line_user_id = user
-                                print(f'[DEBUG] ユーザー発見: db_user_id={db_user_id}, existing_line_user_id={existing_line_user_id}')
+                                error_message = f"❌ 解約処理に失敗しました: {result.get('error', '不明なエラー')}\n\n📱 「メニュー」と入力すると、メインメニューに戻れます。"
+                                send_line_message(event['replyToken'], [{"type": "text", "text": error_message}])
                                 
-                                # LINEユーザーIDが既に設定されている場合
-                                if existing_line_user_id:
-                                    # 既存のLINEユーザーIDと現在のLINEユーザーIDが異なる場合（LINEユーザーIDが変わった場合）
-                                    if existing_line_user_id != user_id:
-                                        print(f'[DEBUG] LINEユーザーID変更検出: 既存={existing_line_user_id}, 現在={user_id}')
-                                        
-                                        # 既存のLINEユーザーIDをクリア
-                                        c.execute('UPDATE users SET line_user_id = NULL WHERE line_user_id = %s', (existing_line_user_id,))
-                                        
-                                        # 新しいLINEユーザーIDで紐付け
-                                        c.execute('UPDATE users SET line_user_id = %s WHERE id = %s', (user_id, db_user_id))
-                                        conn.commit()
-                                        print(f'[DEBUG] LINEユーザーID変更による再紐付け完了: user_id={user_id}, db_user_id={db_user_id}')
-                                        
-                                        # 企業データとの紐付け処理
-                                        print(f'[DEBUG] 企業データ紐付け処理開始: user_id={user_id}, email={normalized_email}')
-                                        
-                                        # メールアドレスで企業データを検索
-                                        c.execute('SELECT id, company_name, stripe_subscription_id FROM companies WHERE email = %s', (normalized_email,))
-                                        company = c.fetchone()
-                                        print(f'[DEBUG] companiesテーブル検索結果: {company}')
-                                        
-                                        if company:
-                                            company_id, company_name, stripe_subscription_id = company
-                                            print(f'[DEBUG] 企業データ発見: company_id={company_id}, company_name={company_name}')
-                                            
-                                            # 企業データにLINEユーザーIDを紐付け
-                                            c.execute('UPDATE companies SET line_user_id = %s WHERE id = %s', (user_id, company_id))
-                                            conn.commit()
-                                            print(f'[DEBUG] 企業データ紐付け完了: user_id={user_id}, company_id={company_id}')
-                                            
-                                            # 決済状況をチェック
-                                            print(f'[DEBUG] 企業紐付け後の決済チェック開始: user_id={user_id}')
-                                            payment_check = is_paid_user_company_centric(user_id)
-                                            print(f'[DEBUG] 企業紐付け後の決済チェック結果: user_id={user_id}, is_paid={payment_check["is_paid"]}, status={payment_check["subscription_status"]}')
-                                            
-                                            if payment_check['is_paid']:
-                                                print(f'[DEBUG] 決済済み確認: user_id={user_id}')
-                                                # 案内メッセージを送信
-                                                try:
-                                                    from services.line_service import send_welcome_with_buttons
-                                                    send_welcome_with_buttons(event['replyToken'])
-                                                    print(f'[DEBUG] メールアドレス連携時の案内文送信完了: user_id={user_id}')
-                                                    # ユーザー状態を設定
-                                                    set_user_state(user_id, 'welcome_sent')
-                                                except Exception as e:
-                                                    print(f'[DEBUG] メールアドレス連携時の案内文送信エラー: {e}')
-                                                    traceback.print_exc()
-                                                    send_line_message(event['replyToken'], [{"type": "text", "text": "ようこそ！AIコレクションズへ\n\n「追加」と入力してコンテンツを追加してください。"}])
-                                                    set_user_state(user_id, 'welcome_sent')
-                                            else:
-                                                print(f'[DEBUG] 未決済確認: user_id={user_id}, status={payment_check["subscription_status"]}')
-                                                # 制限メッセージを送信
-                                                restricted_message = get_restricted_message()
-                                                send_line_message(event['replyToken'], [restricted_message])
-                                        else:
-                                            print(f'[DEBUG] 企業データが見つかりません: email={normalized_email}')
-                                            send_line_message(event['replyToken'], [{"type": "text", "text": "企業データが見つかりません。決済が完了しているかご確認ください。"}])
-                                    else:
-                                        # 同じLINEユーザーIDの場合は既存の処理
-                                        send_line_message(event['replyToken'], [{"type": "text", "text": 'このメールアドレスは既にLINE連携済みです。'}])
-                                else:
-                                    # LINEユーザーIDが未設定の場合（初回連携）
-                                    print(f'[DEBUG] 初回連携処理開始: user_id={user_id}, db_user_id={db_user_id}')
-                                    c.execute('UPDATE users SET line_user_id = %s WHERE id = %s', (user_id, db_user_id))
+                                set_user_state(user_id, 'welcome_sent')
+                        elif text.lower() in ['いいえ', 'no', 'n']:
+                            # キャンセル処理
+                            send_line_message(event['replyToken'], [{"type": "text", "text": "解約をキャンセルしました。\n\n📱 何かお手伝いできることはありますか？\n• 「追加」：他のコンテンツを追加\n• 「状態」：利用状況を確認\n• 「メニュー」：メインメニューに戻る\n• 「ヘルプ」：使い方を確認"}])
+                            set_user_state(user_id, 'welcome_sent')
+                        elif text == 'メニュー':
+                            set_user_state(user_id, 'welcome_sent')
+                            send_line_message(event['replyToken'], [get_menu_message()])
+                        else:
+                            # 無効な入力の場合は確認を促す
+                            send_line_message(event['replyToken'], [{"type": "text", "text": "「はい」または「いいえ」で回答してください。\n\n📱 または「メニュー」でメインメニューに戻ります。"}])
+                elif '@' in text and '.' in text and len(text) < 100:
+                    print(f'[DEBUG] メールアドレス連携処理開始: user_id={user_id}, text={text}')
+                    def normalize_email(email):
+                        email = email.strip().lower()
+                        email = unicodedata.normalize('NFKC', email)
+                        return email
+                    normalized_email = normalize_email(text)
+                    print(f'[DEBUG] 正規化後のメールアドレス: {normalized_email}')
+                    
+                    # 1. usersテーブルでメールアドレスを検索
+                    c.execute('SELECT id, line_user_id FROM users WHERE email = %s', (normalized_email,))
+                    user = c.fetchone()
+                    print(f'[DEBUG] usersテーブル検索結果: {user}')
+                    
+                    if user:
+                        db_user_id, existing_line_user_id = user
+                        print(f'[DEBUG] ユーザー発見: db_user_id={db_user_id}, existing_line_user_id={existing_line_user_id}')
+                        
+                        # LINEユーザーIDが既に設定されている場合
+                        if existing_line_user_id:
+                            # 既存のLINEユーザーIDと現在のLINEユーザーIDが異なる場合（LINEユーザーIDが変わった場合）
+                            if existing_line_user_id != user_id:
+                                print(f'[DEBUG] LINEユーザーID変更検出: 既存={existing_line_user_id}, 現在={user_id}')
+                                
+                                # 既存のLINEユーザーIDをクリア
+                                c.execute('UPDATE users SET line_user_id = NULL WHERE line_user_id = %s', (existing_line_user_id,))
+                                
+                                # 新しいLINEユーザーIDで紐付け
+                                c.execute('UPDATE users SET line_user_id = %s WHERE id = %s', (user_id, db_user_id))
+                                conn.commit()
+                                print(f'[DEBUG] LINEユーザーID変更による再紐付け完了: user_id={user_id}, db_user_id={db_user_id}')
+                                
+                                # 企業データとの紐付け処理
+                                print(f'[DEBUG] 企業データ紐付け処理開始: user_id={user_id}, email={normalized_email}')
+                                
+                                # メールアドレスで企業データを検索
+                                c.execute('SELECT id, company_name, stripe_subscription_id FROM companies WHERE email = %s', (normalized_email,))
+                                company = c.fetchone()
+                                print(f'[DEBUG] companiesテーブル検索結果: {company}')
+                                
+                                if company:
+                                    company_id, company_name, stripe_subscription_id = company
+                                    print(f'[DEBUG] 企業データ発見: company_id={company_id}, company_name={company_name}')
+                                    
+                                    # 企業データにLINEユーザーIDを紐付け
+                                    c.execute('UPDATE companies SET line_user_id = %s WHERE id = %s', (user_id, company_id))
                                     conn.commit()
-                                    print(f'[DEBUG] メールアドレス連携完了: user_id={user_id}, db_user_id={db_user_id}')
+                                    print(f'[DEBUG] 企業データ紐付け完了: user_id={user_id}, company_id={company_id}')
                                     
-                                    # 企業データとの紐付け処理
-                                    print(f'[DEBUG] 企業データ紐付け処理開始: user_id={user_id}, email={normalized_email}')
+                                    # 決済状況をチェック
+                                    print(f'[DEBUG] 企業紐付け後の決済チェック開始: user_id={user_id}')
+                                    payment_check = is_paid_user_company_centric(user_id)
+                                    print(f'[DEBUG] 企業紐付け後の決済チェック結果: user_id={user_id}, is_paid={payment_check["is_paid"]}, status={payment_check["subscription_status"]}')
                                     
-                                    # メールアドレスで企業データを検索
-                                    c.execute('SELECT id, company_name, stripe_subscription_id FROM companies WHERE email = %s', (normalized_email,))
-                                    company = c.fetchone()
-                                    print(f'[DEBUG] companiesテーブル検索結果: {company}')
-                                    
-                                    if company:
-                                        company_id, company_name, stripe_subscription_id = company
-                                        print(f'[DEBUG] 企業データ発見: company_id={company_id}, company_name={company_name}')
-                                        
-                                        # 企業データにLINEユーザーIDを紐付け
-                                        c.execute('UPDATE companies SET line_user_id = %s WHERE id = %s', (user_id, company_id))
-                                        conn.commit()
-                                        print(f'[DEBUG] 企業データ紐付け完了: user_id={user_id}, company_id={company_id}')
-                                        
-                                        # 決済状況をチェック
-                                        print(f'[DEBUG] 企業紐付け後の決済チェック開始: user_id={user_id}')
-                                        payment_check = is_paid_user_company_centric(user_id)
-                                        print(f'[DEBUG] 企業紐付け後の決済チェック結果: user_id={user_id}, is_paid={payment_check["is_paid"]}, status={payment_check["subscription_status"]}')
-                                        
-                                        if payment_check['is_paid']:
-                                            print(f'[DEBUG] 決済済み確認: user_id={user_id}')
-                                            # 案内メッセージを送信
-                                            try:
-                                                from services.line_service import send_welcome_with_buttons
+                                    if payment_check['is_paid']:
+                                        print(f'[DEBUG] 決済済み確認: user_id={user_id}')
+                                        # 案内メッセージを送信
+                                        try:
+                                            from services.line_service import send_welcome_with_buttons
+                                            send_welcome_with_buttons(event['replyToken'])
+                                            print(f'[DEBUG] メールアドレス連携時の案内文送信完了: user_id={user_id}')
+                                            # ユーザー状態を設定
+                                            set_user_state(user_id, 'welcome_sent')
+                                        except Exception as e:
+                                            print(f'[DEBUG] メールアドレス連携時の案内文送信エラー: {e}')
+                                            traceback.print_exc()
+                                            send_line_message(event['replyToken'], [{"type": "text", "text": "ようこそ！AIコレクションズへ\n\n「追加」と入力してコンテンツを追加してください。"}])
+                                            set_user_state(user_id, 'welcome_sent')
+                                    else:
+                                        print(f'[DEBUG] 未決済確認: user_id={user_id}, status={payment_check["subscription_status"]}')
+                                        # 制限メッセージを送信
+                                        restricted_message = get_restricted_message()
+                                        send_line_message(event['replyToken'], [restricted_message])
+                                else:
+                                    print(f'[DEBUG] 企業データが見つかりません: email={normalized_email}')
+                                    send_line_message(event['replyToken'], [{"type": "text", "text": "企業データが見つかりません。決済が完了しているかご確認ください。"}])
+                            else:
+                                # 同じLINEユーザーIDの場合は既存の処理
+                                send_line_message(event['replyToken'], [{"type": "text", "text": 'このメールアドレスは既にLINE連携済みです。'}])
+                        else:
+                            # LINEユーザーIDが未設定の場合（初回連携）
+                            print(f'[DEBUG] 初回連携処理開始: user_id={user_id}, db_user_id={db_user_id}')
+                            c.execute('UPDATE users SET line_user_id = %s WHERE id = %s', (user_id, db_user_id))
+                            conn.commit()
+                            print(f'[DEBUG] メールアドレス連携完了: user_id={user_id}, db_user_id={db_user_id}')
+                            
+                            # 企業データとの紐付け処理
+                            print(f'[DEBUG] 企業データ紐付け処理開始: user_id={user_id}, email={normalized_email}')
+                            
+                            # メールアドレスで企業データを検索
+                            c.execute('SELECT id, company_name, stripe_subscription_id FROM companies WHERE email = %s', (normalized_email,))
+                            company = c.fetchone()
+                            print(f'[DEBUG] companiesテーブル検索結果: {company}')
+                            
+                            if company:
+                                company_id, company_name, stripe_subscription_id = company
+                                print(f'[DEBUG] 企業データ発見: company_id={company_id}, company_name={company_name}')
+                                
+                                # 企業データにLINEユーザーIDを紐付け
+                                c.execute('UPDATE companies SET line_user_id = %s WHERE id = %s', (user_id, company_id))
+                                conn.commit()
+                                print(f'[DEBUG] 企業データ紐付け完了: user_id={user_id}, company_id={company_id}')
+                                
+                                # 決済状況をチェック
+                                print(f'[DEBUG] 企業紐付け後の決済チェック開始: user_id={user_id}')
+                                payment_check = is_paid_user_company_centric(user_id)
+                                print(f'[DEBUG] 企業紐付け後の決済チェック結果: user_id={user_id}, is_paid={payment_check["is_paid"]}, status={payment_check["subscription_status"]}')
+                                
+                                if payment_check['is_paid']:
+                                    print(f'[DEBUG] 決済済み確認: user_id={user_id}')
+                                    # 案内メッセージを送信
+                                    try:
+                                        from services.line_service import send_welcome_with_buttons
                                                 send_welcome_with_buttons(event['replyToken'])
                                                 print(f'[DEBUG] メールアドレス連携時の案内文送信完了: user_id={user_id}')
                                                 # ユーザー状態を設定
@@ -1099,32 +1099,32 @@ def line_webhook():
                                         print(f'[DEBUG] 特定状態でのデフォルト処理: state={state}')
                                         send_line_message(event['replyToken'], [{"type": "text", "text": "無効な入力です。メニューから選択してください。"}])
                                                                  conn.close()
-             # リッチメニューのpostbackイベントの処理
-             elif event.get('type') == 'postback':
-                 user_id = event['source']['userId']
-                 postback_data = event['postback']['data']
-                 conn = get_db_connection()
-                 c = conn.cursor()
-                 c.execute('SELECT id, stripe_subscription_id, line_user_id FROM users WHERE line_user_id = %s', (user_id,))
-                 user = c.fetchone()
-                 if not user:
-                     send_line_message(event['replyToken'], [{"type": "text", "text": get_not_registered_message()}])
-                     conn.close()
-                     continue
-                 user_id_db = user[0]
-                 stripe_subscription_id = user[1]
-                 # postbackデータに基づいて処理
-                 if postback_data == 'action=add_content':
-                     set_user_state(user_id, 'add_select')
-                     handle_add_content(event['replyToken'], user_id_db, stripe_subscription_id)
-                 elif postback_data == 'action=check_status':
-                     handle_status_check(event['replyToken'], user_id_db)
-                 elif postback_data == 'action=cancel_content':
-                     handle_cancel_menu(event['replyToken'], user_id_db, stripe_subscription_id)
-                 elif postback_data == 'action=help':
-                     send_line_message(event['replyToken'], get_help_message())
-                 elif postback_data == 'action=share':
-                     share_message = """📢 友達に紹介
+                                 # リッチメニューのpostbackイベントの処理
+                                 elif event.get('type') == 'postback':
+                                     user_id = event['source']['userId']
+                                     postback_data = event['postback']['data']
+                                     conn = get_db_connection()
+                                     c = conn.cursor()
+                                     c.execute('SELECT id, stripe_subscription_id, line_user_id FROM users WHERE line_user_id = %s', (user_id,))
+                                     user = c.fetchone()
+                                     if not user:
+                                         send_line_message(event['replyToken'], [{"type": "text", "text": get_not_registered_message()}])
+                                         conn.close()
+                                         continue
+                                     user_id_db = user[0]
+                                     stripe_subscription_id = user[1]
+                                     # postbackデータに基づいて処理
+                                     if postback_data == 'action=add_content':
+                                         set_user_state(user_id, 'add_select')
+                                         handle_add_content(event['replyToken'], user_id_db, stripe_subscription_id)
+                                     elif postback_data == 'action=check_status':
+                                         handle_status_check(event['replyToken'], user_id_db)
+                                     elif postback_data == 'action=cancel_content':
+                                         handle_cancel_menu(event['replyToken'], user_id_db, stripe_subscription_id)
+                                     elif postback_data == 'action=help':
+                                         send_line_message(event['replyToken'], get_help_message())
+                                     elif postback_data == 'action=share':
+                                         share_message = """📢 友達に紹介
 
 AIコレクションズをご利用いただき、ありがとうございます！
 
@@ -1137,8 +1137,8 @@ AIコレクションズをご利用いただき、ありがとうございます
 https://lp-production-9e2c.up.railway.app
 
 友達が登録すると、あなたにも特典があります！"""
-                     send_line_message(event['replyToken'], [{"type": "text", "text": share_message}])
-                 conn.close()
+                                         send_line_message(event['replyToken'], [{"type": "text", "text": share_message}])
+                                     conn.close()
      except Exception as e:
          traceback.print_exc()
      return jsonify({'status': 'ok'}) 
