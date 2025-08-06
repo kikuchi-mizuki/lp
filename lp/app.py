@@ -269,6 +269,16 @@ app.register_blueprint(ai_schedule_webhook_bp)
 app.register_blueprint(ai_schedule_webhook_simple_bp)
 app.register_blueprint(debug_bp)
 
+# アプリケーション起動時のデータベース初期化
+print("🚀 アプリケーション起動中...")
+try:
+    init_db()
+    print("✅ データベース初期化完了")
+except Exception as e:
+    print(f"❌ データベース初期化エラー: {e}")
+    import traceback
+    traceback.print_exc()
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -1913,8 +1923,10 @@ def debug_company_restriction(line_channel_id, content_type):
 
 if __name__ == '__main__':
     try:
-        # データベース初期化をスキップしてアプリケーションを起動
+        # データベース初期化を実行
         print("🚀 アプリケーション起動中...")
+        init_db()
+        print("✅ データベース初期化完了")
         
         # デフォルトポートを5001に設定（5000は使用中）
         port = int(os.environ.get('PORT', 5001))

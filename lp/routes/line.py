@@ -897,6 +897,7 @@ def line_webhook():
                         print(f'[DEBUG] handle_add_content_company呼び出し完了')
                     elif text == 'メニュー' and state != 'cancel_select':
                         print(f'[DEBUG] メニューコマンド受信: user_id={user_id}, state={state}')
+                        from utils.message_templates import get_menu_message
                         send_line_message(event['replyToken'], [get_menu_message()])
                     elif text == 'ヘルプ' and state != 'cancel_select':
                         print(f'[DEBUG] ヘルプコマンド受信: user_id={user_id}, state={state}')
