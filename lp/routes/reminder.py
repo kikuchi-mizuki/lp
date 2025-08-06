@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from lp.services.reminder_service import reminder_service
+from services.reminder_service import reminder_service
 import json
 
 reminder_bp = Blueprint('reminder', __name__, url_prefix='/api/v1/reminder')

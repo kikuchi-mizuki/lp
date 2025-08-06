@@ -3,8 +3,8 @@ import json
 import psutil
 import logging
 from datetime import datetime, timedelta
-from lp.utils.db import get_db_connection
-from lp.services.dashboard_service import dashboard_service
+from utils.db import get_db_connection
+from services.dashboard_service import dashboard_service
 
 class MonitoringService:
     """システム監視サービス"""

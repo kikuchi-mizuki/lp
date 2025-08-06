@@ -9,8 +9,8 @@ import time
 import requests
 import json
 import subprocess
-from lp.utils.db import get_db_connection
-from lp.services.company_registration_service import CompanyRegistrationService
+from utils.db import get_db_connection
+from services.company_registration_service import CompanyRegistrationService
 
 class AutomatedAIScheduleClone:
     def __init__(self):

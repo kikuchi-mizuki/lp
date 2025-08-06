@@ -5,8 +5,8 @@
 """
 
 from flask import Blueprint, request, jsonify
-from lp.services.content_management_service import content_management_service
-from lp.services.company_service import CompanyService
+from services.content_management_service import content_management_service
+from services.company_service import CompanyService
 import json
 
 content_management_bp = Blueprint('content_management', __name__, url_prefix='/api/v1/content')

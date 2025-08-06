@@ -12,8 +12,8 @@ import time
 import hashlib
 import subprocess
 from datetime import datetime
-from lp.utils.db import get_db_connection
-from lp.services.company_line_account_service import company_line_service
+from utils.db import get_db_connection
+from services.company_line_account_service import company_line_service
 
 class CompanyRegistrationService:
     """企業情報登録サービス"""

@@ -2,8 +2,8 @@
 import stripe
 import os
 from dotenv import load_dotenv
-from lp.utils.db import get_db_connection
-from lp.services.stripe_service import check_subscription_status
+from utils.db import get_db_connection
+from services.stripe_service import check_subscription_status
 
 load_dotenv()
 stripe.api_key = os.getenv('STRIPE_SECRET_KEY')

@@ -3,9 +3,9 @@ import json
 import zipfile
 import shutil
 from datetime import datetime, timedelta
-from lp.utils.db import get_db_connection
-from lp.services.company_service import CompanyService
-from lp.services.cancellation_service import cancellation_service
+from utils.db import get_db_connection
+from services.company_service import CompanyService
+from services.cancellation_service import cancellation_service
 
 class BackupService:
     """データバックアップサービス"""

@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from lp.services.security_service import security_service, require_auth, require_admin
+from services.security_service import security_service, require_auth, require_admin
 import json
 from datetime import datetime
 

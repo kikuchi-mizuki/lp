@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from lp.services.scheduler_service import scheduler_service
+from services.scheduler_service import scheduler_service
 import json
 
 scheduler_bp = Blueprint('scheduler', __name__, url_prefix='/api/v1/scheduler')

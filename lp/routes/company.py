@@ -3,8 +3,8 @@
 """
 
 from flask import Blueprint, request, jsonify
-from lp.services.company_service import CompanyService
-from lp.services.company_line_service import CompanyLineService
+from services.company_service import CompanyService
+from services.company_line_service import CompanyLineService
 import json
 
 company_bp = Blueprint('company', __name__, url_prefix='/api/v1/companies')

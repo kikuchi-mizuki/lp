@@ -5,8 +5,8 @@ Stripe決済用ルート
 """
 
 from flask import Blueprint, request, jsonify
-from lp.services.stripe_payment_service import stripe_payment_service
-from lp.services.company_service import CompanyService
+from services.stripe_payment_service import stripe_payment_service
+from services.company_service import CompanyService
 import json
 
 stripe_payment_bp = Blueprint('stripe_payment', __name__, url_prefix='/api/v1/stripe')
@@ -184,7 +184,7 @@ def test_payment(company_id):
             message = f'テスト: 支払いに失敗しました。'
             notification_type = 'payment_failure'
         
-        from lp.services.line_api_service import line_api_service
+        from services.line_api_service import line_api_service
         result = line_api_service.send_notification_to_company(
             company_id, notification_type, message
         )

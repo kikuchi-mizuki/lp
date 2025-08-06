@@ -9,8 +9,8 @@ import stripe
 import json
 import time
 from datetime import datetime, timedelta
-from lp.utils.db import get_db_connection
-from lp.services.line_api_service import line_api_service
+from utils.db import get_db_connection
+from services.line_api_service import line_api_service
 
 class StripePaymentService:
     """Stripe決済連携サービス"""

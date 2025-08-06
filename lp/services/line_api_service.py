@@ -11,7 +11,7 @@ import time
 import random
 import string
 from datetime import datetime
-from lp.utils.db import get_db_connection
+from utils.db import get_db_connection
 
 class LineAPIService:
     """LINE API連携サービス"""

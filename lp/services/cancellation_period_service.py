@@ -1,7 +1,7 @@
 import os
 import stripe
 from datetime import datetime
-from lp.utils.db import get_db_connection, get_db_type
+from utils.db import get_db_connection, get_db_type
 
 class CancellationPeriodService:
     """cancellation_historyテーブルを使用した契約期間管理サービス"""

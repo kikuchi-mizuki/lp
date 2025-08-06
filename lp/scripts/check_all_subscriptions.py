@@ -2,7 +2,7 @@ import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import stripe
-from lp.services.stripe_service import ensure_metered_price_in_subscription
+from services.stripe_service import ensure_metered_price_in_subscription
 from dotenv import load_dotenv
 
 load_dotenv()

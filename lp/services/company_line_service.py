@@ -6,7 +6,7 @@ import os
 import requests
 import json
 from datetime import datetime
-from lp.utils.db import get_db_connection
+from utils.db import get_db_connection
 
 class CompanyLineService:
     """企業用LINEアカウント管理サービス"""

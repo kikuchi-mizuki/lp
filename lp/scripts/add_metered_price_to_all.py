@@ -9,7 +9,7 @@ except ImportError:
     # 続行はする
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import stripe
-from lp.services.stripe_service import add_metered_price_to_subscription
+from services.stripe_service import add_metered_price_to_subscription
 
 stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
 

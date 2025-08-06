@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for
-from lp.services.security_service import require_auth, require_admin
-from lp.services.dashboard_service import dashboard_service
+from services.security_service import require_auth, require_admin
+from services.dashboard_service import dashboard_service
 import json
 
 dashboard_ui_bp = Blueprint('dashboard_ui', __name__)

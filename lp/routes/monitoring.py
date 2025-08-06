@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from lp.services.monitoring_service import monitoring_service
+from services.monitoring_service import monitoring_service
 import json
 import os
 from datetime import datetime, timedelta
@@ -128,7 +128,7 @@ def resolve_alert(alert_id):
 def get_database_health():
     """データベース健全性を取得"""
     try:
-        from lp.services.monitoring_service import monitoring_service
+        from services.monitoring_service import monitoring_service
         
         # データベース健全性チェックを直接実行
         db_health = monitoring_service.check_database_health()
@@ -148,7 +148,7 @@ def get_database_health():
 def get_system_resources():
     """システムリソースを取得"""
     try:
-        from lp.services.monitoring_service import monitoring_service
+        from services.monitoring_service import monitoring_service
         
         # システムリソースチェックを直接実行
         resource_health = monitoring_service.check_system_resources()
@@ -168,7 +168,7 @@ def get_system_resources():
 def get_services_status():
     """サービス状況を取得"""
     try:
-        from lp.services.monitoring_service import monitoring_service
+        from services.monitoring_service import monitoring_service
         
         # アプリケーションサービスチェックを直接実行
         app_health = monitoring_service.check_application_services()

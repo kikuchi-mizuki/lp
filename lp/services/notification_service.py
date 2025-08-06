@@ -1,10 +1,10 @@
 import os
 import json
 from datetime import datetime, timedelta
-from lp.utils.db import get_db_connection
-from lp.services.line_api_service import line_api_service
-from lp.services.stripe_payment_service import stripe_payment_service
-from lp.services.company_service import CompanyService
+from utils.db import get_db_connection
+from services.line_api_service import line_api_service
+from services.stripe_payment_service import stripe_payment_service
+from services.company_service import CompanyService
 
 class NotificationService:
     """通知・アラート機能サービス"""

@@ -8,7 +8,7 @@ import jwt
 from datetime import datetime, timedelta
 from functools import wraps
 from flask import request, jsonify, current_app
-from lp.utils.db import get_db_connection
+from utils.db import get_db_connection
 
 class SecurityService:
     """セキュリティサービス"""

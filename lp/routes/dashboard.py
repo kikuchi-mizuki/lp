@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from lp.services.dashboard_service import dashboard_service
+from services.dashboard_service import dashboard_service
 import json
 import os
 from datetime import datetime
@@ -213,7 +213,7 @@ def get_realtime_stats():
         
         # 今日の通知数を取得
         try:
-            from lp.utils.db import get_db_connection
+            from utils.db import get_db_connection
             conn = get_db_connection()
             c = conn.cursor()
             
