@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 import stripe
 import os
 import traceback
+from datetime import datetime, timedelta
 from utils.db import get_db_connection
 
 stripe_bp = Blueprint('stripe', __name__)
@@ -279,11 +280,11 @@ def stripe_webhook():
                 company_id = c.fetchone()[0]
                 print(f'[DEBUG] 企業データ作成: company_id={company_id}, company_name={company_name}')
                 
-                # company_paymentsテーブルにも決済データを作成
+                # company_subscriptionsテーブルにサブスクリプション情報を保存
                 c.execute('''
-                    INSERT INTO company_payments (company_id, stripe_customer_id, stripe_subscription_id, subscription_status, created_at)
-                    VALUES (%s, %s, %s, 'active', CURRENT_TIMESTAMP)
-                ''', (company_id, customer_id, subscription_id))
+                    INSERT INTO company_subscriptions (company_id, content_type, subscription_status, stripe_subscription_id, current_period_end, base_price, additional_price, total_price)
+                    VALUES (%s, %s, 'active', %s, %s, 3900, 0, 3900)
+                ''', (company_id, 'ai_schedule', subscription_id, datetime.now() + timedelta(days=30)))
                 
                 conn.commit()
                 print(f'新規ユーザー登録完了: email={email}, customer_id={customer_id}, subscription_id={subscription_id}')
@@ -316,40 +317,32 @@ def stripe_webhook():
             conn = get_db_connection()
             c = conn.cursor()
             
-            # メールアドレスで既存ユーザーを検索
-            c.execute('SELECT id, line_user_id FROM users WHERE email = %s', (email,))
-            existing_user_by_email = c.fetchone()
+            # メールアドレスで既存企業を検索（企業ユーザー専用）
+            c.execute('SELECT id, line_user_id FROM companies WHERE email = %s', (email,))
+            existing_company_by_email = c.fetchone()
             
-            if existing_user_by_email:
-                user_id, line_user_id = existing_user_by_email
-                # 既存ユーザーの決済情報を更新
-                c.execute('UPDATE users SET stripe_customer_id = %s, stripe_subscription_id = %s WHERE id = %s', (customer_id, subscription_id, user_id))
+            if existing_company_by_email:
+                company_id, line_user_id = existing_company_by_email
+                # 既存企業の決済情報を更新
+                c.execute('UPDATE companies SET stripe_subscription_id = %s WHERE id = %s', (subscription_id, company_id))
                 
-                # companiesテーブルに企業データが存在するかチェック
-                c.execute('SELECT id FROM companies WHERE stripe_subscription_id = %s', (subscription_id,))
-                existing_company = c.fetchone()
+                # 企業データは既に存在するため、サブスクリプション情報を更新
+                print(f'[DEBUG] 既存企業データのサブスクリプション更新: company_id={company_id}')
                 
-                if not existing_company:
-                    # 企業データが存在しない場合は作成（line_user_idはNULLのまま）
-                    company_name = f"企業_{email.split('@')[0]}"
-                    c.execute('''
-                        INSERT INTO companies (company_name, company_code, email, stripe_subscription_id, status, created_at)
-                        VALUES (%s, %s, %s, %s, 'active', CURRENT_TIMESTAMP)
-                        RETURNING id
-                    ''', (company_name, f"company_{user_id}", email, subscription_id))
-                    company_id = c.fetchone()[0]
-                    print(f'[DEBUG] 企業データ作成: company_id={company_id}, company_name={company_name}')
-                    
-                    # company_paymentsテーブルにも決済データを作成
-                    c.execute('''
-                        INSERT INTO company_payments (company_id, stripe_customer_id, stripe_subscription_id, subscription_status, created_at)
-                        VALUES (%s, %s, %s, 'active', CURRENT_TIMESTAMP)
-                    ''', (company_id, customer_id, subscription_id))
-                    
-                    print(f'企業データ作成完了: company_id={company_id}, company_name={company_name}')
+                # company_subscriptionsテーブルにサブスクリプション情報を保存
+                c.execute('''
+                    INSERT INTO company_subscriptions (company_id, content_type, subscription_status, stripe_subscription_id, current_period_end, base_price, additional_price, total_price)
+                    VALUES (%s, %s, 'active', %s, %s, 3900, 0, 3900)
+                    ON CONFLICT (company_id, content_type) DO UPDATE SET
+                        subscription_status = 'active',
+                        stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+                        current_period_end = EXCLUDED.current_period_end
+                ''', (company_id, 'ai_schedule', subscription_id, datetime.now() + timedelta(days=30)))
+                
+                print(f'[DEBUG] サブスクリプション情報保存完了: company_id={company_id}')
                 
                 conn.commit()
-                print(f'既存ユーザーの決済情報を更新: id={user_id}, subscription_id={subscription_id}')
+                print(f'既存企業の決済情報を更新: company_id={company_id}, subscription_id={subscription_id}')
                 
                 # LINE連携済みの場合、案内メッセージを送信
                 if line_user_id:
@@ -376,15 +369,15 @@ def stripe_webhook():
                         c.execute('UPDATE companies SET line_user_id = NULL WHERE line_user_id IS NOT NULL')
                         
                         # 企業データにLINEユーザーIDを設定
-                        c.execute('UPDATE companies SET line_user_id = %s WHERE id = %s', (user_id, company_id))
+                        c.execute('UPDATE companies SET line_user_id = %s WHERE id = %s', (line_user_id, company_id))
                         conn.commit()
-                        print(f'[DEBUG] 企業データ自動更新完了: user_id={user_id}, company_id={company_id}')
+                        print(f'[DEBUG] 企業データ自動更新完了: line_user_id={line_user_id}, company_id={company_id}')
                         
                         # 案内メッセージを送信
                         try:
                             from services.line_service import send_welcome_with_buttons_push
-                            send_welcome_with_buttons_push(user_id)
-                            print(f'[DEBUG] サブスクリプション作成時の自動案内文送信完了: user_id={user_id}')
+                            send_welcome_with_buttons_push(line_user_id)
+                            print(f'[DEBUG] サブスクリプション作成時の自動案内文送信完了: line_user_id={line_user_id}')
                         except Exception as e:
                             print(f'[DEBUG] サブスクリプション作成時の自動案内文送信エラー: {e}')
                             import traceback
@@ -392,21 +385,17 @@ def stripe_webhook():
                     else:
                         print(f'[DEBUG] 未紐付け企業データが見つかりません: email={email}')
             else:
-                # 新規ユーザーとして登録
-                c.execute('INSERT INTO users (email, stripe_customer_id, stripe_subscription_id) VALUES (%s, %s, %s)', (email, customer_id, subscription_id))
-                user_id = c.lastrowid
-                
-                # companiesテーブルにも企業データを作成（line_user_idはNULLのまま）
+                # 新規企業として登録（企業ユーザー専用）
                 company_name = f"企業_{email.split('@')[0]}"
                 c.execute('''
-                    INSERT INTO companies (company_name, company_code, email, stripe_subscription_id, status, created_at)
-                    VALUES (%s, %s, %s, %s, 'active', CURRENT_TIMESTAMP)
+                    INSERT INTO companies (company_name, email, stripe_subscription_id, status, created_at)
+                    VALUES (%s, %s, %s, 'active', CURRENT_TIMESTAMP)
                     RETURNING id
-                ''', (company_name, f"company_{user_id}", email, subscription_id))
+                ''', (company_name, email, subscription_id))
                 company_id = c.fetchone()[0]
-                print(f'[DEBUG] 企業データ作成: company_id={company_id}, company_name={company_name}')
+                print(f'[DEBUG] 新規企業データ作成: company_id={company_id}, company_name={company_name}')
                 
-                # company_paymentsテーブルにも決済データを作成
+                # company_subscriptionsテーブルにサブスクリプション情報を保存
                 c.execute('''
                     INSERT INTO company_payments (company_id, stripe_customer_id, stripe_subscription_id, subscription_status, created_at)
                     VALUES (%s, %s, %s, 'active', CURRENT_TIMESTAMP)
