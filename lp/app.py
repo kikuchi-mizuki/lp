@@ -124,6 +124,17 @@ def init_db():
                 ON company_subscriptions(subscription_status)
             ''')
             
+            # user_statesテーブルの作成（LINEボット用）
+            c.execute('''
+                CREATE TABLE IF NOT EXISTS user_states (
+                    id SERIAL PRIMARY KEY,
+                    line_user_id VARCHAR(255) NOT NULL UNIQUE,
+                    state VARCHAR(100) DEFAULT 'welcome_sent',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
         else:
             # SQLite用の最小限テーブル
             c.execute('''
@@ -164,6 +175,17 @@ def init_db():
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (company_id) REFERENCES companies(id),
                     UNIQUE(company_id, content_type)
+                )
+            ''')
+            
+            # user_statesテーブルの作成（LINEボット用）
+            c.execute('''
+                CREATE TABLE IF NOT EXISTS user_states (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    line_user_id TEXT NOT NULL UNIQUE,
+                    state TEXT DEFAULT 'welcome_sent',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
         
@@ -278,6 +300,9 @@ except Exception as e:
     print(f"❌ データベース初期化エラー: {e}")
     import traceback
     traceback.print_exc()
+
+# アプリケーション初期化完了の確認
+print("✅ アプリケーション初期化完了")
 
 @app.route('/')
 def index():
