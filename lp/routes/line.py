@@ -788,7 +788,7 @@ def line_webhook():
                         continue
                     
                     # 状態に基づく処理
-                    if state == 'add_select':
+                    elif state == 'add_select':
                         print(f'[DEBUG] add_select状態での処理: user_id={user_id}, text={text}')
                         if text in ['1', '2', '3', '4']:
                             print(f'[DEBUG] コンテンツ選択: text={text}')
