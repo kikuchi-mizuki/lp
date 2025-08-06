@@ -652,6 +652,7 @@ def line_webhook():
                         elif current_state == 'welcome_sent':
                             print(f'[DEBUG] 既に案内文送信済み、メニューを表示: user_id={user_id}')
                             # メニューメッセージを送信
+                            from utils.message_templates import get_menu_message
                             send_line_message(event['replyToken'], [get_menu_message()])
                             conn.close()
                             continue
