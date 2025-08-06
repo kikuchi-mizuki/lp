@@ -840,6 +840,53 @@ def line_webhook():
                                 error_message = "数字を入力してください。\n\n対応形式:\n• 1,2,3 (カンマ区切り)\n• 1.2.3 (ドット区切り)\n• 1 2 3 (スペース区切り)\n• 一二三 (日本語数字)\n• 1番目,2番目 (序数表現)\n• 最初,二番目 (日本語序数)"
                                 send_line_message(event['replyToken'], [{"type": "text", "text": error_message}])
 
+                    # add_select状態での処理
+                    elif state == 'add_select':
+                        print(f'[DEBUG] add_select状態での処理: user_id={user_id}, text={text}')
+                        if text in ['1', '2', '3']:
+                            # コンテンツ選択処理
+                            content_info = {
+                                '1': {
+                                    'name': 'AI予定秘書',
+                                    'price': 1500,
+                                    "description": '日程調整のストレスから解放される、スケジュール管理の相棒',
+                                    'usage': 'Googleカレンダーと連携し、LINEで予定の追加・確認・空き時間の提案まで。調整のやりとりに追われる時間を、もっとクリエイティブに使えるように。',
+                                    'url': 'https://lp-production-9e2c.up.railway.app/schedule',
+                                    'line_url': 'https://line.me/R/ti/p/@ai_schedule_secretary'
+                                },
+                                '2': {
+                                    'name': 'AI経理秘書',
+                                    'price': 1500,
+                                    "description": '打合せ後すぐ送れる、スマートな請求書作成アシスタント',
+                                    'usage': 'LINEで項目を送るだけで、見積書や請求書を即作成。営業から事務処理までを一気通貫でスムーズに。',
+                                    'url': 'https://lp-production-9e2c.up.railway.app/accounting',
+                                    'line_url': 'https://line.me/R/ti/p/@ai_accounting_secretary'
+                                },
+                                '3': {
+                                    'name': 'AIタスクコンシェルジュ',
+                                    'price': 1500,
+                                    "description": '今日やるべきことを、ベストなタイミングで',
+                                    'usage': '登録したタスクを空き時間に自動で配置し、理想的な1日をAIが提案。「やりたいのにできない」を、「自然にこなせる」毎日に。',
+                                    'url': 'https://lp-production-9e2c.up.railway.app/task',
+                                    'line_url': 'https://line.me/R/ti/p/@ai_task_concierge'
+                                }
+                            }
+                            
+                            if text in content_info:
+                                content = content_info[text]
+                                # 確認メッセージを送信
+                                confirm_message = f"📋 {content['name']}の追加を確認\n\n✨ {content['description']}\n\n💡 使い方：\n{content['usage']}\n\n💰 料金：{content['price']}円/月\n\nこのコンテンツを追加しますか？\n\n「はい」で追加、「いいえ」でキャンセル"
+                                send_line_message(event['replyToken'], [{"type": "text", "text": confirm_message}])
+                                # 確認状態に設定
+                                set_user_state(user_id, f'confirm_{text}')
+                            else:
+                                send_line_message(event['replyToken'], [{"type": "text", "text": "無効なコンテンツ番号です。1、2、3のいずれかを選択してください。"}])
+                        elif text == 'メニュー':
+                            set_user_state(user_id, 'welcome_sent')
+                            send_line_message(event['replyToken'], [get_menu_message()])
+                        else:
+                            send_line_message(event['replyToken'], [{"type": "text", "text": "1、2、3のいずれかを選択してください。\n\nまたは「メニュー」でメインメニューに戻ります。"}])
+                    
                     # その他のコマンド処理（add_select状態以外）
                     elif text == '追加' and state != 'cancel_select':
                         print(f'[DEBUG] 追加コマンド受信: user_id={user_id}, state={state}')
