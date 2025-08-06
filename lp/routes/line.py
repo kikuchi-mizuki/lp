@@ -649,23 +649,22 @@ def line_webhook():
                         print(f'[DEBUG] ユーザー状態確認: user_id={user_id}, current_state={current_state}')
                         if current_state is None:
                             print(f'[DEBUG] ユーザー状態がNone、案内文を送信: user_id={user_id}')
+                            # 案内メッセージを送信
+                            try:
+                                send_welcome_with_buttons(event['replyToken'])
+                                print(f'[DEBUG] 決済済みユーザーの案内文送信完了: user_id={user_id}')
+                                # ユーザー状態を設定
+                                set_user_state(user_id, 'welcome_sent')
+                            except Exception as e:
+                                print(f'[DEBUG] 決済済みユーザーの案内文送信エラー: {e}')
+                                traceback.print_exc()
+                                send_line_message(event['replyToken'], [{"type": "text", "text": "ようこそ！AIコレクションズへ\n\n「追加」と入力してコンテンツを追加してください。"}])
+                                set_user_state(user_id, 'welcome_sent')
                         elif current_state == 'welcome_sent':
                             print(f'[DEBUG] 既に案内文送信済み、コマンド処理に移行: user_id={user_id}')
                             # コマンド処理に移行するため、ここでは何もしない
                             conn.close()
                             # continueを削除して、コマンド処理に進む
-                        
-                        # 案内メッセージを送信
-                        try:
-                            send_welcome_with_buttons(event['replyToken'])
-                            print(f'[DEBUG] 決済済みユーザーの案内文送信完了: user_id={user_id}')
-                            # ユーザー状態を設定
-                            set_user_state(user_id, 'welcome_sent')
-                        except Exception as e:
-                            print(f'[DEBUG] 決済済みユーザーの案内文送信エラー: {e}')
-                            traceback.print_exc()
-                            send_line_message(event['replyToken'], [{"type": "text", "text": "ようこそ！AIコレクションズへ\n\n「追加」と入力してコンテンツを追加してください。"}])
-                            set_user_state(user_id, 'welcome_sent')
                     else:
                         print(f'[DEBUG] 未決済確認: user_id={user_id}, status={payment_check["subscription_status"]}')
                         # 制限メッセージを送信
