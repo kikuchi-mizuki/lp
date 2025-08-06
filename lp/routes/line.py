@@ -536,7 +536,7 @@ def line_webhook():
                 # 企業ID中心統合システムで企業情報を検索
                 conn = get_db_connection()
                 c = conn.cursor()
-                c.execute('SELECT id, company_name, stripe_subscription_id FROM companies WHERE line_user_id = %s', (user_id,))
+                c.execute('SELECT id, company_name FROM companies WHERE line_user_id = %s', (user_id,))
                 existing_company = c.fetchone()
                 print(f'[DEBUG] 友達追加時の企業検索結果: {existing_company}')
                 
@@ -558,7 +558,7 @@ def line_webhook():
                         set_user_state(user_id, 'welcome_sent')
                 else:
                     # 未紐付け企業を検索
-                    c.execute('SELECT id, company_name, stripe_subscription_id FROM companies WHERE line_user_id IS NULL ORDER BY created_at DESC LIMIT 1')
+                    c.execute('SELECT id, company_name FROM companies WHERE line_user_id IS NULL ORDER BY created_at DESC LIMIT 1')
                     unlinked_company = c.fetchone()
                     print(f'[DEBUG] 友達追加時の未紐付け企業検索結果: {unlinked_company}')
                     
@@ -620,7 +620,7 @@ def line_webhook():
                 
                 # 1. まずcompaniesテーブルでLINEユーザーIDを検索（決済済みユーザー）
                 print(f'[DEBUG] companiesテーブル検索開始: line_user_id={user_id}')
-                c.execute('SELECT id, company_name, stripe_subscription_id FROM companies WHERE line_user_id = %s', (user_id,))
+                c.execute('SELECT id, company_name FROM companies WHERE line_user_id = %s', (user_id,))
                 print(f'[DEBUG] SQLクエリ実行完了')
                 company = c.fetchone()
                 print(f'[DEBUG] companiesテーブル検索結果: {company}')
@@ -628,7 +628,13 @@ def line_webhook():
                 if company:
                     # 決済済みユーザーとして認識
                     company_id = company[0]
-                    stripe_subscription_id = company[2]
+                    company_name = company[1]
+                    
+                    # stripe_subscription_idはcompany_subscriptionsテーブルから取得
+                    c.execute('SELECT stripe_subscription_id FROM company_subscriptions WHERE company_id = %s AND subscription_status = "active" LIMIT 1', (company_id,))
+                    subscription = c.fetchone()
+                    stripe_subscription_id = subscription[0] if subscription else None
+                    
                     print(f'[DEBUG] 決済済みユーザーとして認識: user_id={user_id}, company_id={company_id}')
                     
                     # 決済状況をチェック
@@ -945,12 +951,17 @@ def line_webhook():
                                 print(f'[DEBUG] 企業データ紐付け処理開始: user_id={user_id}, email={normalized_email}')
                                 
                                 # メールアドレスで企業データを検索
-                                c.execute('SELECT id, company_name, stripe_subscription_id FROM companies WHERE email = %s', (normalized_email,))
+                                c.execute('SELECT id, company_name FROM companies WHERE email = %s', (normalized_email,))
                                 company = c.fetchone()
                                 print(f'[DEBUG] companiesテーブル検索結果: {company}')
                                 
                                 if company:
-                                    company_id, company_name, stripe_subscription_id = company
+                                    company_id, company_name = company
+                                    
+                                    # stripe_subscription_idはcompany_subscriptionsテーブルから取得
+                                    c.execute('SELECT stripe_subscription_id FROM company_subscriptions WHERE company_id = %s AND subscription_status = "active" LIMIT 1', (company_id,))
+                                    subscription = c.fetchone()
+                                    stripe_subscription_id = subscription[0] if subscription else None
                                     print(f'[DEBUG] 企業データ発見: company_id={company_id}, company_name={company_name}')
                                     
                                     # 企業データにLINEユーザーIDを紐付け
@@ -998,24 +1009,17 @@ def line_webhook():
                             print(f'[DEBUG] 企業データ紐付け処理開始: user_id={user_id}, email={normalized_email}')
                             
                             # メールアドレスで企業データを検索（emailフィールドを使用）
-                            c.execute('SELECT id, company_name, stripe_subscription_id FROM companies WHERE email = %s', (normalized_email,))
+                            c.execute('SELECT id, company_name FROM companies WHERE email = %s', (normalized_email,))
                             company = c.fetchone()
                             print(f'[DEBUG] companiesテーブル検索結果（email）: {company}')
                             
-                            if not company:
-                                # emailで見つからない場合、stripe_subscription_idで検索
-                                print(f'[DEBUG] emailで企業データが見つからないため、stripe_subscription_idで検索: email={normalized_email}')
-                                c.execute('SELECT stripe_subscription_id FROM users WHERE email = %s', (normalized_email,))
-                                user_result = c.fetchone()
-                                
-                                if user_result and user_result[0]:
-                                    stripe_subscription_id = user_result[0]
-                                    c.execute('SELECT id, company_name, stripe_subscription_id FROM companies WHERE stripe_subscription_id = %s', (stripe_subscription_id,))
-                                    company = c.fetchone()
-                                    print(f'[DEBUG] companiesテーブル検索結果（stripe_subscription_id）: {company}')
-                            
                             if company:
-                                company_id, company_name, stripe_subscription_id = company
+                                company_id, company_name = company
+                                
+                                # stripe_subscription_idはcompany_subscriptionsテーブルから取得
+                                c.execute('SELECT stripe_subscription_id FROM company_subscriptions WHERE company_id = %s AND subscription_status = "active" LIMIT 1', (company_id,))
+                                subscription = c.fetchone()
+                                stripe_subscription_id = subscription[0] if subscription else None
                                 print(f'[DEBUG] 企業データ発見: company_id={company_id}, company_name={company_name}')
                                 
                                 # 企業データにLINEユーザーIDを紐付け
@@ -1062,12 +1066,17 @@ def line_webhook():
                             print(f'[DEBUG] 決済データの確認を開始')
                             
                             # companiesテーブルでメールアドレスを検索（決済データ）
-                            c.execute('SELECT id, company_name, stripe_subscription_id FROM companies WHERE email = %s', (normalized_email,))
+                            c.execute('SELECT id, company_name FROM companies WHERE email = %s', (normalized_email,))
                             company = c.fetchone()
                             print(f'[DEBUG] companiesテーブル検索結果: {company}')
                             
                             if company:
-                                company_id, company_name, stripe_subscription_id = company
+                                company_id, company_name = company
+                                
+                                # stripe_subscription_idはcompany_subscriptionsテーブルから取得
+                                c.execute('SELECT stripe_subscription_id FROM company_subscriptions WHERE company_id = %s AND subscription_status = "active" LIMIT 1', (company_id,))
+                                subscription = c.fetchone()
+                                stripe_subscription_id = subscription[0] if subscription else None
                                 print(f'[DEBUG] 決済データ発見: company_id={company_id}, company_name={company_name}')
                                 
                                 # 新規ユーザーとして登録
@@ -1128,7 +1137,7 @@ def line_webhook():
             c = conn.cursor()
             
             # 企業ユーザー専用：companiesテーブルから企業情報を取得
-            c.execute('SELECT id, company_name, stripe_subscription_id FROM companies WHERE line_user_id = %s', (user_id,))
+            c.execute('SELECT id, company_name FROM companies WHERE line_user_id = %s', (user_id,))
             company = c.fetchone()
             
             if not company:
@@ -1136,7 +1145,12 @@ def line_webhook():
                 conn.close()
                 return jsonify({'status': 'ok'})
                 
-            company_id, company_name, stripe_subscription_id = company
+            company_id, company_name = company
+            
+            # stripe_subscription_idはcompany_subscriptionsテーブルから取得
+            c.execute('SELECT stripe_subscription_id FROM company_subscriptions WHERE company_id = %s AND subscription_status = "active" LIMIT 1', (company_id,))
+            subscription = c.fetchone()
+            stripe_subscription_id = subscription[0] if subscription else None
             
             # postbackデータに基づいて処理
             if postback_data == 'action=add_content':
