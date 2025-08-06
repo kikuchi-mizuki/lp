@@ -27,6 +27,7 @@ def get_user_state(line_user_id):
             return 'welcome_sent'  # デフォルト状態
     except Exception as e:
         print(f'[DEBUG] ユーザー状態取得エラー: {e}')
+        print(f'[DEBUG] エラーのためNoneを返します')
         return None
 
 def set_user_state(line_user_id, state):

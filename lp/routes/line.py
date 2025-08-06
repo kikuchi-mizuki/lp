@@ -646,6 +646,7 @@ def line_webhook():
                         print(f'[DEBUG] 決済済み確認: user_id={user_id}')
                         # 既に案内文が送信されているかチェック
                         current_state = get_user_state(user_id)
+                        print(f'[DEBUG] ユーザー状態確認: user_id={user_id}, current_state={current_state}')
                         if current_state == 'welcome_sent':
                             print(f'[DEBUG] 既に案内文送信済み、スキップ: user_id={user_id}')
                             conn.close()
