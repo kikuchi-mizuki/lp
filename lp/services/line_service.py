@@ -95,6 +95,7 @@ def send_line_message(reply_token, messages):
             print(f'[DEBUG] LINE API 400エラー詳細: {response.text}')
             try:
                 error_detail = response.json()
+                print(f'[DEBUG] LINE API エラー詳細JSON: {error_detail}')
                 if 'message' in error_detail:
                     if 'reply token' in error_detail['message'].lower():
                         print(f'[DEBUG] replyTokenエラー: {error_detail["message"]}')
@@ -102,15 +103,24 @@ def send_line_message(reply_token, messages):
                         send_line_message.used_tokens.discard(reply_token)
                         if reply_token in send_line_message.token_times:
                             del send_line_message.token_times[reply_token]
-            except:
-                pass
+                        # replyTokenエラーの場合は、エラーとして処理せずに正常終了
+                        print(f'[DEBUG] replyTokenエラーのため、メッセージ送信をスキップします')
+                        return
+                    elif 'invalid' in error_detail['message'].lower():
+                        print(f'[DEBUG] 無効なリクエストエラー: {error_detail["message"]}')
+                        # 無効なリクエストの場合は、エラーとして処理
+                        raise Exception(f'LINE API 無効なリクエスト: {error_detail["message"]}')
+            except Exception as parse_error:
+                print(f'[DEBUG] LINE API エラー詳細（JSON解析失敗）: {response.text}')
+                # JSON解析に失敗した場合は、エラーとして処理
+                raise Exception(f'LINE API 400エラー: {response.text}')
         
         response.raise_for_status()
         print(f'[DEBUG] LINE API送信成功: status_code={response.status_code}')
     except requests.exceptions.Timeout:
         print('❌ LINE API タイムアウトエラー')
         with open('error.log', 'a', encoding='utf-8') as f:
-            f.write('LINE API タイムアウトエラー\n')
+            f.write(f'{datetime.now().isoformat()} - LINE API タイムアウトエラー\n')
     except Exception as e:
         print(f'LINEメッセージ送信エラー: {e}')
         if hasattr(e, 'response') and e.response is not None:
@@ -120,7 +130,7 @@ def send_line_message(reply_token, messages):
         traceback.print_exc()
         # エラー詳細をerror.logにも追記
         with open('error.log', 'a', encoding='utf-8') as f:
-            f.write('LINEメッセージ送信エラー: ' + str(e) + '\n')
+            f.write(f'{datetime.now().isoformat()} - LINEメッセージ送信エラー: {str(e)}\n')
             if hasattr(e, 'response') and e.response is not None:
                 f.write(f'LINE API エラー詳細: {e.response.text}\n')
                 f.write(f'LINE API リクエストデータ: {data}\n')
@@ -1218,8 +1228,8 @@ def handle_cancel_menu(reply_token, user_id_db, stripe_subscription_id):
         # サブスクリプション状態をチェック
         subscription_status = check_subscription_status(stripe_subscription_id)
         
-        if not subscription_status['is_active']:
-            if subscription_status['status'] == 'canceled':
+        if not subscription_status.get('is_active', False):
+            if subscription_status.get('status') == 'canceled':
                 # サブスクリプションが解約済み
                 payment_message = {
                     "type": "template",

@@ -1022,85 +1022,83 @@ def line_webhook():
                                         # ユーザー状態を設定
                                         set_user_state(user_id, 'welcome_sent')
                                     except Exception as e:
-                                                print(f'[DEBUG] メールアドレス連携時の案内文送信エラー: {e}')
-                                                traceback.print_exc()
-                                                send_line_message(event['replyToken'], [{"type": "text", "text": "ようこそ！AIコレクションズへ\n\n「追加」と入力してコンテンツを追加してください。"}])
-                                                set_user_state(user_id, 'welcome_sent')
-                                    else:
-                                            print(f'[DEBUG] 未決済確認: user_id={user_id}, status={payment_check["subscription_status"]}')
-                                            # 制限メッセージを送信
-                                            restricted_message = get_restricted_message()
-                                            send_line_message(event['replyToken'], [restricted_message])
-                                    else:
-                                        print(f'[DEBUG] 企業データが見つかりません: email={normalized_email}')
-                                        send_line_message(event['replyToken'], [{"type": "text", "text": "企業データが見つかりません。決済が完了しているかご確認ください。"}])
+                                        print(f'[DEBUG] メールアドレス連携時の案内文送信エラー: {e}')
+                                        traceback.print_exc()
+                                        send_line_message(event['replyToken'], [{"type": "text", "text": "ようこそ！AIコレクションズへ\n\n「追加」と入力してコンテンツを追加してください。"}])
+                                        set_user_state(user_id, 'welcome_sent')
                                 else:
-                                    # メールアドレスが見つからない場合、決済データを確認
-                                    print(f'[DEBUG] メールアドレスが見つかりません: email={normalized_email}')
-                                    print(f'[DEBUG] 決済データの確認を開始')
-                                    
-                                    # companiesテーブルでメールアドレスを検索（決済データ）
-                                    c.execute('SELECT id, company_name, stripe_subscription_id FROM companies WHERE email = %s', (normalized_email,))
-                                    company = c.fetchone()
-                                    print(f'[DEBUG] companiesテーブル検索結果: {company}')
-                                    
-                                    if company:
-                                        company_id, company_name, stripe_subscription_id = company
-                                        print(f'[DEBUG] 決済データ発見: company_id={company_id}, company_name={company_name}')
-                                        
-                                        # 新規ユーザーとして登録
-                                        c.execute('INSERT INTO users (email, line_user_id, stripe_subscription_id) VALUES (%s, %s, %s)', (normalized_email, user_id, stripe_subscription_id))
-                                        db_user_id = c.lastrowid
-                                        print(f'[DEBUG] 新規ユーザー登録完了: db_user_id={db_user_id}')
-                                        
-                                        # 企業データにLINEユーザーIDを紐付け
-                                        c.execute('UPDATE companies SET line_user_id = %s WHERE id = %s', (user_id, company_id))
-                                        conn.commit()
-                                        print(f'[DEBUG] 企業データ紐付け完了: user_id={user_id}, company_id={company_id}')
-                                        
-                                        # 決済状況をチェック
-                                        print(f'[DEBUG] 決済データ紐付け後の決済チェック開始: user_id={user_id}')
-                                        payment_check = is_paid_user_company_centric(user_id)
-                                        print(f'[DEBUG] 決済データ紐付け後の決済チェック結果: user_id={user_id}, is_paid={payment_check["is_paid"]}, status={payment_check["subscription_status"]}')
-                                        
-                                        if payment_check['is_paid']:
-                                            print(f'[DEBUG] 決済済み確認: user_id={user_id}')
-                                            # 案内メッセージを送信
-                                            try:
-                                                from lp.services.line_service import send_welcome_with_buttons
-                                                send_welcome_with_buttons(event['replyToken'])
-                                                print(f'[DEBUG] 決済データ紐付け時の案内文送信完了: user_id={user_id}')
-                                                # ユーザー状態を設定
-                                                set_user_state(user_id, 'welcome_sent')
-                                            except Exception as e:
-                                                print(f'[DEBUG] 決済データ紐付け時の案内文送信エラー: {e}')
-                                                traceback.print_exc()
-                                                send_line_message(event['replyToken'], [{"type": "text", "text": "ようこそ！AIコレクションズへ\n\n「追加」と入力してコンテンツを追加してください。"}])
-                                                set_user_state(user_id, 'welcome_sent')
-                                        else:
-                                            print(f'[DEBUG] 未決済確認: user_id={user_id}, status={payment_check["subscription_status"]}')
-                                            # 制限メッセージを送信
-                                            restricted_message = get_restricted_message()
-                                            send_line_message(event['replyToken'], [restricted_message])
-                                    else:
-                                        # 決済データも見つからない場合
-                                        print(f'[DEBUG] 決済データも見つかりません: email={normalized_email}')
-                                        send_line_message(event['replyToken'], [{"type": "text", "text": 'ご登録メールアドレスが見つかりません。LPでご登録済みかご確認ください。'}])
+                                    print(f'[DEBUG] 未決済確認: user_id={user_id}, status={payment_check["subscription_status"]}')
+                                    # 制限メッセージを送信
+                                    restricted_message = get_restricted_message()
+                                    send_line_message(event['replyToken'], [restricted_message])
+                            else:
+                                print(f'[DEBUG] 企業データが見つかりません: email={normalized_email}')
+                                send_line_message(event['replyToken'], [{"type": "text", "text": "企業データが見つかりません。決済が完了しているかご確認ください。"}])
+                            # メールアドレスが見つからない場合、決済データを確認
+                            print(f'[DEBUG] メールアドレスが見つかりません: email={normalized_email}')
+                            print(f'[DEBUG] 決済データの確認を開始')
+                            
+                            # companiesテーブルでメールアドレスを検索（決済データ）
+                            c.execute('SELECT id, company_name, stripe_subscription_id FROM companies WHERE email = %s', (normalized_email,))
+                            company = c.fetchone()
+                            print(f'[DEBUG] companiesテーブル検索結果: {company}')
+                            
+                            if company:
+                                company_id, company_name, stripe_subscription_id = company
+                                print(f'[DEBUG] 決済データ発見: company_id={company_id}, company_name={company_name}')
+                                
+                                # 新規ユーザーとして登録
+                                c.execute('INSERT INTO users (email, line_user_id, stripe_subscription_id) VALUES (%s, %s, %s)', (normalized_email, user_id, stripe_subscription_id))
+                                db_user_id = c.lastrowid
+                                print(f'[DEBUG] 新規ユーザー登録完了: db_user_id={db_user_id}')
+                                
+                                # 企業データにLINEユーザーIDを紐付け
+                                c.execute('UPDATE companies SET line_user_id = %s WHERE id = %s', (user_id, company_id))
+                                conn.commit()
+                                print(f'[DEBUG] 企業データ紐付け完了: user_id={user_id}, company_id={company_id}')
+                                
+                                # 決済状況をチェック
+                                print(f'[DEBUG] 決済データ紐付け後の決済チェック開始: user_id={user_id}')
+                                payment_check = is_paid_user_company_centric(user_id)
+                                print(f'[DEBUG] 決済データ紐付け後の決済チェック結果: user_id={user_id}, is_paid={payment_check["is_paid"]}, status={payment_check["subscription_status"]}')
+                                
+                                if payment_check['is_paid']:
+                                    print(f'[DEBUG] 決済済み確認: user_id={user_id}')
+                                    # 案内メッセージを送信
+                                    try:
+                                        from lp.services.line_service import send_welcome_with_buttons
+                                        send_welcome_with_buttons(event['replyToken'])
+                                        print(f'[DEBUG] 決済データ紐付け時の案内文送信完了: user_id={user_id}')
+                                        # ユーザー状態を設定
+                                        set_user_state(user_id, 'welcome_sent')
+                                    except Exception as e:
+                                        print(f'[DEBUG] 決済データ紐付け時の案内文送信エラー: {e}')
+                                        traceback.print_exc()
+                                        send_line_message(event['replyToken'], [{"type": "text", "text": "ようこそ！AIコレクションズへ\n\n「追加」と入力してコンテンツを追加してください。"}])
+                                        set_user_state(user_id, 'welcome_sent')
                                 else:
-                                    print(f'[DEBUG] デフォルト処理: user_id={user_id}, state={state}, text={text}')
-                                    print(f'[DEBUG] どの条件にも当てはまらないためデフォルト処理に進む: text="{text}", state="{state}"')
-                                    
-                                    # メールアドレス連携を促すメッセージを送信
-                                    if not state or state == 'welcome_sent':
-                                        print(f'[DEBUG] メールアドレス連携を促すメッセージを送信: user_id={user_id}')
-                                        send_line_message(event['replyToken'], [{"type": "text", "text": "決済済みの方は、登録時のメールアドレスを送信してください。\n\n例: example@example.com\n\n※メールアドレスを送信すると、自動的に企業データと紐付けされます。"}])
-                                    else:
-                                        # 特定の状態ではデフォルトメッセージを送信
-                                        print(f'[DEBUG] 特定状態でのデフォルト処理: state={state}')
-                                        send_line_message(event['replyToken'], [{"type": "text", "text": "無効な入力です。メニューから選択してください。"}])
-                                conn.close()
+                                    print(f'[DEBUG] 未決済確認: user_id={user_id}, status={payment_check["subscription_status"]}')
+                                    # 制限メッセージを送信
+                                    restricted_message = get_restricted_message()
+                                    send_line_message(event['replyToken'], [restricted_message])
+                            else:
+                                # 決済データも見つからない場合
+                                print(f'[DEBUG] 決済データも見つかりません: email={normalized_email}')
+                                send_line_message(event['replyToken'], [{"type": "text", "text": 'ご登録メールアドレスが見つかりません。LPでご登録済みかご確認ください。'}])
+                            print(f'[DEBUG] デフォルト処理: user_id={user_id}, state={state}, text={text}')
+                            print(f'[DEBUG] どの条件にも当てはまらないためデフォルト処理に進む: text="{text}", state="{state}"')
+                            
+                            # メールアドレス連携を促すメッセージを送信
+                            if not state or state == 'welcome_sent':
+                                print(f'[DEBUG] メールアドレス連携を促すメッセージを送信: user_id={user_id}')
+                                send_line_message(event['replyToken'], [{"type": "text", "text": "決済済みの方は、登録時のメールアドレスを送信してください。\n\n例: example@example.com\n\n※メールアドレスを送信すると、自動的に企業データと紐付けされます。"}])
+                            else:
+                                # 特定の状態ではデフォルトメッセージを送信
+                                print(f'[DEBUG] 特定状態でのデフォルト処理: state={state}')
+                                send_line_message(event['replyToken'], [{"type": "text", "text": "無効な入力です。メニューから選択してください。"}])
+                        conn.close()
                     # リッチメニューのpostbackイベントの処理
-                                 elif event.get('type') == 'postback':
+                    elif event.get('type') == 'postback':
                                      user_id = event['source']['userId']
                                      postback_data = event['postback']['data']
                                      conn = get_db_connection()
@@ -1139,6 +1137,6 @@ https://lp-production-9e2c.up.railway.app
 友達が登録すると、あなたにも特典があります！"""
                                          send_line_message(event['replyToken'], [{"type": "text", "text": share_message}])
                                      conn.close()
-     except Exception as e:
-         traceback.print_exc()
-     return jsonify({'status': 'ok'}) 
+    except Exception as e:
+        traceback.print_exc()
+    return jsonify({'status': 'ok'}) 

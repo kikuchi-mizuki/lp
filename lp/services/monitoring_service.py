@@ -587,5 +587,105 @@ class MonitoringService:
                 'error': f'アラート解決エラー: {str(e)}'
             }
 
+    def check_line_api_errors(self):
+        """LINE APIエラーの監視"""
+        try:
+            # error.logからLINE API関連のエラーを確認
+            error_log_path = os.path.join(os.path.dirname(__file__), '..', 'error.log')
+            
+            if not os.path.exists(error_log_path):
+                return {
+                    'success': True,
+                    'line_errors': [],
+                    'message': 'エラーログファイルが存在しません'
+                }
+            
+            # 過去1時間のLINE APIエラーを確認
+            cutoff_time = datetime.now() - timedelta(hours=1)
+            line_errors = []
+            
+            with open(error_log_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if 'LINE' in line and ('ERROR' in line or 'エラー' in line):
+                        try:
+                            # タイムスタンプを抽出
+                            if ' - ' in line:
+                                timestamp_str = line.split(' - ')[0]
+                                log_time = datetime.fromisoformat(timestamp_str.replace(' ', 'T'))
+                                
+                                if log_time >= cutoff_time:
+                                    line_errors.append({
+                                        'timestamp': log_time.isoformat(),
+                                        'message': line.strip()
+                                    })
+                        except:
+                            continue
+            
+            # 最新のエラーから順に並べ替え
+            line_errors.sort(key=lambda x: x['timestamp'], reverse=True)
+            
+            return {
+                'success': True,
+                'line_errors': line_errors[:50],  # 最新50件まで
+                'total_count': len(line_errors)
+            }
+            
+        except Exception as e:
+            self.logger.error(f"LINE APIエラー監視エラー: {e}")
+            return {
+                'success': False,
+                'error': f'LINE APIエラー監視エラー: {str(e)}'
+            }
+    
+    def check_stripe_errors(self):
+        """Stripeエラーの監視"""
+        try:
+            # error.logからStripe関連のエラーを確認
+            error_log_path = os.path.join(os.path.dirname(__file__), '..', 'error.log')
+            
+            if not os.path.exists(error_log_path):
+                return {
+                    'success': True,
+                    'stripe_errors': [],
+                    'message': 'エラーログファイルが存在しません'
+                }
+            
+            # 過去1時間のStripeエラーを確認
+            cutoff_time = datetime.now() - timedelta(hours=1)
+            stripe_errors = []
+            
+            with open(error_log_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if 'Stripe' in line and ('ERROR' in line or 'エラー' in line):
+                        try:
+                            # タイムスタンプを抽出
+                            if ' - ' in line:
+                                timestamp_str = line.split(' - ')[0]
+                                log_time = datetime.fromisoformat(timestamp_str.replace(' ', 'T'))
+                                
+                                if log_time >= cutoff_time:
+                                    stripe_errors.append({
+                                        'timestamp': log_time.isoformat(),
+                                        'message': line.strip()
+                                    })
+                        except:
+                            continue
+            
+            # 最新のエラーから順に並べ替え
+            stripe_errors.sort(key=lambda x: x['timestamp'], reverse=True)
+            
+            return {
+                'success': True,
+                'stripe_errors': stripe_errors[:50],  # 最新50件まで
+                'total_count': len(stripe_errors)
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Stripeエラー監視エラー: {e}")
+            return {
+                'success': False,
+                'error': f'Stripeエラー監視エラー: {str(e)}'
+            }
+
 # インスタンスを作成
 monitoring_service = MonitoringService() 
