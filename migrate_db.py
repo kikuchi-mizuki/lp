@@ -5,11 +5,15 @@
 
 import os
 import sys
+from dotenv import load_dotenv
 
-# プロジェクトのルートディレクトリをパスに追加
+# 環境変数を読み込み
+load_dotenv()
+
+# プロジェクトのルートディレクトリをPythonパスに追加
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from lp.utils.db import migrate_add_pending_charge
+from utils.db import migrate_add_pending_charge
 
 def main():
     print("🔄 データベースマイグレーションを開始します...")
