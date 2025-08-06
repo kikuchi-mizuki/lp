@@ -57,7 +57,7 @@ LINE_CHANNEL_SECRET = os.getenv('LINE_CHANNEL_SECRET')
 DATABASE_URL = os.getenv('DATABASE_URL', 'database.db')
 
 def init_db():
-    """データベースの初期化（企業ID中心統合対応）"""
+    """データベースの初期化（企業ユーザー専用最小限設計）"""
     conn = None
     c = None
     try:
@@ -69,104 +69,103 @@ def init_db():
         db_type = get_db_type()
         
         if db_type == 'postgresql':
-            # PostgreSQL用の企業テーブル作成
+            # 企業基本情報テーブル（最小限）
             c.execute('''
                 CREATE TABLE IF NOT EXISTS companies (
                     id SERIAL PRIMARY KEY,
                     company_name VARCHAR(255) NOT NULL,
-                    line_user_id VARCHAR(255) UNIQUE,
-                    stripe_subscription_id VARCHAR(255),
+                    email VARCHAR(255) NOT NULL,
                     status VARCHAR(50) DEFAULT 'active',
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
             
-            # 企業決済テーブル
-            c.execute('''
-                CREATE TABLE IF NOT EXISTS company_payments (
-                    id SERIAL PRIMARY KEY,
-                    company_id INTEGER NOT NULL,
-                    stripe_subscription_id VARCHAR(255),
-                    subscription_status VARCHAR(50) DEFAULT 'active',
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (company_id) REFERENCES companies (id)
-                )
-            ''')
-            
-            # 企業使用ログテーブル
-            c.execute('''
-                CREATE TABLE IF NOT EXISTS company_usage_logs (
-                    id SERIAL PRIMARY KEY,
-                    company_id INTEGER NOT NULL,
-                    content_type VARCHAR(100) NOT NULL,
-                    is_free BOOLEAN DEFAULT FALSE,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    subscription_status VARCHAR(50),
-                    current_period_start TIMESTAMP,
-                    current_period_end TIMESTAMP,
-                    trial_start TIMESTAMP,
-                    trial_end TIMESTAMP,
-                    stripe_subscription_id VARCHAR(255),
-                    FOREIGN KEY (company_id) REFERENCES companies (id)
-                )
-            ''')
-            
-            # 企業LINEアカウントテーブル
+            # 企業LINEアカウントテーブル（最小限）
             c.execute('''
                 CREATE TABLE IF NOT EXISTS company_line_accounts (
                     id SERIAL PRIMARY KEY,
                     company_id INTEGER NOT NULL,
-                    line_channel_id VARCHAR(255),
-                    line_channel_secret VARCHAR(255),
-                    line_channel_access_token VARCHAR(255),
-                    webhook_url VARCHAR(500),
+                    content_type VARCHAR(100) NOT NULL,
+                    line_channel_id VARCHAR(255) NOT NULL,
+                    line_channel_access_token VARCHAR(255) NOT NULL,
                     status VARCHAR(50) DEFAULT 'active',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (company_id) REFERENCES companies (id)
+                    FOREIGN KEY (company_id) REFERENCES companies(id),
+                    UNIQUE(company_id, content_type)
                 )
             ''')
             
-            # 企業デプロイメントテーブル
+            # 企業サブスクリプション管理テーブル（最小限）
             c.execute('''
-                CREATE TABLE IF NOT EXISTS company_deployments (
+                CREATE TABLE IF NOT EXISTS company_subscriptions (
                     id SERIAL PRIMARY KEY,
                     company_id INTEGER NOT NULL,
-                    service_name VARCHAR(255),
-                    deployment_url VARCHAR(500),
-                    status VARCHAR(50) DEFAULT 'active',
+                    content_type VARCHAR(100) NOT NULL,
+                    subscription_status VARCHAR(50) DEFAULT 'active',
+                    current_period_end TIMESTAMP,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (company_id) REFERENCES companies (id)
+                    FOREIGN KEY (company_id) REFERENCES companies(id),
+                    UNIQUE(company_id, content_type)
                 )
             ''')
             
-            conn.commit()
-            print("✅ 企業ID中心統合データベース初期化完了")
+            # インデックスの作成（パフォーマンス向上）
+            c.execute('''
+                CREATE INDEX IF NOT EXISTS idx_company_line_accounts_channel_id 
+                ON company_line_accounts(line_channel_id)
+            ''')
+            
+            c.execute('''
+                CREATE INDEX IF NOT EXISTS idx_company_subscriptions_status 
+                ON company_subscriptions(subscription_status)
+            ''')
             
         else:
-            # SQLite用のテーブル作成（簡略化）
+            # SQLite用の最小限テーブル
             c.execute('''
                 CREATE TABLE IF NOT EXISTS companies (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     company_name TEXT NOT NULL,
-                    line_user_id TEXT UNIQUE,
-                    stripe_subscription_id TEXT,
+                    email TEXT NOT NULL,
                     status TEXT DEFAULT 'active',
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
             
-            conn.commit()
-            print("✅ SQLite企業テーブル初期化完了")
+            c.execute('''
+                CREATE TABLE IF NOT EXISTS company_line_accounts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    company_id INTEGER NOT NULL,
+                    content_type TEXT NOT NULL,
+                    line_channel_id TEXT NOT NULL,
+                    line_channel_access_token TEXT NOT NULL,
+                    status TEXT DEFAULT 'active',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (company_id) REFERENCES companies(id),
+                    UNIQUE(company_id, content_type)
+                )
+            ''')
             
+            c.execute('''
+                CREATE TABLE IF NOT EXISTS company_subscriptions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    company_id INTEGER NOT NULL,
+                    content_type TEXT NOT NULL,
+                    subscription_status TEXT DEFAULT 'active',
+                    current_period_end TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (company_id) REFERENCES companies(id),
+                    UNIQUE(company_id, content_type)
+                )
+            ''')
+        
+        conn.commit()
+        print("✅ 企業ユーザー専用最小限データベースの初期化が完了しました")
+        
     except Exception as e:
         print(f"❌ データベース初期化エラー: {e}")
-        import traceback
-        traceback.print_exc()
+        if conn:
+            conn.rollback()
     finally:
         if c:
             c.close()
@@ -215,40 +214,8 @@ def init_db():
                 )
             ''')
         else:
-            # SQLite用の追加テーブル
-            c.execute('''
-                CREATE TABLE IF NOT EXISTS cancellation_history (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER NOT NULL,
-                    content_type TEXT NOT NULL,
-                    cancelled_at TIMESTAMP NOT NULL,
-                    subscription_status TEXT,
-                    current_period_start TIMESTAMP,
-                    current_period_end TIMESTAMP,
-                    trial_start TIMESTAMP,
-                    trial_end TIMESTAMP,
-                    stripe_subscription_id TEXT,
-                    FOREIGN KEY (user_id) REFERENCES users (id)
-                )
-            ''')
-            
-            # 契約期間管理テーブルを追加
-            c.execute('''
-                CREATE TABLE IF NOT EXISTS subscription_periods (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER NOT NULL,
-                    stripe_subscription_id TEXT NOT NULL,
-                    subscription_status TEXT NOT NULL,
-                    current_period_start TIMESTAMP,
-                    current_period_end TIMESTAMP,
-                    trial_start TIMESTAMP,
-                    trial_end TIMESTAMP,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (user_id) REFERENCES users (id),
-                    UNIQUE(stripe_subscription_id)
-                )
-            ''')
+            # SQLite用の企業ユーザー専用テーブルは既に作成済み
+            pass
         
         conn.commit()
         print("✅ 追加テーブル作成完了")
@@ -263,9 +230,8 @@ def init_db():
         if conn:
             conn.close()
     
-    # ユーザー状態テーブルの初期化
-    from models.user_state import init_user_states_table
-    init_user_states_table()
+    # 企業ユーザー専用システムのため、ユーザー状態テーブルは不要
+    pass
 
 app = Flask(__name__, static_folder='static', static_url_path='/static')
 app.register_blueprint(line_bp)
@@ -295,19 +261,341 @@ app.register_blueprint(debug_bp)
 def index():
     return render_template('index.html')
 
-@app.route('/company-registration')
-def company_registration_form():
-    """企業情報登録フォーム（旧ルート）"""
-    subscription_id = request.args.get('subscription_id', '')
-    content_type = request.args.get('content_type', '')
-    return render_template('company_registration.html', 
-                         subscription_id=subscription_id, 
-                         content_type=content_type)
+# 企業ユーザー専用の決済フォーム処理
+@app.route('/company-registration', methods=['GET', 'POST'])
+def company_registration():
+    """
+    企業ユーザー専用の決済フォーム
+    """
+    if request.method == 'GET':
+        return render_template('company_registration.html')
+    
+    # POST処理（決済フォーム送信）
+    if request.is_json:
+        # LPからの直接送信（JSON形式）
+        data = request.get_json()
+        company_name = data.get('company_name')
+        email = data.get('email')
+        content_type = data.get('content_type', 'ai_schedule')  # デフォルトはAI予定秘書
+    else:
+        # フォームからの送信
+        company_name = request.form.get('company_name')
+        email = request.form.get('email')
+        content_type = request.form.get('content_type', 'ai_schedule')
+    
+    if not company_name or not email:
+        return jsonify({'error': '企業名とメールアドレスは必須です'}), 400
+    
+    # 既存企業の確認
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute('SELECT id FROM companies WHERE email = %s', (email,))
+    existing_company = c.fetchone()
+    conn.close()
+    
+    if existing_company:
+        return jsonify({'error': 'このメールアドレスは既に登録されています'}), 400
+    
+    # Stripeチェックアウトセッションを作成
+    try:
+        checkout_session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            line_items=[{
+                'price': os.getenv('STRIPE_COMPANY_MONTHLY_PRICE_ID', 'price_company_monthly'),
+                'quantity': 1,
+            }],
+            mode='subscription',
+            success_url=url_for('company_registration_success', _external=True) + '?session_id={CHECKOUT_SESSION_ID}',
+            cancel_url=url_for('company_registration_cancel', _external=True),
+            metadata={
+                'company_name': company_name,
+                'email': email,
+                'content_type': content_type
+            },
+            customer_email=email,
+            billing_address_collection='required',
+            allow_promotion_codes=True
+        )
+        
+        return jsonify({'url': checkout_session.url})
+        
+    except Exception as e:
+        print(f"❌ Stripeチェックアウトセッション作成エラー: {e}")
+        return jsonify({'error': '決済セッションの作成に失敗しました'}), 500
 
-@app.route('/ai-schedule-clone')
-def ai_schedule_clone_form():
-    """AI予定秘書複製フォーム（新ルート）"""
-    return render_template('company_registration.html')
+# 企業登録成功時の処理
+@app.route('/company-registration-success')
+def company_registration_success():
+    """
+    企業登録成功時の処理
+    """
+    session_id = request.args.get('session_id')
+    
+    if not session_id:
+        return redirect('/company-registration')
+    
+    try:
+        # Stripeからセッション情報を取得
+        checkout_session = stripe.checkout.Session.retrieve(session_id)
+        
+        if checkout_session.payment_status != 'paid':
+            return redirect('/company-registration-cancel')
+        
+        # 企業情報をデータベースに保存
+        company_id = create_company_profile(checkout_session.metadata)
+        
+        # LINEアカウントを自動作成
+        line_account = create_company_line_account(company_id, checkout_session.metadata)
+        
+        # サブスクリプション情報を保存
+        save_company_subscription(company_id, checkout_session.subscription)
+        
+        # 次回請求日を計算
+        subscription = stripe.Subscription.retrieve(checkout_session.subscription)
+        next_billing_date = datetime.fromtimestamp(subscription.current_period_end).strftime('%Y年%m月%d日')
+        
+        return render_template('company_registration_success.html',
+                             company_data=checkout_session.metadata,
+                             company_id=company_id,
+                             line_account=line_account,
+                             next_billing_date=next_billing_date)
+        
+    except Exception as e:
+        print(f"❌ 企業登録成功処理エラー: {e}")
+        return redirect('/company-registration-cancel')
+
+# 企業登録キャンセル時の処理
+@app.route('/company-registration-cancel')
+def company_registration_cancel():
+    """
+    企業登録キャンセル時の処理
+    """
+    return render_template('company_registration_cancel.html')
+
+# 企業基本情報をデータベースに保存
+def create_company_profile(company_data):
+    """
+    企業基本情報をデータベースに保存
+    """
+    conn = None
+    c = None
+    
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        c.execute('''
+            INSERT INTO companies (company_name, email, status)
+            VALUES (%s, %s, 'active')
+            RETURNING id
+        ''', (company_data['company_name'], company_data['email']))
+        
+        company_id = c.fetchone()[0]
+        conn.commit()
+        
+        print(f"✅ 企業基本情報を保存しました: {company_id}")
+        return company_id
+        
+    except Exception as e:
+        print(f"❌ 企業基本情報保存エラー: {e}")
+        if conn:
+            conn.rollback()
+        raise
+    finally:
+        if c:
+            c.close()
+        if conn:
+            conn.close()
+
+# 企業専用LINEアカウントを自動作成
+def create_company_line_account(company_id, company_data):
+    """
+    企業専用LINEアカウントを自動作成
+    """
+    try:
+        # LINE Developers Console APIでチャンネル作成（モック）
+        # 実際の実装ではLINE APIを使用
+        line_channel_id = f"U{company_id}_{int(time.time())}"
+        line_channel_access_token = f"token_{company_id}_{int(time.time())}"
+        
+        # データベースにLINEアカウント情報を保存
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        c.execute('''
+            INSERT INTO company_line_accounts 
+            (company_id, content_type, line_channel_id, line_channel_access_token, status)
+            VALUES (%s, %s, %s, %s, 'active')
+        ''', (
+            company_id,
+            company_data['content_type'],
+            line_channel_id,
+            line_channel_access_token
+        ))
+        
+        conn.commit()
+        conn.close()
+        
+        line_account = {
+            'line_channel_id': line_channel_id,
+            'line_channel_access_token': line_channel_access_token,
+            'qr_code_url': None,  # 実際の実装ではQRコードURLを生成
+            'status': 'active'
+        }
+        
+        print(f"✅ 企業LINEアカウントを作成しました: {line_channel_id}")
+        return line_account
+        
+    except Exception as e:
+        print(f"❌ 企業LINEアカウント作成エラー: {e}")
+        raise
+
+# 企業サブスクリプション情報をデータベースに保存
+def save_company_subscription(company_id, stripe_subscription_id):
+    """
+    企業サブスクリプション情報をデータベースに保存
+    """
+    conn = None
+    c = None
+    
+    try:
+        # Stripeからサブスクリプション情報を取得
+        subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+        
+        # セッションから企業データを取得
+        company_data = session.get('company_data', {})
+        content_type = company_data.get('content_type', 'AI予定秘書')
+        
+        # サブスクリプションの期間を計算
+        current_period_end = datetime.fromtimestamp(subscription.current_period_end)
+        
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        c.execute('''
+            INSERT INTO company_subscriptions 
+            (company_id, content_type, subscription_status, current_period_end)
+            VALUES (%s, %s, %s, %s)
+        ''', (
+            company_id,
+            content_type,
+            subscription.status,
+            current_period_end
+        ))
+        
+        conn.commit()
+        
+        print(f"✅ 企業サブスクリプションを保存しました: {company_id}")
+        
+    except Exception as e:
+        print(f"❌ 企業サブスクリプション保存エラー: {e}")
+        if conn:
+            conn.rollback()
+        raise
+    finally:
+        if c:
+            c.close()
+        if conn:
+            conn.close()
+
+# Stripe Webhook処理（企業ユーザー専用）
+@app.route('/webhook/stripe/company', methods=['POST'])
+def stripe_webhook_company():
+    """
+    Stripe Webhook処理（企業ユーザー専用）
+    """
+    payload = request.get_data(as_text=True)
+    sig_header = request.headers.get('Stripe-Signature')
+    
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, os.getenv('STRIPE_WEBHOOK_SECRET')
+        )
+    except ValueError as e:
+        print(f"❌ Webhookペイロードエラー: {e}")
+        return jsonify({'error': 'Invalid payload'}), 400
+    except stripe.error.SignatureVerificationError as e:
+        print(f"❌ Webhook署名検証エラー: {e}")
+        return jsonify({'error': 'Invalid signature'}), 400
+    
+    # イベントタイプに応じた処理
+    if event['type'] == 'customer.subscription.deleted':
+        handle_company_subscription_cancelled(event)
+    elif event['type'] == 'invoice.payment_failed':
+        handle_company_payment_failed(event)
+    elif event['type'] == 'invoice.payment_succeeded':
+        handle_company_payment_succeeded(event)
+    
+    return jsonify({'status': 'success'})
+
+# 企業サブスクリプション解約処理
+def handle_company_subscription_cancelled(event):
+    """
+    企業サブスクリプション解約処理
+    """
+    subscription_id = event['data']['object']['id']
+    
+    try:
+        from services.company_service import cancel_company_content
+        
+        # サブスクリプションIDから企業IDとコンテンツタイプを取得
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        c.execute('''
+            SELECT company_id, content_type 
+            FROM company_subscriptions 
+            WHERE stripe_subscription_id = %s
+        ''', (subscription_id,))
+        
+        subscription = c.fetchone()
+        if not subscription:
+            print(f"❌ サブスクリプションが見つかりません: {subscription_id}")
+            return
+        
+        company_id, content_type = subscription
+        
+        # 解約処理を実行
+        result = cancel_company_content(company_id, content_type)
+        
+        if result:
+            print(f"✅ 企業解約処理が完了しました: {company_id}, {content_type}")
+        else:
+            print(f"❌ 企業解約処理に失敗しました: {company_id}, {content_type}")
+        
+    except Exception as e:
+        print(f"❌ 企業解約処理エラー: {e}")
+    finally:
+        if c:
+            c.close()
+        if conn:
+            conn.close()
+
+# 企業決済失敗処理
+def handle_company_payment_failed(event):
+    """
+    企業決済失敗処理
+    """
+    invoice = event['data']['object']
+    subscription_id = invoice['subscription']
+    
+    print(f"⚠️ 企業決済失敗: {subscription_id}")
+    
+    # 決済失敗通知を送信（実装予定）
+    # send_payment_failed_notification(subscription_id)
+
+# 企業決済成功処理
+def handle_company_payment_succeeded(event):
+    """
+    企業決済成功処理
+    """
+    invoice = event['data']['object']
+    subscription_id = invoice['subscription']
+    
+    print(f"✅ 企業決済成功: {subscription_id}")
+    
+    # 決済成功通知を送信（実装予定）
+    # send_payment_succeeded_notification(subscription_id)
 
 @app.route('/company-registration-debug')
 def company_registration_debug():
@@ -317,12 +605,6 @@ def company_registration_debug():
     return render_template('company_registration_debug.html', 
                          subscription_id=subscription_id, 
                          content_type=content_type)
-
-@app.route('/company-registration-success')
-def company_registration_success():
-    """企業登録成功ページ"""
-    company_id = request.args.get('company_id')
-    return render_template('company_registration_success.html', company_id=company_id)
 
 @app.route('/company-dashboard')
 def company_dashboard():
@@ -703,135 +985,79 @@ def fix_table_structure():
             'message': str(e)
         })
 
-@app.route('/debug/test_cancellation')
-def test_cancellation():
-    """解約処理のテスト用エンドポイント"""
-    try:
-        # from services.cancellation_service import record_cancellation  # 削除された関数
-        
-        # 現在のユーザーデータを確認
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute('SELECT id, email, line_user_id FROM users ORDER BY id')
-        users = []
-        for row in c.fetchall():
-            users.append({
-                'id': row[0],
-                'email': row[1],
-                'line_user_id': row[2]
-            })
-        
-        # 最初のユーザーIDを使用してテスト
-        if users:
-            test_user_id = users[0]['id']
-            print(f'[DEBUG] テスト用ユーザーID: {test_user_id}')
-            
-            # テスト用の解約記録
-            # record_cancellation(test_user_id, 'AI経理秘書')  # 削除された関数
-            
-            # 解約履歴を確認
-            c.execute('''
-                SELECT ch.id, ch.user_id, ch.content_type, ch.cancelled_at,
-                       u.email, u.line_user_id
-                FROM cancellation_history ch
-                LEFT JOIN users u ON ch.user_id = u.id
-                WHERE ch.content_type = 'AI経理秘書'
-                ORDER BY ch.cancelled_at DESC
-            ''')
-            
-            cancellations = []
-            for row in c.fetchall():
-                cancellations.append({
-                    'id': row[0],
-                    'user_id': row[1],
-                    'content_type': row[2],
-                    'cancelled_at': row[3],
-                    'user_email': row[4],
-                    'line_user_id': row[5]
-                })
-            
-            conn.close()
-            
-            return jsonify({
-                'status': 'ok',
-                'message': '解約処理テスト完了',
-                'users': users,
-                'test_user_id': test_user_id,
-                'cancellations': cancellations,
-                'count': len(cancellations)
-            })
-        else:
-            conn.close()
-            return jsonify({
-                'status': 'error',
-                'message': 'ユーザーデータが見つかりません'
-            })
-    except Exception as e:
-        return jsonify({
-            'status': 'error',
-            'message': str(e)
-        })
+# @app.route('/debug/test_cancellation')
+# def test_cancellation():
+#     """解約処理のテスト用エンドポイント（企業ユーザー専用に統一するため削除）"""
+#     pass
 
-@app.route('/debug/add_user_data')
-def add_user_data():
-    """ユーザーデータを追加するエンドポイント"""
+@app.route('/debug/add_company_data')
+def add_company_data():
+    """企業データを追加するエンドポイント"""
     try:
         conn = get_db_connection()
         c = conn.cursor()
         
-        # 新しいユーザーデータを追加
-        new_user_data = {
-            'email': 'test_user@example.com',
-            'stripe_customer_id': 'cus_test_' + str(int(time.time())),
-            'stripe_subscription_id': 'sub_test_' + str(int(time.time())),
-            'line_user_id': 'U231cdb3fc0687f3abc7bcaba5214dfff'
+        # 新しい企業データを追加
+        new_company_data = {
+            'company_name': 'テスト企業株式会社',
+            'email': 'test_company@example.com',
+            'content_type': 'ai_schedule',
+            'line_channel_id': 'U231cdb3fc0687f3abc7bcaba5214dfff',
+            'line_channel_access_token': 'test_token_' + str(int(time.time()))
         }
         
+        # 企業基本情報を追加
         c.execute('''
-            INSERT INTO users (email, stripe_customer_id, stripe_subscription_id, line_user_id)
-            VALUES (%s, %s, %s, %s)
-            ON CONFLICT (line_user_id) DO NOTHING
-        ''', (new_user_data['email'], new_user_data['stripe_customer_id'], 
-              new_user_data['stripe_subscription_id'], new_user_data['line_user_id']))
+            INSERT INTO companies (company_name, email, status)
+            VALUES (%s, %s, 'active')
+            ON CONFLICT (email) DO NOTHING
+            RETURNING id
+        ''', (new_company_data['company_name'], new_company_data['email']))
         
-        conn.commit()
-        
-        # 追加されたユーザーを確認
-        c.execute('SELECT id, email, line_user_id FROM users WHERE line_user_id = %s', (new_user_data['line_user_id'],))
-        user_result = c.fetchone()
-        
-        if user_result:
-            user_id = user_result[0]
-            # このユーザーにAI予定秘書の解約履歴を追加
+        company_result = c.fetchone()
+        if company_result:
+            company_id = company_result[0]
+            
+            # 企業LINEアカウントを追加
             c.execute('''
-                INSERT INTO cancellation_history (user_id, content_type, cancelled_at)
-                VALUES (%s, %s, CURRENT_TIMESTAMP)
-                ON CONFLICT DO NOTHING
-            ''', (user_id, 'AI予定秘書'))
+                INSERT INTO company_line_accounts (company_id, content_type, line_channel_id, line_channel_access_token, status)
+                VALUES (%s, %s, %s, %s, 'active')
+                ON CONFLICT (company_id, content_type) DO NOTHING
+            ''', (company_id, new_company_data['content_type'], 
+                  new_company_data['line_channel_id'], new_company_data['line_channel_access_token']))
+            
+            # 企業サブスクリプションを追加
+            c.execute('''
+                INSERT INTO company_subscriptions (company_id, content_type, subscription_status)
+                VALUES (%s, %s, 'active')
+                ON CONFLICT (company_id, content_type) DO NOTHING
+            ''', (company_id, new_company_data['content_type']))
             
             conn.commit()
             
-            # 全ユーザーを取得
-            c.execute('SELECT id, email, line_user_id FROM users ORDER BY id')
-            all_users = []
+            # 全企業を取得
+            c.execute('SELECT id, company_name, email, status FROM companies ORDER BY id')
+            all_companies = []
             for row in c.fetchall():
-                all_users.append({
+                all_companies.append({
                     'id': row[0],
-                    'email': row[1],
-                    'line_user_id': row[2]
+                    'company_name': row[1],
+                    'email': row[2],
+                    'status': row[3]
                 })
             
             conn.close()
             
             return jsonify({
                 'status': 'ok',
-                'message': 'ユーザーデータを追加しました',
-                'added_user': {
-                    'id': user_id,
-                    'email': new_user_data['email'],
-                    'line_user_id': new_user_data['line_user_id']
+                'message': '企業データを追加しました',
+                'added_company': {
+                    'id': company_id,
+                    'company_name': new_company_data['company_name'],
+                    'email': new_company_data['email'],
+                    'line_channel_id': new_company_data['line_channel_id']
                 },
-                'all_users': all_users
+                'all_companies': all_companies
             })
         else:
             conn.close()
@@ -867,12 +1093,12 @@ def check_registration():
     
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute('SELECT id, line_user_id FROM users WHERE email = %s', (email,))
+    c.execute('SELECT id FROM companies WHERE email = %s', (email,))
     user = c.fetchone()
     conn.close()
     
     if user:
-        return jsonify({'registered': True, 'line_linked': user[1] is not None})
+        return jsonify({'registered': True, 'company_id': user[0]})
     else:
         return jsonify({'registered': False})
 
@@ -895,15 +1121,15 @@ def thanks():
         try:
             conn = get_db_connection()
             c = conn.cursor()
-            c.execute('SELECT id FROM users WHERE email = %s ORDER BY created_at DESC LIMIT 1', (email,))
+            c.execute('SELECT id FROM companies WHERE email = %s ORDER BY created_at DESC LIMIT 1', (email,))
             user = c.fetchone()
             conn.close()
             if user:
-                user_id = user[0]
+                company_id = user[0]
         except Exception as e:
             print(f'[DEBUG] ユーザーID取得エラー: {e}')
     
-    return render_template('thanks.html', email=email, user_id=user_id)
+    return render_template('thanks.html', email=email, company_id=company_id)
 
 @app.route('/static/<path:filename>')
 def static_files(filename):
@@ -924,28 +1150,27 @@ def line_status():
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)})
 
-@app.route('/debug/users')
-def debug_users():
-    """デバッグ用：ユーザー一覧表示"""
+@app.route('/debug/companies')
+def debug_companies():
+    """デバッグ用：企業一覧表示"""
     try:
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute('SELECT id, email, stripe_customer_id, stripe_subscription_id, line_user_id, created_at FROM users ORDER BY created_at DESC LIMIT 10')
-        users = c.fetchall()
+        c.execute('SELECT id, company_name, email, status, created_at FROM companies ORDER BY created_at DESC LIMIT 10')
+        companies = c.fetchall()
         conn.close()
         
-        user_list = []
-        for user in users:
-            user_list.append({
-                'id': user[0],
-                'email': user[1],
-                'stripe_customer_id': user[2],
-                'stripe_subscription_id': user[3],
-                'line_user_id': user[4],
-                'created_at': user[5]
+        company_list = []
+        for company in companies:
+            company_list.append({
+                'id': company[0],
+                'company_name': company[1],
+                'email': company[2],
+                'status': company[3],
+                'created_at': company[4]
             })
         
-        return jsonify({'users': user_list})
+        return jsonify({'companies': company_list})
     except Exception as e:
         return jsonify({'error': str(e)})
 
@@ -1000,25 +1225,31 @@ def debug_webhook_status():
     except Exception as e:
         return jsonify({'error': str(e)})
 
-@app.route('/debug/update_line_user_id/<email>/<new_line_user_id>')
-def debug_update_line_user_id(email, new_line_user_id):
-    """デバッグ用：LINEユーザーIDを手動で更新"""
+@app.route('/debug/update_company_line_user_id/<email>/<new_line_user_id>')
+def debug_update_company_line_user_id(email, new_line_user_id):
+    """デバッグ用：企業LINEユーザーIDを手動で更新"""
     try:
         conn = get_db_connection()
         c = conn.cursor()
         
-        # 既存のLINEユーザーIDをクリア
-        c.execute('UPDATE users SET line_user_id = NULL WHERE email = %s', (email,))
+        # 企業IDを取得
+        c.execute('SELECT id FROM companies WHERE email = %s', (email,))
+        company = c.fetchone()
         
-        # 新しいLINEユーザーIDで更新
-        c.execute('UPDATE users SET line_user_id = %s WHERE email = %s', (new_line_user_id, email))
+        if not company:
+            return jsonify({'error': '企業が見つかりません'}), 404
+        
+        company_id = company[0]
+        
+        # 企業LINEアカウントを更新
+        c.execute('UPDATE company_line_accounts SET line_channel_id = %s WHERE company_id = %s', (new_line_user_id, company_id))
         
         conn.commit()
         conn.close()
         
         return jsonify({
             'success': True,
-            'message': f'LINEユーザーIDを更新しました: email={email}, new_line_user_id={new_line_user_id}'
+            'message': f'企業LINEユーザーIDを更新しました: company_id={company_id}, new_line_user_id={new_line_user_id}'
         })
     except Exception as e:
         return jsonify({'error': str(e)})
@@ -1032,32 +1263,15 @@ def debug_subscription(subscription_id):
     except Exception as e:
         return jsonify({'error': str(e)})
 
-@app.route('/debug/update_subscription/<new_subscription_id>')
-def update_subscription_id(new_subscription_id):
-    """デバッグ用：サブスクリプションID更新"""
-    try:
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute('UPDATE users SET stripe_subscription_id = %s WHERE id = 1', (new_subscription_id,))
-        conn.commit()
-        conn.close()
-        return jsonify({'success': True, 'message': f'Updated subscription ID to {new_subscription_id}'})
-    except Exception as e:
-        return jsonify({'error': str(e)})
+# @app.route('/debug/update_subscription/<new_subscription_id>')
+# def update_subscription_id(new_subscription_id):
+#     """デバッグ用：サブスクリプションID更新（企業ユーザー専用に統一するため削除）"""
+#     pass
 
-@app.route('/debug/add_user')
-def add_user():
-    """デバッグ用：テストユーザー追加"""
-    try:
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute('INSERT INTO users (email, stripe_customer_id, stripe_subscription_id) VALUES (%s, %s, %s)',
-                  ('test@example.com', 'cus_test123', 'sub_test123'))
-        conn.commit()
-        conn.close()
-        return jsonify({'success': True, 'message': 'Test user added'})
-    except Exception as e:
-        return jsonify({'error': str(e)})
+# @app.route('/debug/add_user')
+# def add_user():
+#     """デバッグ用：テストユーザー追加（企業ユーザー専用に統一するため削除）"""
+#     pass
 
 @app.route('/debug/usage_logs')
 def debug_usage_logs():
@@ -1071,79 +1285,10 @@ def debug_usage_logs():
     except Exception as e:
         return jsonify({'error': str(e)})
 
-@app.route('/subscribe', methods=['POST'])
-def subscribe():
-    """Stripeサブスクリプション作成"""
-    try:
-        # フォームデータとJSONの両方に対応
-        if request.is_json:
-            data = request.get_json()
-            email = data.get('email')
-        else:
-            email = request.form.get('email')
-        
-        if not email:
-            return jsonify({'error': 'Email is required'}), 400
-        
-        # 既存ユーザーの確認
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute('SELECT id, stripe_customer_id, stripe_subscription_id FROM users WHERE email = %s', (email,))
-        existing_user = c.fetchone()
-        conn.close()
-        
-        if existing_user:
-            user_id, customer_id, subscription_id = existing_user
-            print(f"既存ユーザー発見: user_id={user_id}, customer_id={customer_id}, subscription_id={subscription_id}")
-            
-            # 既存のサブスクリプションの状態を確認
-            try:
-                subscription = stripe.Subscription.retrieve(subscription_id)
-                if subscription['status'] in ['active', 'trialing']:
-                    print(f"既存のサブスクリプションが有効: {subscription_id}")
-                    # 既存のサブスクリプションが有効な場合は、そのまま成功ページにリダイレクト
-                    return jsonify({
-                        'existing_subscription': True,
-                        'subscription_id': subscription_id,
-                        'redirect_url': url_for('thanks', _external=True) + f"?email={email}"
-                    })
-                else:
-                    print(f"既存のサブスクリプションが無効: {subscription_id}, status={subscription['status']}")
-            except Exception as e:
-                print(f"既存サブスクリプション確認エラー: {e}")
-        
-        # 新規ユーザーまたは無効なサブスクリプションの場合、新しいサブスクリプションを作成
-        print(f"新しいサブスクリプションを作成: email={email}")
-        
-        # Stripe Checkout Sessionを作成（月額料金と従量課金Priceの両方を含む）
-        session = stripe.checkout.Session.create(
-            payment_method_types=['card'],
-            mode='subscription',
-            customer_email=email,
-            line_items=[
-                {
-                    'price': MONTHLY_PRICE_ID,
-                    'quantity': 1,
-                },
-                {
-                    'price': USAGE_PRICE_ID,
-                    # 従量課金Priceにはquantityを指定しない
-                }
-            ],
-            subscription_data={
-                'trial_period_days': 7,  # 1週間の無料期間
-            },
-            success_url=url_for('thanks', _external=True) + f"?email={email}",
-            cancel_url=url_for('index', _external=True),
-        )
-        
-        return jsonify({
-            'session_id': session.id,
-            'url': session.url
-        })
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+# @app.route('/subscribe', methods=['POST'])
+# def subscribe():
+#     """Stripeサブスクリプション作成（個人ユーザー用 - 企業ユーザー専用に統一するため削除）"""
+#     pass
 
 @app.route('/debug/subscription_periods')
 def debug_subscription_periods():
@@ -1152,44 +1297,40 @@ def debug_subscription_periods():
         conn = get_db_connection()
         c = conn.cursor()
         
-        # subscription_periodsテーブルの内容を取得
+        # company_subscriptionsテーブルの内容を取得
         c.execute('''
             SELECT 
-                sp.id,
-                sp.user_id,
-                u.email,
-                sp.stripe_subscription_id,
-                sp.subscription_status,
-                sp.current_period_start,
-                sp.current_period_end,
-                sp.trial_start,
-                sp.trial_end,
-                sp.updated_at
-            FROM subscription_periods sp
-            JOIN users u ON sp.user_id = u.id
-            ORDER BY sp.updated_at DESC
+                cs.id,
+                cs.company_id,
+                c.company_name,
+                c.email,
+                cs.content_type,
+                cs.subscription_status,
+                cs.current_period_end,
+                cs.created_at
+            FROM company_subscriptions cs
+            JOIN companies c ON cs.company_id = c.id
+            ORDER BY cs.created_at DESC
         ''')
         
-        periods = []
+        subscriptions = []
         for row in c.fetchall():
-            periods.append({
+            subscriptions.append({
                 'id': row[0],
-                'user_id': row[1],
-                'email': row[2],
-                'stripe_subscription_id': row[3],
-                'subscription_status': row[4],
-                'current_period_start': row[5],
+                'company_id': row[1],
+                'company_name': row[2],
+                'email': row[3],
+                'content_type': row[4],
+                'subscription_status': row[5],
                 'current_period_end': row[6],
-                'trial_start': row[7],
-                'trial_end': row[8],
-                'updated_at': row[9]
+                'created_at': row[7]
             })
         
         # テーブル構造も確認
         c.execute("""
             SELECT column_name, data_type, is_nullable 
             FROM information_schema.columns 
-            WHERE table_name = 'subscription_periods' 
+            WHERE table_name = 'company_subscriptions' 
             ORDER BY ordinal_position
         """)
         
@@ -1205,72 +1346,23 @@ def debug_subscription_periods():
         
         return jsonify({
             'status': 'ok',
-            'subscription_periods': periods,
+            'company_subscriptions': subscriptions,
             'table_structure': columns,
-            'count': len(periods)
+            'count': len(subscriptions)
         })
         
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)})
 
-@app.route('/debug/sync_subscription/<int:user_id>')
-def debug_sync_subscription(user_id):
-    """指定ユーザーの契約期間情報をStripeから同期"""
-    try:
-        from services.subscription_period_service import SubscriptionPeriodService
-        
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute('SELECT stripe_subscription_id FROM users WHERE id = %s', (user_id,))
-        result = c.fetchone()
-        conn.close()
-        
-        if not result or not result[0]:
-            return jsonify({'status': 'error', 'message': 'サブスクリプションIDが見つかりません'})
-        
-        stripe_subscription_id = result[0]
-        period_service = SubscriptionPeriodService()
-        success = period_service.sync_subscription_period(user_id, stripe_subscription_id)
-        
-        if success:
-            # 同期後の情報を取得
-            subscription_info = period_service.get_subscription_info(user_id)
-            return jsonify({
-                'status': 'ok',
-                'message': '契約期間情報を同期しました',
-                'subscription_info': subscription_info
-            })
-        else:
-            return jsonify({'status': 'error', 'message': '同期に失敗しました'})
-            
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)})
+# @app.route('/debug/sync_subscription/<int:user_id>')
+# def debug_sync_subscription(user_id):
+#     """指定ユーザーの契約期間情報をStripeから同期（企業ユーザー専用に統一するため削除）"""
+#     pass
 
-@app.route('/debug/cancellation_periods')
-def debug_cancellation_periods():
-    """cancellation_historyテーブルの契約期間情報を確認"""
-    try:
-        conn = get_db_connection()
-        c = conn.cursor()
-        
-        # cancellation_historyテーブルの内容を取得
-        c.execute('''
-            SELECT 
-                ch.id,
-                ch.user_id,
-                u.email,
-                ch.content_type,
-                ch.subscription_status,
-                ch.current_period_start,
-                ch.current_period_end,
-                ch.trial_start,
-                ch.trial_end,
-                ch.stripe_subscription_id,
-                ch.cancelled_at
-            FROM cancellation_history ch
-            JOIN users u ON ch.user_id = u.id
-            ORDER BY ch.cancelled_at DESC
-        ''')
+# @app.route('/debug/cancellation_periods')
+# def debug_cancellation_periods():
+#     """cancellation_historyテーブルの契約期間情報を確認（企業ユーザー専用に統一するため削除）"""
+#     pass
         
         periods = []
         for row in c.fetchall():
@@ -1316,38 +1408,10 @@ def debug_cancellation_periods():
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)})
 
-@app.route('/debug/update_cancellation_period/<int:user_id>/<content_type>')
-def debug_update_cancellation_period(user_id, content_type):
-    """指定ユーザーの契約期間情報をcancellation_historyに更新"""
-    try:
-        from services.cancellation_period_service import CancellationPeriodService
-        
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute('SELECT stripe_subscription_id FROM users WHERE id = %s', (user_id,))
-        result = c.fetchone()
-        conn.close()
-        
-        if not result or not result[0]:
-            return jsonify({'status': 'error', 'message': 'サブスクリプションIDが見つかりません'})
-        
-        stripe_subscription_id = result[0]
-        period_service = CancellationPeriodService()
-        success = period_service.update_subscription_period(user_id, content_type, stripe_subscription_id)
-        
-        if success:
-            # 更新後の情報を取得
-            subscription_info = period_service.get_subscription_info(user_id, content_type)
-            return jsonify({
-                'status': 'ok',
-                'message': '契約期間情報を更新しました',
-                'subscription_info': subscription_info
-            })
-        else:
-            return jsonify({'status': 'error', 'message': '更新に失敗しました'})
-            
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)})
+# @app.route('/debug/update_cancellation_period/<int:user_id>/<content_type>')
+# def debug_update_cancellation_period(user_id, content_type):
+#     """指定ユーザーの契約期間情報をcancellation_historyに更新（企業ユーザー専用に統一するため削除）"""
+#     pass
 
 @app.route('/debug/migrate_cancellation_history')
 def migrate_cancellation_history():
@@ -1438,87 +1502,15 @@ def migrate_cancellation_history():
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)})
 
-@app.route('/debug/update_existing_cancellation/<int:user_id>/<content_type>')
-def update_existing_cancellation(user_id, content_type):
-    """既存のcancellation_historyレコードに契約期間情報を更新"""
-    try:
-        from services.cancellation_period_service import CancellationPeriodService
-        
-        # ユーザーのサブスクリプションIDを取得
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute('SELECT stripe_subscription_id FROM users WHERE id = %s', (user_id,))
-        result = c.fetchone()
-        conn.close()
-        
-        if not result or not result[0]:
-            return jsonify({'status': 'error', 'message': 'サブスクリプションIDが見つかりません'})
-        
-        stripe_subscription_id = result[0]
-        
-        # 契約期間情報を更新
-        period_service = CancellationPeriodService()
-        success = period_service.update_subscription_period(user_id, content_type, stripe_subscription_id)
-        
-        if success:
-            # 更新後の情報を取得
-            subscription_info = period_service.get_subscription_info(user_id, content_type)
-            
-            # 更新後のテーブル内容も確認
-            conn = get_db_connection()
-            c = conn.cursor()
-            c.execute('''
-                SELECT 
-                    id, user_id, content_type, cancelled_at,
-                    subscription_status, current_period_start, current_period_end,
-                    trial_start, trial_end, stripe_subscription_id
-                FROM cancellation_history 
-                WHERE user_id = %s AND content_type = %s
-            ''', (user_id, content_type))
-            
-            updated_record = c.fetchone()
-            conn.close()
-            
-            if updated_record:
-                record_info = {
-                    'id': updated_record[0],
-                    'user_id': updated_record[1],
-                    'content_type': updated_record[2],
-                    'cancelled_at': updated_record[3],
-                    'subscription_status': updated_record[4],
-                    'current_period_start': updated_record[5],
-                    'current_period_end': updated_record[6],
-                    'trial_start': updated_record[7],
-                    'trial_end': updated_record[8],
-                    'stripe_subscription_id': updated_record[9]
-                }
-            else:
-                record_info = None
-            
-            return jsonify({
-                'status': 'ok',
-                'message': '既存レコードを更新しました',
-                'subscription_info': subscription_info,
-                'updated_record': record_info
-            })
-        else:
-            return jsonify({'status': 'error', 'message': '更新に失敗しました'})
-            
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)})
+# @app.route('/debug/update_existing_cancellation/<int:user_id>/<content_type>')
+# def update_existing_cancellation(user_id, content_type):
+#     """既存のcancellation_historyレコードに契約期間情報を更新（企業ユーザー専用に統一するため削除）"""
+#     pass
 
-@app.route('/debug/create_content_period/<int:user_id>/<content_type>')
-def debug_create_content_period(user_id, content_type):
-    """指定ユーザーのコンテンツ追加時に契約期間情報を保存"""
-    try:
-        from services.cancellation_period_service import CancellationPeriodService
-        
-        # ユーザーのサブスクリプションIDを取得
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute('SELECT stripe_subscription_id FROM users WHERE id = %s', (user_id,))
-        result = c.fetchone()
-        conn.close()
+# @app.route('/debug/create_content_period/<int:user_id>/<content_type>')
+# def debug_create_content_period(user_id, content_type):
+#     """指定ユーザーのコンテンツ追加時に契約期間情報を保存（企業ユーザー専用に統一するため削除）"""
+#     pass
         
         if not result or not result[0]:
             return jsonify({'status': 'error', 'message': 'サブスクリプションIDが見つかりません'})
@@ -1652,6 +1644,123 @@ def debug_update_company_line_user_id(company_id, line_user_id):
             
     except Exception as e:
         return jsonify({'error': str(e)})
+
+# 企業ユーザー専用の解約制限チェックAPI
+@app.route('/api/v1/company/restriction/check', methods=['POST'])
+def check_company_restriction_api():
+    """
+    企業ユーザーの解約制限チェックAPI
+    """
+    try:
+        data = request.get_json()
+        line_channel_id = data.get('line_channel_id')
+        content_type = data.get('content_type')
+        
+        if not line_channel_id or not content_type:
+            return jsonify({
+                'error': 'line_channel_id と content_type は必須です'
+            }), 400
+        
+        # 企業制限チェックを実行
+        from services.company_service import check_company_restriction
+        result = check_company_restriction(line_channel_id, content_type)
+        
+        return jsonify({
+            'is_restricted': result['is_restricted'],
+            'reason': result['reason'],
+            'message': result['message'],
+            'content_type': content_type,
+            'line_channel_id': line_channel_id
+        })
+        
+    except Exception as e:
+        print(f"❌ 企業制限チェックAPIエラー: {e}")
+        return jsonify({
+            'error': 'システムエラーが発生しました',
+            'is_restricted': False  # エラー時は制限しない
+        }), 500
+
+# 企業情報取得API
+@app.route('/api/v1/company/info/<line_channel_id>', methods=['GET'])
+def get_company_info_api(line_channel_id):
+    """
+    企業情報取得API
+    """
+    try:
+        from services.company_service import get_company_by_line_channel_id, get_company_line_accounts, get_company_subscriptions
+        
+        # 企業基本情報を取得
+        company = get_company_by_line_channel_id(line_channel_id)
+        if not company:
+            return jsonify({
+                'error': '企業情報が見つかりません'
+            }), 404
+        
+        # LINEアカウント情報を取得
+        line_accounts = get_company_line_accounts(company['id'])
+        
+        # サブスクリプション情報を取得
+        subscriptions = get_company_subscriptions(company['id'])
+        
+        return jsonify({
+            'company': company,
+            'line_accounts': line_accounts,
+            'subscriptions': subscriptions
+        })
+        
+    except Exception as e:
+        print(f"❌ 企業情報取得APIエラー: {e}")
+        return jsonify({
+            'error': 'システムエラーが発生しました'
+        }), 500
+
+# 企業コンテンツ解約API
+@app.route('/api/v1/company/cancel/<int:company_id>/<content_type>', methods=['POST'])
+def cancel_company_content_api(company_id, content_type):
+    """
+    企業コンテンツ解約API
+    """
+    try:
+        from services.company_service import cancel_company_content
+        
+        result = cancel_company_content(company_id, content_type)
+        if not result:
+            return jsonify({
+                'error': '解約処理に失敗しました'
+            }), 500
+        
+        return jsonify({
+            'message': '解約処理が完了しました',
+            'result': result
+        })
+        
+    except Exception as e:
+        print(f"❌ 企業コンテンツ解約APIエラー: {e}")
+        return jsonify({
+            'error': 'システムエラーが発生しました'
+        }), 500
+
+# 企業制限チェックテスト用API
+@app.route('/debug/company/restriction/<line_channel_id>/<content_type>')
+def debug_company_restriction(line_channel_id, content_type):
+    """
+    企業制限チェックのデバッグ用API
+    """
+    try:
+        from services.company_service import check_company_restriction
+        
+        result = check_company_restriction(line_channel_id, content_type)
+        
+        return jsonify({
+            'line_channel_id': line_channel_id,
+            'content_type': content_type,
+            'result': result
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'error': str(e)
+        }), 500
 
 if __name__ == '__main__':
     try:

@@ -23,6 +23,7 @@
                 <h1 class="hero-title">AIがあなたの<br>秘書になる時代</h1>
                 <p class="hero-subtitle">スマホに話しかけるだけで<br>日常のタスクがどんどん片付いていく</p>
                 <form id="subscription-form" class="hero-form">
+                    <input type="text" name="company_name" placeholder="企業名を入力" required class="hero-input">
                     <input type="email" name="email" placeholder="メールアドレスを入力" required class="hero-input">
                     <button type="submit" class="hero-btn">１週間無料トライアル中！</button>
                 </form>
@@ -38,7 +39,7 @@
                     <span class="marker">もっと集中するために</span>
                 </h2>
                 <p class="statement-text">
-                    AIコレクションズは、忙しい個人事業主や経営者のための"AI秘書サブスク"。<br><br>
+                    AIコレクションズは、忙しい企業や経営者のための"AI秘書サブスク"。<br><br>
                     まるで長年連れ添ったパートナーのように、あなたの一言にスムーズに反応し、煩わしい業務を次々とこなしてくれる頼れるAIたちが、あなたの日常をサポートします。<br><br>
                     「AIって、こんなに頼れるんだ」<br>
                     そんな驚きと安心を、毎日の中に。<br><br>
@@ -123,6 +124,7 @@
         document.getElementById('subscription-form').addEventListener('submit', async function(e) {
             e.preventDefault();
             
+            const companyName = document.querySelector('input[name="company_name"]').value;
             const email = document.querySelector('input[name="email"]').value;
             const submitButton = document.querySelector('.hero-btn');
             
@@ -131,12 +133,15 @@
             submitButton.textContent = '処理中...';
             
             try {
-                const response = await fetch('/subscribe', {
+                const response = await fetch('/company-registration', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ email: email })
+                    body: JSON.stringify({ 
+                        company_name: companyName,
+                        email: email 
+                    })
                 });
                 
                 const data = await response.json();
@@ -148,15 +153,7 @@
                     return;
                 }
                 
-                // 既存のサブスクリプションがある場合
-                if (data.existing_subscription) {
-                    console.log('既存のサブスクリプションが有効です:', data.subscription_id);
-                    // 直接成功ページにリダイレクト
-                    window.location.href = data.redirect_url;
-                    return;
-                }
-                
-                // 新しいサブスクリプションの場合、Stripeの決済ページにリダイレクト
+                // 企業登録成功の場合、Stripeの決済ページにリダイレクト
                 window.location.href = data.url;
                 
             } catch (error) {
