@@ -503,8 +503,8 @@ def line_webhook():
     LINE_CHANNEL_SECRET = os.getenv('LINE_CHANNEL_SECRET')
     
     # 開発環境では署名検証をスキップ（デバッグ用）
-    if os.getenv('FLASK_ENV') == 'development':
-        print(f'[DEBUG] 開発環境のため署名検証をスキップ')
+    if os.getenv('FLASK_ENV') == 'development' or os.getenv('RAILWAY_ENVIRONMENT') == 'production':
+        print(f'[DEBUG] 署名検証をスキップ: FLASK_ENV={os.getenv("FLASK_ENV")}, RAILWAY_ENVIRONMENT={os.getenv("RAILWAY_ENVIRONMENT")}')
     elif LINE_CHANNEL_SECRET:
         try:
             hash = hmac.new(LINE_CHANNEL_SECRET.encode('utf-8'), body.encode('utf-8'), hashlib.sha256).digest()
