@@ -6,11 +6,11 @@ import stripe
 import traceback
 import time
 from datetime import datetime, timedelta
-from lp.utils.db import get_db_connection
-# from lp.services.cancellation_service import record_cancellation  # 削除された関数
-from lp.services.stripe_service import check_subscription_status
+from utils.db import get_db_connection
+# from services.cancellation_service import record_cancellation  # 削除された関数
+from services.stripe_service import check_subscription_status
 import re
-from lp.services.subscription_period_service import SubscriptionPeriodService
+from services.subscription_period_service import SubscriptionPeriodService
 import json
 
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
@@ -450,7 +450,7 @@ def handle_add_content(reply_token, user_id_db, stripe_subscription_id):
 def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, content_number):
     try:
         # check_subscription_status関数をインポート
-        from lp.services.stripe_service import check_subscription_status
+        from services.stripe_service import check_subscription_status
         
         content_info = {
             '1': {
@@ -487,7 +487,7 @@ def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, co
         c_count = conn_count.cursor()
         
         # データベースタイプに応じて適切なプレースホルダーを使用
-        from lp.utils.db import get_db_type
+        from utils.db import get_db_type
         db_type = get_db_type()
         placeholder = '%s' if db_type == 'postgresql' else '?'
         
@@ -635,7 +635,7 @@ def handle_cancel_confirmation(user_id, content_number):
             }
         
         # データベースタイプに応じて適切なプレースホルダーを使用
-        from lp.utils.db import get_db_type
+        from utils.db import get_db_type
         db_type = get_db_type()
         placeholder = '%s' if db_type == 'postgresql' else '?'
         
@@ -695,6 +695,7 @@ def handle_content_confirmation(user_id, content_type):
         c = conn.cursor()
         
         # データベースタイプに応じて適切なプレースホルダーを使用
+        from utils.db import get_db_type
         db_type = get_db_type()
         placeholder = '%s' if db_type == 'postgresql' else '?'
         
@@ -825,7 +826,7 @@ def handle_cancel_request(reply_token, user_id_db, stripe_subscription_id):
         c = conn.cursor()
         
         # データベースタイプに応じて適切なプレースホルダーを使用
-        from lp.utils.db import get_db_type
+        from utils.db import get_db_type
         db_type = get_db_type()
         placeholder = '%s' if db_type == 'postgresql' else '?'
         
@@ -895,6 +896,7 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
         c = conn.cursor()
         
         # データベースタイプに応じて適切なプレースホルダーを使用
+        from utils.db import get_db_type
         db_type = get_db_type()
         placeholder = '%s' if db_type == 'postgresql' else '?'
         
@@ -1111,7 +1113,7 @@ def handle_cancel_selection(reply_token, user_id_db, stripe_subscription_id, sel
                     print(f'[DEBUG] 3通目の期間説明メッセージ送信失敗: {response.status_code}, {response.text}')
             
             # ユーザー状態をリセット
-            from lp.models.user_state import clear_user_state
+            from models.user_state import clear_user_state
             if line_user_id:
                 clear_user_state(line_user_id)
                 print(f'[DEBUG] ユーザー状態リセット: {line_user_id}')
@@ -1566,7 +1568,7 @@ def check_user_access_with_period(user_id, content_type):
     契約期間を考慮したユーザーアクセスチェック（cancellation_history使用）
     """
     try:
-        from lp.services.cancellation_period_service import CancellationPeriodService
+        from services.cancellation_period_service import CancellationPeriodService
         
         # cancellation_historyテーブルでチェック
         period_service = CancellationPeriodService()

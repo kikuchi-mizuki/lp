@@ -3,7 +3,7 @@
 ユーザー状態管理モデル
 """
 
-from lp.utils.db import get_db_connection
+from utils.db import get_db_connection
 import datetime
 
 def get_user_state(line_user_id):
@@ -13,7 +13,7 @@ def get_user_state(line_user_id):
         c = conn.cursor()
         
         # データベースタイプに応じて適切なプレースホルダーを使用
-        from lp.utils.db import get_db_type
+        from utils.db import get_db_type
         db_type = get_db_type()
         placeholder = '%s' if db_type == 'postgresql' else '?'
         
@@ -36,7 +36,7 @@ def set_user_state(line_user_id, state):
         c = conn.cursor()
         
         # データベースタイプに応じて適切なSQL構文を使用
-        from lp.utils.db import get_db_type
+        from utils.db import get_db_type
         db_type = get_db_type()
         
         if db_type == 'postgresql':
@@ -67,7 +67,7 @@ def clear_user_state(line_user_id):
         c = conn.cursor()
         
         # データベースタイプに応じて適切なプレースホルダーを使用
-        from lp.utils.db import get_db_type
+        from utils.db import get_db_type
         db_type = get_db_type()
         placeholder = '%s' if db_type == 'postgresql' else '?'
         
@@ -85,7 +85,7 @@ def init_user_states_table():
         c = conn.cursor()
         
         # データベースタイプに応じて適切なテーブル作成構文を使用
-        from lp.utils.db import get_db_type
+        from utils.db import get_db_type
         db_type = get_db_type()
         
         if db_type == 'postgresql':
