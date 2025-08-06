@@ -1323,7 +1323,7 @@ def handle_add_content_company(reply_token, company_id, stripe_subscription_id):
         total_subscription_count = c.fetchone()[0]
         
         # 企業のLINEアカウント数を確認
-        c.execute(f'SELECT COUNT(*) FROM company_line_accounts WHERE company_id = {placeholder} AND status = "active"', (company_id,))
+        c.execute(f'SELECT COUNT(*) FROM company_line_accounts WHERE company_id = {placeholder} AND status = {placeholder}', (company_id, 'active'))
         total_line_account_count = c.fetchone()[0]
         
         conn.close()
@@ -1542,11 +1542,20 @@ def handle_content_confirmation_company(company_id, content_type):
             total_price = base_price + (existing_count * additional_price_per_content)
         
         # 新しいサブスクリプションを作成
-        c.execute(f'''
-            INSERT INTO company_subscriptions 
-            (company_id, content_type, subscription_status, base_price, additional_price, total_price, current_period_end) 
-            VALUES ({placeholder}, {placeholder}, 'active', {placeholder}, {placeholder}, {placeholder}, DATE_ADD(NOW(), INTERVAL 1 MONTH))
-        ''', (company_id, content_type, base_price, additional_price_per_content, total_price))
+        if db_type == 'postgresql':
+            # PostgreSQL用の日付計算
+            c.execute(f'''
+                INSERT INTO company_subscriptions 
+                (company_id, content_type, subscription_status, base_price, additional_price, total_price, current_period_end) 
+                VALUES ({placeholder}, {placeholder}, 'active', {placeholder}, {placeholder}, {placeholder}, NOW() + INTERVAL '1 month')
+            ''', (company_id, content_type, base_price, additional_price_per_content, total_price))
+        else:
+            # SQLite用の日付計算
+            c.execute(f'''
+                INSERT INTO company_subscriptions 
+                (company_id, content_type, subscription_status, base_price, additional_price, total_price, current_period_end) 
+                VALUES ({placeholder}, {placeholder}, 'active', {placeholder}, {placeholder}, {placeholder}, DATE_ADD(NOW(), INTERVAL 1 MONTH))
+            ''', (company_id, content_type, base_price, additional_price_per_content, total_price))
         
         # 新しいLINEアカウントを作成
         line_channel_id = f"company_{company_id}_{content_type}_{int(time.time())}"
