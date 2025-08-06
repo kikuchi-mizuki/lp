@@ -15,7 +15,7 @@ from services.line_service import (
 from utils.message_templates import get_menu_message, get_help_message, get_default_message
 from utils.db import get_db_connection
 from models.user_state import get_user_state, set_user_state, clear_user_state, init_user_states_table
-from services.user_service import is_paid_user, is_paid_user_company_centric, get_restricted_message
+from services.user_service import is_paid_user, is_paid_user_company_centric, get_restricted_message, is_paid_user_by_email, update_line_user_id_for_email
 # from services.cancellation_service import is_content_cancelled, get_restriction_message_for_content  # 削除された関数
 
 line_bp = Blueprint('line', __name__)
@@ -1017,13 +1017,20 @@ def line_webhook():
                                 conn.commit()
                                 print(f'[DEBUG] 企業データ紐付け完了: user_id={user_id}, company_id={company_id}')
                                 
-                                # 決済状況をチェック
-                                print(f'[DEBUG] 企業紐付け後の決済チェック開始: user_id={user_id}')
-                                payment_check = is_paid_user_company_centric(user_id)
-                                print(f'[DEBUG] 企業紐付け後の決済チェック結果: user_id={user_id}, is_paid={payment_check["is_paid"]}, status={payment_check["subscription_status"]}')
+                                # 決済状況をチェック（メールアドレス中心）
+                                print(f'[DEBUG] メールアドレス中心の決済チェック開始: email={normalized_email}')
+                                payment_check = is_paid_user_by_email(normalized_email)
+                                print(f'[DEBUG] メールアドレス中心の決済チェック結果: email={normalized_email}, is_paid={payment_check["is_paid"]}, status={payment_check["subscription_status"]}')
                                 
                                 if payment_check['is_paid']:
                                     print(f'[DEBUG] 決済済み確認: user_id={user_id}')
+                                    # 企業データにLINEユーザーIDを紐付け（自動更新機能）
+                                    update_success = update_line_user_id_for_email(normalized_email, user_id)
+                                    if update_success:
+                                        print(f'[DEBUG] 企業データLINEユーザーID紐付け完了: user_id={user_id}, email={normalized_email}')
+                                    else:
+                                        print(f'[DEBUG] 企業データLINEユーザーID紐付け失敗: user_id={user_id}, email={normalized_email}')
+                                    
                                     # 案内メッセージを送信
                                     try:
                                         send_welcome_with_buttons(event['replyToken'])

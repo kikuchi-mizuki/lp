@@ -416,3 +416,181 @@ def update_line_user_id_for_company(company_id, new_line_user_id):
     except Exception as e:
         print(f'[ERROR] LINEユーザーID更新エラー: {e}')
         return False
+
+def update_line_user_id_for_email(email, new_line_user_id):
+    """
+    メールアドレスに対応する企業データのLINEユーザーIDを更新
+    
+    Args:
+        email (str): メールアドレス
+        new_line_user_id (str): 新しいLINEユーザーID
+        
+    Returns:
+        bool: 更新成功時True
+    """
+    try:
+        print(f'[DEBUG] LINEユーザーID更新開始: email={email}, new_line_user_id={new_line_user_id}')
+        
+        # PostgreSQL接続
+        import psycopg2
+        from dotenv import load_dotenv
+        load_dotenv()
+        
+        database_url = os.getenv("DATABASE_URL")
+        if not database_url:
+            database_url = "postgresql://postgres:WZgnjZezoefHmxbwRjUbiPhajtwubmUs@gondola.proxy.rlwy.net:16797/railway"
+        
+        conn = psycopg2.connect(database_url)
+        c = conn.cursor()
+        
+        # 企業データのLINEユーザーIDを更新
+        c.execute('''
+            UPDATE companies 
+            SET line_user_id = %s, updated_at = CURRENT_TIMESTAMP
+            WHERE email = %s
+        ''', (new_line_user_id, email))
+        
+        updated_count = c.rowcount
+        conn.commit()
+        conn.close()
+        
+        if updated_count > 0:
+            print(f'[DEBUG] LINEユーザーID更新成功: email={email}, new_line_user_id={new_line_user_id}')
+            return True
+        else:
+            print(f'[DEBUG] 更新対象が見つかりません: email={email}')
+            return False
+            
+    except Exception as e:
+        print(f'[ERROR] LINEユーザーID更新エラー: {e}')
+        return False
+
+def is_paid_user_by_email(email):
+    """
+    メールアドレス中心の決済状況チェック（LINEユーザーID変更対応）
+    
+    Args:
+        email (str): メールアドレス
+        
+    Returns:
+        dict: {
+            'is_paid': bool,
+            'subscription_status': str,
+            'message': str,
+            'redirect_url': str
+        }
+    """
+    print(f'[DEBUG] is_paid_user_by_email開始: email={email}')
+    try:
+        # PostgreSQL接続を使用
+        import psycopg2
+        from dotenv import load_dotenv
+        load_dotenv()
+        
+        # Railway本番環境のデータベース接続情報
+        database_url = os.getenv("DATABASE_URL")
+        if not database_url:
+            database_url = "postgresql://postgres:WZgnjZezoefHmxbwRjUbiPhajtwubmUs@gondola.proxy.rlwy.net:16797/railway"
+        
+        print(f'[DEBUG] PostgreSQL接続開始: {database_url[:50]}...')
+        
+        conn = psycopg2.connect(database_url)
+        c = conn.cursor()
+        print(f'[DEBUG] PostgreSQL接続成功')
+        
+        # メールアドレスで企業データを検索
+        c.execute('''
+            SELECT id, company_name, stripe_subscription_id, status
+            FROM companies 
+            WHERE email = %s
+        ''', (email,))
+        
+        result = c.fetchone()
+        print(f'[DEBUG] 企業データベース検索結果: email={email}, result={result}')
+        
+        if not result:
+            print(f'[DEBUG] 企業が見つかりません: email={email}')
+            conn.close()
+            return {
+                'is_paid': False,
+                'subscription_status': 'not_registered',
+                'message': 'AIコレクションズの公式LINEにご登録ください。',
+                'redirect_url': 'https://line.me/R/ti/p/@ai_collections'
+            }
+        
+        company_id, company_name, stripe_subscription_id, status = result
+        print(f'[DEBUG] 企業情報取得: company_id={company_id}, company_name={company_name}, stripe_subscription_id={stripe_subscription_id}, status={status}')
+        
+        # 企業の決済状況をチェック
+        c.execute('''
+            SELECT subscription_status, current_period_end
+            FROM company_payments 
+            WHERE company_id = %s 
+            ORDER BY created_at DESC 
+            LIMIT 1
+        ''', (company_id,))
+        
+        payment_result = c.fetchone()
+        print(f'[DEBUG] 決済状況検索結果: company_id={company_id}, payment_result={payment_result}')
+        
+        conn.close()
+        print(f'[DEBUG] データベース接続終了')
+        
+        # 決済状況の判定
+        if payment_result and payment_result[0] == 'active':
+            current_period_end = payment_result[1]
+            print(f'[DEBUG] 有効な決済: company_id={company_id}, status=active, period_end={current_period_end}')
+            
+            # 期限切れチェック
+            if current_period_end:
+                from datetime import datetime, timezone, timedelta
+                jst = timezone(timedelta(hours=9))
+                current_time = datetime.now(jst)
+                
+                # タイムゾーン情報を統一（current_period_endをawareに変換）
+                if current_period_end.tzinfo is None:
+                    current_period_end = current_period_end.replace(tzinfo=jst)
+                
+                if current_period_end > current_time:
+                    print(f'[DEBUG] 有効期限内: company_id={company_id}')
+                    return {
+                        'is_paid': True,
+                        'subscription_status': 'active',
+                        'message': None,
+                        'redirect_url': None
+                    }
+                else:
+                    print(f'[DEBUG] 期限切れ: company_id={company_id}, period_end={current_period_end}, current_time={current_time}')
+                    return {
+                        'is_paid': False,
+                        'subscription_status': 'expired',
+                        'message': 'サブスクリプションの有効期限が切れています。',
+                        'redirect_url': 'https://line.me/R/ti/p/@ai_collections'
+                    }
+            else:
+                print(f'[DEBUG] 期限未設定: company_id={company_id}')
+                return {
+                    'is_paid': True,
+                    'subscription_status': 'active',
+                    'message': None,
+                    'redirect_url': None
+                }
+        else:
+            print(f'[DEBUG] 無効な決済または未決済: company_id={company_id}, payment_status={payment_result[0] if payment_result else "none"}')
+            return {
+                'is_paid': False,
+                'subscription_status': payment_result[0] if payment_result else 'not_paid',
+                'message': '決済済みユーザーのみご利用いただけます。',
+                'redirect_url': 'https://line.me/R/ti/p/@ai_collections'
+            }
+            
+    except Exception as e:
+        print(f'[ERROR] メールアドレス中心決済状況チェックエラー: {e}')
+        import traceback
+        traceback.print_exc()
+        return {
+            'is_paid': False,
+            'subscription_status': 'error',
+            'message': 'システムエラーが発生しました。',
+            'redirect_url': 'https://line.me/R/ti/p/@ai_collections'
+        }
