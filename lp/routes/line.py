@@ -669,12 +669,81 @@ def line_webhook():
                         conn.close()
                         continue
                 else:
-                    # 2. companiesテーブルで見つからない場合、メールアドレス連携を促す
-                    print(f'[DEBUG] 既存企業が見つからないため、メールアドレス連携を促す')
-                    # メールアドレス連携を促すメッセージを送信
-                    send_line_message(event['replyToken'], [{"type": "text", "text": "決済済みの方は、登録時のメールアドレスを送信してください。\n\n例: example@example.com\n\n※メールアドレスを送信すると、自動的に企業データと紐付けされます。"}])
-                    conn.close()
-                    continue
+                    # 2. companiesテーブルで見つからない場合、メールアドレス処理を実行
+                    print(f'[DEBUG] 既存企業が見つからないため、メールアドレス処理を実行')
+                    
+                    # メールアドレス処理ロジック
+                    if '@' in text and '.' in text and len(text) < 100:
+                        print(f'[DEBUG] メールアドレス連携処理開始: user_id={user_id}, text={text}')
+                        
+                        def normalize_email(email):
+                            email = email.strip().lower()
+                            email = unicodedata.normalize('NFKC', email)
+                            return email
+                        
+                        normalized_email = normalize_email(text)
+                        print(f'[DEBUG] 正規化後のメールアドレス: {normalized_email}')
+                        
+                        # データベース接続を取得
+                        conn = get_db_connection()
+                        c = conn.cursor()
+                        
+                        # 1. companiesテーブルでメールアドレスを検索
+                        c.execute('SELECT id, company_name FROM companies WHERE email = %s', (normalized_email,))
+                        company = c.fetchone()
+                        print(f'[DEBUG] companiesテーブル検索結果: {company}')
+                        
+                        if company:
+                            company_id, company_name = company
+                            print(f'[DEBUG] 企業データ発見: company_id={company_id}, company_name={company_name}')
+                            
+                            # stripe_subscription_idはcompany_subscriptionsテーブルから取得
+                            c.execute('SELECT stripe_subscription_id FROM company_subscriptions WHERE company_id = %s AND subscription_status = "active" LIMIT 1', (company_id,))
+                            subscription = c.fetchone()
+                            stripe_subscription_id = subscription[0] if subscription else None
+                            
+                            # 企業データにLINEユーザーIDを紐付け
+                            c.execute('UPDATE companies SET line_user_id = %s WHERE id = %s', (user_id, company_id))
+                            conn.commit()
+                            print(f'[DEBUG] 企業データ紐付け完了: user_id={user_id}, company_id={company_id}')
+                            
+                            # 決済状況をチェック
+                            print(f'[DEBUG] 企業紐付け後の決済チェック開始: user_id={user_id}')
+                            payment_check = is_paid_user_company_centric(user_id)
+                            print(f'[DEBUG] 企業紐付け後の決済チェック結果: user_id={user_id}, is_paid={payment_check["is_paid"]}, status={payment_check["subscription_status"]}')
+                            
+                            if payment_check['is_paid']:
+                                print(f'[DEBUG] 決済済み確認: user_id={user_id}')
+                                # 案内メッセージを送信
+                                try:
+                                    send_welcome_with_buttons(event['replyToken'])
+                                    print(f'[DEBUG] メールアドレス連携時の案内文送信完了: user_id={user_id}')
+                                    # ユーザー状態を設定
+                                    set_user_state(user_id, 'welcome_sent')
+                                except Exception as e:
+                                    print(f'[DEBUG] メールアドレス連携時の案内文送信エラー: {e}')
+                                    traceback.print_exc()
+                                    send_line_message(event['replyToken'], [{"type": "text", "text": "ようこそ！AIコレクションズへ\n\n「追加」と入力してコンテンツを追加してください。"}])
+                                    set_user_state(user_id, 'welcome_sent')
+                            else:
+                                print(f'[DEBUG] 未決済確認: user_id={user_id}, status={payment_check["subscription_status"]}')
+                                # 制限メッセージを送信
+                                restricted_message = get_restricted_message()
+                                send_line_message(event['replyToken'], [restricted_message])
+                        else:
+                            # 企業データが見つからない場合
+                            print(f'[DEBUG] 企業データが見つかりません: email={normalized_email}')
+                            send_line_message(event['replyToken'], [{"type": "text", "text": 'ご登録メールアドレスが見つかりません。LPでご登録済みかご確認ください。'}])
+                        
+                        # データベース接続を閉じる
+                        conn.close()
+                        continue
+                    else:
+                        # メールアドレス以外の場合は、メールアドレス連携を促すメッセージを送信
+                        print(f'[DEBUG] メールアドレス以外のメッセージのため、メールアドレス連携を促す')
+                        send_line_message(event['replyToken'], [{"type": "text", "text": "決済済みの方は、登録時のメールアドレスを送信してください。\n\n例: example@example.com\n\n※メールアドレスを送信すると、自動的に企業データと紐付けされます。"}])
+                        conn.close()
+                        continue
                     print(f'[DEBUG] ユーザー状態確認: user_id={user_id}, state={state}')
                     print(f'[DEBUG] 状態詳細: state={state}, text={text}')
                     
