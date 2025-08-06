@@ -58,6 +58,7 @@ DATABASE_URL = os.getenv('DATABASE_URL', 'database.db')
 
 def init_db():
     """データベースの初期化（企業ユーザー専用最小限設計）"""
+    logger.info("🔄 データベース初期化開始")
     conn = None
     c = None
     try:
@@ -190,7 +191,7 @@ def init_db():
             ''')
         
         conn.commit()
-        print("✅ 企業ユーザー専用最小限データベースの初期化が完了しました")
+        logger.info("✅ 企業ユーザー専用最小限データベースの初期化が完了しました")
         
         # user_statesテーブルの初期化
         from models.user_state import init_user_states_table
@@ -252,10 +253,10 @@ def init_db():
             pass
         
         conn.commit()
-        print("✅ 追加テーブル作成完了")
+        logger.info("✅ 追加テーブル作成完了")
         
     except Exception as e:
-        print(f"❌ 追加テーブル作成エラー: {e}")
+        logger.error(f"❌ 追加テーブル作成エラー: {e}")
         import traceback
         traceback.print_exc()
     finally:
@@ -292,17 +293,21 @@ app.register_blueprint(ai_schedule_webhook_simple_bp)
 app.register_blueprint(debug_bp)
 
 # アプリケーション起動時のデータベース初期化
-print("🚀 アプリケーション起動中...")
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+logger.info("🚀 アプリケーション起動中...")
 try:
     init_db()
-    print("✅ データベース初期化完了")
+    logger.info("✅ データベース初期化完了")
 except Exception as e:
-    print(f"❌ データベース初期化エラー: {e}")
+    logger.error(f"❌ データベース初期化エラー: {e}")
     import traceback
     traceback.print_exc()
 
 # アプリケーション初期化完了の確認
-print("✅ アプリケーション初期化完了")
+logger.info("✅ アプリケーション初期化完了")
 
 @app.route('/')
 def index():
