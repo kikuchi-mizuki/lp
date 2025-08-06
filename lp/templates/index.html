@@ -3,142 +3,169 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AIコレクションズ - 企業ユーザー専用システム</title>
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            padding: 0;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .container {
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            padding: 40px;
-            text-align: center;
-            max-width: 600px;
-            width: 90%;
-        }
-        h1 {
-            color: #333;
-            margin-bottom: 20px;
-            font-size: 2.5em;
-        }
-        .subtitle {
-            color: #666;
-            font-size: 1.2em;
-            margin-bottom: 30px;
-        }
-        .status {
-            background: #e8f5e8;
-            border: 2px solid #4caf50;
-            border-radius: 10px;
-            padding: 20px;
-            margin: 20px 0;
-        }
-        .status h3 {
-            color: #2e7d32;
-            margin: 0 0 10px 0;
-        }
-        .status p {
-            color: #388e3c;
-            margin: 0;
-        }
-        .api-section {
-            background: #f5f5f5;
-            border-radius: 10px;
-            padding: 20px;
-            margin: 20px 0;
-            text-align: left;
-        }
-        .api-section h3 {
-            color: #333;
-            margin-top: 0;
-        }
-        .endpoint {
-            background: #fff;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            padding: 10px;
-            margin: 10px 0;
-            font-family: monospace;
-        }
-        .method {
-            background: #007bff;
-            color: white;
-            padding: 2px 8px;
-            border-radius: 3px;
-            font-size: 0.8em;
-            margin-right: 10px;
-        }
-        .debug-links {
-            margin-top: 30px;
-        }
-        .debug-links a {
-            display: inline-block;
-            background: #6c757d;
-            color: white;
-            text-decoration: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            margin: 5px;
-            transition: background 0.3s;
-        }
-        .debug-links a:hover {
-            background: #545b62;
-        }
-    </style>
+    <title>AIコレクションズ - AI秘書サブスクリプション</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://js.stripe.com/v3/"></script>
 </head>
 <body>
-    <div class="container">
-        <h1>🤖 AIコレクションズ</h1>
-        <p class="subtitle">企業ユーザー専用システム</p>
-        
-        <div class="status">
-            <h3>✅ システム状況</h3>
-            <p>データベース接続: 正常</p>
-            <p>API: 稼働中</p>
-            <p>解約制限チェック: 利用可能</p>
-        </div>
-        
-        <div class="api-section">
-            <h3>📡 利用可能なAPI</h3>
-            
-            <div class="endpoint">
-                <span class="method">POST</span>
-                <strong>/api/v1/company/restriction/check</strong>
-                <p>企業解約制限チェック</p>
-            </div>
-            
-            <div class="endpoint">
-                <span class="method">GET</span>
-                <strong>/api/v1/company/info/{line_channel_id}</strong>
-                <p>企業情報取得</p>
-            </div>
-            
-            <div class="endpoint">
-                <span class="method">POST</span>
-                <strong>/api/v1/company/cancel/{company_id}/{content_type}</strong>
-                <p>企業コンテンツ解約</p>
-            </div>
-            
-            <div class="endpoint">
-                <span class="method">GET</span>
-                <strong>/health</strong>
-                <p>ヘルスチェック</p>
+    <header>
+        <div class="header-container">
+            <div class="logo-container">
+                <img src="/static/images/logo.png" alt="AI Collections" class="logo-image">
             </div>
         </div>
-        
-        <div class="debug-links">
-            <h3>🔧 デバッグツール</h3>
-            <a href="/debug/db">データベース状態確認</a>
-            <a href="/debug/company/restriction/test/AI予定秘書">解約制限テスト</a>
+    </header>
+
+    <main>
+        <!-- Hero Section -->
+        <section class="hero">
+            <div class="hero-content">
+                <h1 class="hero-title">AIがあなたの<br>秘書になる時代</h1>
+                <p class="hero-subtitle">スマホに話しかけるだけで<br>日常のタスクがどんどん片付いていく</p>
+                <form id="subscription-form" class="hero-form">
+                    <input type="email" name="email" placeholder="メールアドレスを入力" required class="hero-input">
+                    <button type="submit" class="hero-btn">１週間無料トライアル中！</button>
+                </form>
+            </div>
+        </section>
+
+        <!-- Statement Section -->
+        <section class="section">
+            <div class="statement-content">
+                <h2 class="statement-title statement-title-marker">
+                    あなたが本当に<br>
+                    向き合いたい仕事に<br>
+                    <span class="marker">もっと集中するために</span>
+                </h2>
+                <p class="statement-text">
+                    AIコレクションズは、忙しい個人事業主や経営者のための"AI秘書サブスク"。<br><br>
+                    まるで長年連れ添ったパートナーのように、あなたの一言にスムーズに反応し、煩わしい業務を次々とこなしてくれる頼れるAIたちが、あなたの日常をサポートします。<br><br>
+                    「AIって、こんなに頼れるんだ」<br>
+                    そんな驚きと安心を、毎日の中に。<br><br>
+                    あなただけの"できる秘書たち"が揃ったコレクション、それがAIコレクションズです。
+                </p>
+            </div>
+        </section>
+
+        <!-- Features Section -->
+        <section class="section">
+            <h2 class="section-title">ラインアップ</h2>
+            <p class="section-subtitle">コンテンツは随時追加予定です。</p>
+            
+            <div class="features">
+                <div class="feature-card">
+                    <img src="/static/images/secretary_optimized.jpg" alt="AI秘書イラスト" class="feature-icon-image">
+                    <h3 class="feature-title">AI予定秘書</h3>
+                    <p class="feature-description">Googleカレンダー連携で、LINEから予定追加・確認・空き時間提案まで。スケジュール管理を自動化します。</p>
+                    <img src="/static/images/line_schedule_optimized.jpg" alt="LINE予定秘書画面" class="line-screenshot">
+                </div>
+                
+                <div class="feature-card">
+                    <img src="/static/images/accounting_icon_optimized.jpg" alt="AI経理秘書イラスト" class="feature-icon-image">
+                    <h3 class="feature-title">AI経理秘書</h3>
+                    <p class="feature-description">LINEで送るだけで、見積書や請求書を即作成。事務処理もスムーズに、経理業務を効率化します。</p>
+                    <img src="/static/images/line_accounting_optimized.jpg" alt="LINE経理秘書画面" class="line-screenshot">
+                </div>
+                
+                <div class="feature-card">
+                    <img src="/static/images/task_icon_optimized.jpg" alt="AIタスクコンシェルジュイラスト" class="feature-icon-image">
+                    <h3 class="feature-title">AIタスクコンシェルジュ</h3>
+                    <p class="feature-description">登録タスクを自動で最適配置。「やりたいのにできない」を解消し、生産性を最大化します。</p>
+                    <img src="/static/images/line_task_optimized.jpg" alt="LINEタスクコンシェルジュ画面" class="line-screenshot">
+                </div>
+                <div class="col-md-6 mb-4">
+                        <div class="card h-100 shadow-sm">
+                            <div class="card-body text-center">
+                                <i class="fas fa-cog fa-3x text-primary mb-3"></i>
+                                <h5 class="card-title">Railway設定</h5>
+                                <p class="card-text">Railwayトークンの自動設定と環境変数の管理</p>
+                                <a href="/railway-token-setup" class="btn btn-primary">
+                                    <i class="fas fa-magic"></i> 自動設定
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+            </div>
+        </section>
+
+        <!-- Pricing Section -->
+        <section class="pricing">
+            <div class="section">
+                <h2 class="section-title">料金プラン</h2>
+                <p class="section-subtitle">シンプルで分かりやすい料金体系</p>
+                
+                <div class="pricing-card">
+                    <div class="price-main">月額5,000円</div>
+                    <div class="price-sub">＋コンテンツ追加1件1,500円</div>
+                    <p class="price-description">
+                        例：1件だけ使う→合計5,000円<br>
+                        2件使う→合計6,500円
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- CTA Section -->
+        <section class="cta-section">
+            <a href="#" class="cta-btn">今すぐAIコレクションズを始める</a>
+        </section>
+    </main>
+
+    <footer>
+        <div class="footer-links">
+            <a href="/privacy.html">プライバシーポリシー</a>
+            <a href="/law.html">特商法表記</a>
         </div>
-    </div>
+        <div class="footer-copyright">&copy; 2024 AIコレクションズ</div>
+    </footer>
+
+    <script>
+        document.getElementById('subscription-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const email = document.querySelector('input[name="email"]').value;
+            const submitButton = document.querySelector('.hero-btn');
+            
+            // ボタンを無効化
+            submitButton.disabled = true;
+            submitButton.textContent = '処理中...';
+            
+            try {
+                const response = await fetch('/subscribe', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email: email })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    alert('エラーが発生しました: ' + data.error);
+                    submitButton.disabled = false;
+                    submitButton.textContent = '１週間無料トライアル中！';
+                    return;
+                }
+                
+                // 既存のサブスクリプションがある場合
+                if (data.existing_subscription) {
+                    console.log('既存のサブスクリプションが有効です:', data.subscription_id);
+                    // 直接成功ページにリダイレクト
+                    window.location.href = data.redirect_url;
+                    return;
+                }
+                
+                // 新しいサブスクリプションの場合、Stripeの決済ページにリダイレクト
+                window.location.href = data.url;
+                
+            } catch (error) {
+                console.error('Error:', error);
+                alert('エラーが発生しました。もう一度お試しください。');
+                submitButton.disabled = false;
+                submitButton.textContent = '１週間無料トライアル中！';
+            }
+        });
+    </script>
 </body>
 </html>

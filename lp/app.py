@@ -57,7 +57,7 @@ LINE_CHANNEL_SECRET = os.getenv('LINE_CHANNEL_SECRET')
 DATABASE_URL = os.getenv('DATABASE_URL', 'database.db')
 
 def init_db():
-    """データベースの初期化（企業ユーザー専用最小限設計）"""
+    """データベースの初期化（企業ID中心統合対応）"""
     conn = None
     c = None
     try:
@@ -69,103 +69,104 @@ def init_db():
         db_type = get_db_type()
         
         if db_type == 'postgresql':
-            # 企業基本情報テーブル（最小限）
+            # PostgreSQL用の企業テーブル作成
             c.execute('''
                 CREATE TABLE IF NOT EXISTS companies (
                     id SERIAL PRIMARY KEY,
                     company_name VARCHAR(255) NOT NULL,
-                    email VARCHAR(255) NOT NULL,
+                    line_user_id VARCHAR(255) UNIQUE,
+                    stripe_subscription_id VARCHAR(255),
                     status VARCHAR(50) DEFAULT 'active',
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
             
-            # 企業LINEアカウントテーブル（最小限）
+            # 企業決済テーブル
+            c.execute('''
+                CREATE TABLE IF NOT EXISTS company_payments (
+                    id SERIAL PRIMARY KEY,
+                    company_id INTEGER NOT NULL,
+                    stripe_subscription_id VARCHAR(255),
+                    subscription_status VARCHAR(50) DEFAULT 'active',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (company_id) REFERENCES companies (id)
+                )
+            ''')
+            
+            # 企業使用ログテーブル
+            c.execute('''
+                CREATE TABLE IF NOT EXISTS company_usage_logs (
+                    id SERIAL PRIMARY KEY,
+                    company_id INTEGER NOT NULL,
+                    content_type VARCHAR(100) NOT NULL,
+                    is_free BOOLEAN DEFAULT FALSE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    subscription_status VARCHAR(50),
+                    current_period_start TIMESTAMP,
+                    current_period_end TIMESTAMP,
+                    trial_start TIMESTAMP,
+                    trial_end TIMESTAMP,
+                    stripe_subscription_id VARCHAR(255),
+                    FOREIGN KEY (company_id) REFERENCES companies (id)
+                )
+            ''')
+            
+            # 企業LINEアカウントテーブル
             c.execute('''
                 CREATE TABLE IF NOT EXISTS company_line_accounts (
                     id SERIAL PRIMARY KEY,
                     company_id INTEGER NOT NULL,
-                    content_type VARCHAR(100) NOT NULL,
-                    line_channel_id VARCHAR(255) NOT NULL,
-                    line_channel_access_token VARCHAR(255) NOT NULL,
+                    line_channel_id VARCHAR(255),
+                    line_channel_secret VARCHAR(255),
+                    line_channel_access_token VARCHAR(255),
+                    webhook_url VARCHAR(500),
                     status VARCHAR(50) DEFAULT 'active',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (company_id) REFERENCES companies(id),
-                    UNIQUE(company_id, content_type)
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (company_id) REFERENCES companies (id)
                 )
             ''')
             
-            # 企業サブスクリプション管理テーブル（最小限）
+            # 企業デプロイメントテーブル
             c.execute('''
-                CREATE TABLE IF NOT EXISTS company_subscriptions (
+                CREATE TABLE IF NOT EXISTS company_deployments (
                     id SERIAL PRIMARY KEY,
                     company_id INTEGER NOT NULL,
-                    content_type VARCHAR(100) NOT NULL,
-                    subscription_status VARCHAR(50) DEFAULT 'active',
-                    current_period_end TIMESTAMP,
+                    service_name VARCHAR(255),
+                    deployment_url VARCHAR(500),
+                    status VARCHAR(50) DEFAULT 'active',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (company_id) REFERENCES companies(id),
-                    UNIQUE(company_id, content_type)
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (company_id) REFERENCES companies (id)
                 )
             ''')
             
-            # インデックスの作成（パフォーマンス向上）
-            c.execute('''
-                CREATE INDEX IF NOT EXISTS idx_company_line_accounts_channel_id 
-                ON company_line_accounts(line_channel_id)
-            ''')
-            
-            c.execute('''
-                CREATE INDEX IF NOT EXISTS idx_company_subscriptions_status 
-                ON company_subscriptions(subscription_status)
-            ''')
+            conn.commit()
+            print("✅ 企業ID中心統合データベース初期化完了")
             
         else:
-            # SQLite用の最小限テーブル
+            # SQLite用のテーブル作成（簡略化）
             c.execute('''
                 CREATE TABLE IF NOT EXISTS companies (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     company_name TEXT NOT NULL,
-                    email TEXT NOT NULL,
+                    line_user_id TEXT UNIQUE,
+                    stripe_subscription_id TEXT,
                     status TEXT DEFAULT 'active',
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
             
-            c.execute('''
-                CREATE TABLE IF NOT EXISTS company_line_accounts (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    company_id INTEGER NOT NULL,
-                    content_type TEXT NOT NULL,
-                    line_channel_id TEXT NOT NULL,
-                    line_channel_access_token TEXT NOT NULL,
-                    status TEXT DEFAULT 'active',
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (company_id) REFERENCES companies(id),
-                    UNIQUE(company_id, content_type)
-                )
-            ''')
+            conn.commit()
+            print("✅ SQLite企業テーブル初期化完了")
             
-            c.execute('''
-                CREATE TABLE IF NOT EXISTS company_subscriptions (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    company_id INTEGER NOT NULL,
-                    content_type TEXT NOT NULL,
-                    subscription_status TEXT DEFAULT 'active',
-                    current_period_end TIMESTAMP,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (company_id) REFERENCES companies(id),
-                    UNIQUE(company_id, content_type)
-                )
-            ''')
-        
-        conn.commit()
-        print("✅ 企業ユーザー専用最小限データベースの初期化が完了しました")
-        
     except Exception as e:
         print(f"❌ データベース初期化エラー: {e}")
-        if conn:
-            conn.rollback()
+        import traceback
+        traceback.print_exc()
     finally:
         if c:
             c.close()
@@ -294,330 +295,19 @@ app.register_blueprint(debug_bp)
 def index():
     return render_template('index.html')
 
-# 企業ユーザー専用の決済フォーム処理
-@app.route('/company-registration', methods=['GET', 'POST'])
-def company_registration():
-    """
-    企業ユーザー専用の決済フォーム
-    """
-    if request.method == 'GET':
-        return render_template('company_registration.html')
-    
-    # POST処理（決済フォーム送信）
-    company_name = request.form.get('company_name')
-    email = request.form.get('email')
-    content_type = request.form.get('content_type')
-    
-    if not all([company_name, email, content_type]):
-        return jsonify({'error': '必須項目が入力されていません'}), 400
-    
-    # セッションに企業情報を保存
-    session['company_data'] = {
-        'company_name': company_name,
-        'email': email,
-        'content_type': content_type
-    }
-    
-    # Stripeチェックアウトセッションを作成
-    try:
-        checkout_session = stripe.checkout.Session.create(
-            payment_method_types=['card'],
-            line_items=[{
-                'price': os.getenv('STRIPE_COMPANY_MONTHLY_PRICE_ID', 'price_company_monthly'),
-                'quantity': 1,
-            }],
-            mode='subscription',
-            success_url=url_for('company_registration_success', _external=True) + '?session_id={CHECKOUT_SESSION_ID}',
-            cancel_url=url_for('company_registration_cancel', _external=True),
-            metadata={
-                'company_name': company_name,
-                'email': email,
-                'content_type': content_type
-            },
-            customer_email=email,
-            billing_address_collection='required',
-            allow_promotion_codes=True
-        )
-        
-        return jsonify({'id': checkout_session.id})
-        
-    except Exception as e:
-        print(f"❌ Stripeチェックアウトセッション作成エラー: {e}")
-        return jsonify({'error': '決済セッションの作成に失敗しました'}), 500
+@app.route('/company-registration')
+def company_registration_form():
+    """企業情報登録フォーム（旧ルート）"""
+    subscription_id = request.args.get('subscription_id', '')
+    content_type = request.args.get('content_type', '')
+    return render_template('company_registration.html', 
+                         subscription_id=subscription_id, 
+                         content_type=content_type)
 
-# 企業登録成功時の処理
-@app.route('/company-registration-success')
-def company_registration_success():
-    """
-    企業登録成功時の処理
-    """
-    session_id = request.args.get('session_id')
-    
-    if not session_id:
-        return redirect('/company-registration')
-    
-    try:
-        # Stripeからセッション情報を取得
-        checkout_session = stripe.checkout.Session.retrieve(session_id)
-        
-        if checkout_session.payment_status != 'paid':
-            return redirect('/company-registration-cancel')
-        
-        # 企業情報をデータベースに保存
-        company_id = create_company_profile(checkout_session.metadata)
-        
-        # LINEアカウントを自動作成
-        line_account = create_company_line_account(company_id, checkout_session.metadata)
-        
-        # サブスクリプション情報を保存
-        save_company_subscription(company_id, checkout_session.subscription)
-        
-        # 次回請求日を計算
-        subscription = stripe.Subscription.retrieve(checkout_session.subscription)
-        next_billing_date = datetime.fromtimestamp(subscription.current_period_end).strftime('%Y年%m月%d日')
-        
-        return render_template('company_registration_success.html',
-                             company_data=checkout_session.metadata,
-                             company_id=company_id,
-                             line_account=line_account,
-                             next_billing_date=next_billing_date)
-        
-    except Exception as e:
-        print(f"❌ 企業登録成功処理エラー: {e}")
-        return redirect('/company-registration-cancel')
-
-# 企業登録キャンセル時の処理
-@app.route('/company-registration-cancel')
-def company_registration_cancel():
-    """
-    企業登録キャンセル時の処理
-    """
-    return render_template('company_registration_cancel.html')
-
-# 企業基本情報をデータベースに保存
-def create_company_profile(company_data):
-    """
-    企業基本情報をデータベースに保存
-    """
-    conn = None
-    c = None
-    
-    try:
-        conn = get_db_connection()
-        c = conn.cursor()
-        
-        c.execute('''
-            INSERT INTO companies (company_name, email, status)
-            VALUES (%s, %s, 'active')
-            RETURNING id
-        ''', (company_data['company_name'], company_data['email']))
-        
-        company_id = c.fetchone()[0]
-        conn.commit()
-        
-        print(f"✅ 企業基本情報を保存しました: {company_id}")
-        return company_id
-        
-    except Exception as e:
-        print(f"❌ 企業基本情報保存エラー: {e}")
-        if conn:
-            conn.rollback()
-        raise
-    finally:
-        if c:
-            c.close()
-        if conn:
-            conn.close()
-
-# 企業専用LINEアカウントを自動作成
-def create_company_line_account(company_id, company_data):
-    """
-    企業専用LINEアカウントを自動作成
-    """
-    try:
-        # LINE Developers Console APIでチャンネル作成（モック）
-        # 実際の実装ではLINE APIを使用
-        line_channel_id = f"U{company_id}_{int(time.time())}"
-        line_channel_access_token = f"token_{company_id}_{int(time.time())}"
-        
-        # データベースにLINEアカウント情報を保存
-        conn = get_db_connection()
-        c = conn.cursor()
-        
-        c.execute('''
-            INSERT INTO company_line_accounts 
-            (company_id, content_type, line_channel_id, line_channel_access_token, status)
-            VALUES (%s, %s, %s, %s, 'active')
-        ''', (
-            company_id,
-            company_data['content_type'],
-            line_channel_id,
-            line_channel_access_token
-        ))
-        
-        conn.commit()
-        conn.close()
-        
-        line_account = {
-            'line_channel_id': line_channel_id,
-            'line_channel_access_token': line_channel_access_token,
-            'qr_code_url': None,  # 実際の実装ではQRコードURLを生成
-            'status': 'active'
-        }
-        
-        print(f"✅ 企業LINEアカウントを作成しました: {line_channel_id}")
-        return line_account
-        
-    except Exception as e:
-        print(f"❌ 企業LINEアカウント作成エラー: {e}")
-        raise
-
-# 企業サブスクリプション情報をデータベースに保存
-def save_company_subscription(company_id, stripe_subscription_id):
-    """
-    企業サブスクリプション情報をデータベースに保存
-    """
-    conn = None
-    c = None
-    
-    try:
-        # Stripeからサブスクリプション情報を取得
-        subscription = stripe.Subscription.retrieve(stripe_subscription_id)
-        
-        # セッションから企業データを取得
-        company_data = session.get('company_data', {})
-        content_type = company_data.get('content_type', 'AI予定秘書')
-        
-        # サブスクリプションの期間を計算
-        current_period_end = datetime.fromtimestamp(subscription.current_period_end)
-        
-        conn = get_db_connection()
-        c = conn.cursor()
-        
-        c.execute('''
-            INSERT INTO company_subscriptions 
-            (company_id, content_type, subscription_status, current_period_end)
-            VALUES (%s, %s, %s, %s)
-        ''', (
-            company_id,
-            content_type,
-            subscription.status,
-            current_period_end
-        ))
-        
-        conn.commit()
-        
-        print(f"✅ 企業サブスクリプションを保存しました: {company_id}")
-        
-    except Exception as e:
-        print(f"❌ 企業サブスクリプション保存エラー: {e}")
-        if conn:
-            conn.rollback()
-        raise
-    finally:
-        if c:
-            c.close()
-        if conn:
-            conn.close()
-
-# Stripe Webhook処理（企業ユーザー専用）
-@app.route('/webhook/stripe/company', methods=['POST'])
-def stripe_webhook_company():
-    """
-    Stripe Webhook処理（企業ユーザー専用）
-    """
-    payload = request.get_data(as_text=True)
-    sig_header = request.headers.get('Stripe-Signature')
-    
-    try:
-        event = stripe.Webhook.construct_event(
-            payload, sig_header, os.getenv('STRIPE_WEBHOOK_SECRET')
-        )
-    except ValueError as e:
-        print(f"❌ Webhookペイロードエラー: {e}")
-        return jsonify({'error': 'Invalid payload'}), 400
-    except stripe.error.SignatureVerificationError as e:
-        print(f"❌ Webhook署名検証エラー: {e}")
-        return jsonify({'error': 'Invalid signature'}), 400
-    
-    # イベントタイプに応じた処理
-    if event['type'] == 'customer.subscription.deleted':
-        handle_company_subscription_cancelled(event)
-    elif event['type'] == 'invoice.payment_failed':
-        handle_company_payment_failed(event)
-    elif event['type'] == 'invoice.payment_succeeded':
-        handle_company_payment_succeeded(event)
-    
-    return jsonify({'status': 'success'})
-
-# 企業サブスクリプション解約処理
-def handle_company_subscription_cancelled(event):
-    """
-    企業サブスクリプション解約処理
-    """
-    subscription_id = event['data']['object']['id']
-    
-    try:
-        from services.company_service import cancel_company_content
-        
-        # サブスクリプションIDから企業IDとコンテンツタイプを取得
-        conn = get_db_connection()
-        c = conn.cursor()
-        
-        c.execute('''
-            SELECT company_id, content_type 
-            FROM company_subscriptions 
-            WHERE stripe_subscription_id = %s
-        ''', (subscription_id,))
-        
-        subscription = c.fetchone()
-        if not subscription:
-            print(f"❌ サブスクリプションが見つかりません: {subscription_id}")
-            return
-        
-        company_id, content_type = subscription
-        
-        # 解約処理を実行
-        result = cancel_company_content(company_id, content_type)
-        
-        if result:
-            print(f"✅ 企業解約処理が完了しました: {company_id}, {content_type}")
-        else:
-            print(f"❌ 企業解約処理に失敗しました: {company_id}, {content_type}")
-        
-    except Exception as e:
-        print(f"❌ 企業解約処理エラー: {e}")
-    finally:
-        if c:
-            c.close()
-        if conn:
-            conn.close()
-
-# 企業決済失敗処理
-def handle_company_payment_failed(event):
-    """
-    企業決済失敗処理
-    """
-    invoice = event['data']['object']
-    subscription_id = invoice['subscription']
-    
-    print(f"⚠️ 企業決済失敗: {subscription_id}")
-    
-    # 決済失敗通知を送信（実装予定）
-    # send_payment_failed_notification(subscription_id)
-
-# 企業決済成功処理
-def handle_company_payment_succeeded(event):
-    """
-    企業決済成功処理
-    """
-    invoice = event['data']['object']
-    subscription_id = invoice['subscription']
-    
-    print(f"✅ 企業決済成功: {subscription_id}")
-    
-    # 決済成功通知を送信（実装予定）
-    # send_payment_succeeded_notification(subscription_id)
+@app.route('/ai-schedule-clone')
+def ai_schedule_clone_form():
+    """AI予定秘書複製フォーム（新ルート）"""
+    return render_template('company_registration.html')
 
 @app.route('/company-registration-debug')
 def company_registration_debug():
@@ -627,6 +317,12 @@ def company_registration_debug():
     return render_template('company_registration_debug.html', 
                          subscription_id=subscription_id, 
                          content_type=content_type)
+
+@app.route('/company-registration-success')
+def company_registration_success():
+    """企業登録成功ページ"""
+    company_id = request.args.get('company_id')
+    return render_template('company_registration_success.html', company_id=company_id)
 
 @app.route('/company-dashboard')
 def company_dashboard():
@@ -1956,124 +1652,6 @@ def debug_update_company_line_user_id(company_id, line_user_id):
             
     except Exception as e:
         return jsonify({'error': str(e)})
-
-# 企業ユーザー専用の解約制限チェックAPI
-@app.route('/api/v1/company/restriction/check', methods=['POST'])
-def check_company_restriction_api():
-    """
-    企業ユーザーの解約制限チェックAPI
-    """
-    try:
-        data = request.get_json()
-        line_channel_id = data.get('line_channel_id')
-        content_type = data.get('content_type')
-        
-        if not line_channel_id or not content_type:
-            return jsonify({
-                'error': 'line_channel_id と content_type は必須です'
-            }), 400
-        
-        # 企業制限チェックを実行
-        from services.company_service import check_company_restriction
-        result = check_company_restriction(line_channel_id, content_type)
-        
-        return jsonify({
-            'is_restricted': result['is_restricted'],
-            'reason': result['reason'],
-            'message': result['message'],
-            'content_type': content_type,
-            'line_channel_id': line_channel_id
-        })
-        
-    except Exception as e:
-        print(f"❌ 企業制限チェックAPIエラー: {e}")
-        return jsonify({
-            'error': 'システムエラーが発生しました',
-            'is_restricted': False  # エラー時は制限しない
-        }), 500
-
-# 企業情報取得API
-@app.route('/api/v1/company/info/<line_channel_id>', methods=['GET'])
-def get_company_info_api(line_channel_id):
-    """
-    企業情報取得API
-    
-    """
-    try:
-        from services.company_service import get_company_by_line_channel_id, get_company_line_accounts, get_company_subscriptions
-        
-        # 企業基本情報を取得
-        company = get_company_by_line_channel_id(line_channel_id)
-        if not company:
-            return jsonify({
-                'error': '企業情報が見つかりません'
-            }), 404
-        
-        # LINEアカウント情報を取得
-        line_accounts = get_company_line_accounts(company['id'])
-        
-        # サブスクリプション情報を取得
-        subscriptions = get_company_subscriptions(company['id'])
-        
-        return jsonify({
-            'company': company,
-            'line_accounts': line_accounts,
-            'subscriptions': subscriptions
-        })
-        
-    except Exception as e:
-        print(f"❌ 企業情報取得APIエラー: {e}")
-        return jsonify({
-            'error': 'システムエラーが発生しました'
-        }), 500
-
-# 企業コンテンツ解約API
-@app.route('/api/v1/company/cancel/<int:company_id>/<content_type>', methods=['POST'])
-def cancel_company_content_api(company_id, content_type):
-    """
-    企業コンテンツ解約API
-    """
-    try:
-        from services.company_service import cancel_company_content
-        
-        result = cancel_company_content(company_id, content_type)
-        if not result:
-            return jsonify({
-                'error': '解約処理に失敗しました'
-            }), 500
-        
-        return jsonify({
-            'message': '解約処理が完了しました',
-            'result': result
-        })
-        
-    except Exception as e:
-        print(f"❌ 企業コンテンツ解約APIエラー: {e}")
-        return jsonify({
-            'error': 'システムエラーが発生しました'
-        }), 500
-
-# 企業制限チェックテスト用API
-@app.route('/debug/company/restriction/<line_channel_id>/<content_type>')
-def debug_company_restriction(line_channel_id, content_type):
-    """
-    企業制限チェックのデバッグ用API
-    """
-    try:
-        from services.company_service import check_company_restriction
-        
-        result = check_company_restriction(line_channel_id, content_type)
-        
-        return jsonify({
-            'line_channel_id': line_channel_id,
-            'content_type': content_type,
-            'result': result
-        })
-        
-    except Exception as e:
-        return jsonify({
-            'error': str(e)
-        }), 500
 
 if __name__ == '__main__':
     try:
