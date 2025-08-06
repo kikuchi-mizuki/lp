@@ -165,43 +165,96 @@ def init_db():
             c.close()
         if conn:
             conn.close()
-        
-        c.execute('''
-            CREATE TABLE IF NOT EXISTS cancellation_history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                content_type TEXT NOT NULL,
-                cancelled_at TIMESTAMP NOT NULL,
-                subscription_status TEXT,
-                current_period_start TIMESTAMP,
-                current_period_end TIMESTAMP,
-                trial_start TIMESTAMP,
-                trial_end TIMESTAMP,
-                stripe_subscription_id TEXT,
-                FOREIGN KEY (user_id) REFERENCES users (id)
-            )
-        ''')
-        
-        # 契約期間管理テーブルを追加
-        c.execute('''
-            CREATE TABLE IF NOT EXISTS subscription_periods (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                stripe_subscription_id TEXT NOT NULL,
-                subscription_status TEXT NOT NULL,
-                current_period_start TIMESTAMP,
-                current_period_end TIMESTAMP,
-                trial_start TIMESTAMP,
-                trial_end TIMESTAMP,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users (id),
-                UNIQUE(stripe_subscription_id)
-            )
-        ''')
     
-    conn.commit()
-    conn.close()
+    # 追加テーブルの作成（新しい接続で実行）
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # データベースタイプを確認
+        db_type = get_db_type()
+        
+        if db_type == 'postgresql':
+            # PostgreSQL用の追加テーブル
+            c.execute('''
+                CREATE TABLE IF NOT EXISTS cancellation_history (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL,
+                    content_type VARCHAR(100) NOT NULL,
+                    cancelled_at TIMESTAMP NOT NULL,
+                    subscription_status VARCHAR(50),
+                    current_period_start TIMESTAMP,
+                    current_period_end TIMESTAMP,
+                    trial_start TIMESTAMP,
+                    trial_end TIMESTAMP,
+                    stripe_subscription_id VARCHAR(255)
+                )
+            ''')
+            
+            # 契約期間管理テーブルを追加
+            c.execute('''
+                CREATE TABLE IF NOT EXISTS subscription_periods (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL,
+                    stripe_subscription_id VARCHAR(255) NOT NULL,
+                    subscription_status VARCHAR(50) NOT NULL,
+                    current_period_start TIMESTAMP,
+                    current_period_end TIMESTAMP,
+                    trial_start TIMESTAMP,
+                    trial_end TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(stripe_subscription_id)
+                )
+            ''')
+        else:
+            # SQLite用の追加テーブル
+            c.execute('''
+                CREATE TABLE IF NOT EXISTS cancellation_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    content_type TEXT NOT NULL,
+                    cancelled_at TIMESTAMP NOT NULL,
+                    subscription_status TEXT,
+                    current_period_start TIMESTAMP,
+                    current_period_end TIMESTAMP,
+                    trial_start TIMESTAMP,
+                    trial_end TIMESTAMP,
+                    stripe_subscription_id TEXT,
+                    FOREIGN KEY (user_id) REFERENCES users (id)
+                )
+            ''')
+            
+            # 契約期間管理テーブルを追加
+            c.execute('''
+                CREATE TABLE IF NOT EXISTS subscription_periods (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    stripe_subscription_id TEXT NOT NULL,
+                    subscription_status TEXT NOT NULL,
+                    current_period_start TIMESTAMP,
+                    current_period_end TIMESTAMP,
+                    trial_start TIMESTAMP,
+                    trial_end TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users (id),
+                    UNIQUE(stripe_subscription_id)
+                )
+            ''')
+        
+        conn.commit()
+        print("✅ 追加テーブル作成完了")
+        
+    except Exception as e:
+        print(f"❌ 追加テーブル作成エラー: {e}")
+        import traceback
+        traceback.print_exc()
+    finally:
+        if c:
+            c.close()
+        if conn:
+            conn.close()
     
     # ユーザー状態テーブルの初期化
     from models.user_state import init_user_states_table
@@ -1553,11 +1606,21 @@ def debug_railway():
         })
 
 if __name__ == '__main__':
-    # データベース初期化をスキップしてアプリケーションを起動
-    print("🚀 アプリケーション起動中...")
-    
-    # デフォルトポートを5000に設定
-    port = int(os.environ.get('PORT', 5000))
-    print(f"📡 ポート {port} で起動します")
-    
-    app.run(debug=True, host='0.0.0.0', port=port) 
+    try:
+        # データベース初期化をスキップしてアプリケーションを起動
+        print("🚀 アプリケーション起動中...")
+        
+        # デフォルトポートを5001に設定（5000は使用中）
+        port = int(os.environ.get('PORT', 5001))
+        print(f"📡 ポート {port} で起動します")
+        
+        # アプリケーションの設定を確認
+        print(f"📊 登録されたBlueprint数: {len(app.blueprints)}")
+        print(f"📊 テンプレートフォルダ: {app.template_folder}")
+        print(f"📊 静的ファイルフォルダ: {app.static_folder}")
+        
+        app.run(debug=False, host='0.0.0.0', port=port)
+    except Exception as e:
+        print(f"❌ アプリケーション起動エラー: {e}")
+        import traceback
+        traceback.print_exc() 
