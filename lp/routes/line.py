@@ -990,16 +990,7 @@ def line_webhook():
                         else:
                             print(f'[DEBUG] 企業データが見つかりません: email={normalized_email}')
                             send_line_message(event['replyToken'], [{"type": "text", "text": "企業データが見つかりません。決済が完了しているかご確認ください。"}])
-                                                continue
-                                else:
-                                    print(f'[DEBUG] 未決済確認: user_id={user_id}, status={payment_check["subscription_status"]}')
-                                    # 制限メッセージを送信
-                                    restricted_message = get_restricted_message()
-                                    send_line_message(event['replyToken'], [restricted_message])
-                            else:
-                                # 決済データも見つからない場合
-                                print(f'[DEBUG] 決済データも見つかりません: email={normalized_email}')
-                                send_line_message(event['replyToken'], [{"type": "text", "text": 'ご登録メールアドレスが見つかりません。LPでご登録済みかご確認ください。'}])
+                        continue
             else:
                 print(f'[DEBUG] デフォルト処理: user_id={user_id}, state={state}, text={text}')
                 print(f'[DEBUG] どの条件にも当てはまらないためデフォルト処理に進む: text="{text}", state="{state}"')
