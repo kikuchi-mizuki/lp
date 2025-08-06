@@ -80,7 +80,53 @@ class SubscriptionPeriodService:
             conn = get_db_connection()
             c = conn.cursor()
             
-            # usage_logsとsubscription_periodsを結合して判定
+            # まず、サブスクリプション情報を直接チェック
+            if self.db_type == 'postgresql':
+                c.execute('''
+                    SELECT 
+                        sp.subscription_status,
+                        sp.current_period_end,
+                        sp.trial_end
+                    FROM subscription_periods sp
+                    JOIN users u ON sp.user_id = u.id
+                    WHERE u.id = %s
+                ''', (user_id,))
+            else:
+                c.execute('''
+                    SELECT 
+                        sp.subscription_status,
+                        sp.current_period_end,
+                        sp.trial_end
+                    FROM subscription_periods sp
+                    JOIN users u ON sp.user_id = u.id
+                    WHERE u.id = ?
+                ''', (user_id,))
+            
+            subscription_result = c.fetchone()
+            
+            if subscription_result:
+                subscription_status, current_period_end, trial_end = subscription_result
+                
+                # 契約期間の判定
+                current_time = datetime.now()
+                
+                if subscription_status == 'active':
+                    return True, "アクティブなサブスクリプション"
+                elif subscription_status == 'past_due':
+                    return True, "支払い遅延中だが利用可能"
+                elif subscription_status == 'canceled':
+                    if current_period_end and current_period_end > current_time:
+                        return True, "キャンセル済みだが期間内"
+                    else:
+                        return False, "契約期間が終了"
+                elif subscription_status == 'trialing':
+                    return False, "トライアル期間中（請求が始まっていません）"
+                elif subscription_status in ['incomplete', 'incomplete_expired', 'unpaid']:
+                    return False, "支払いが完了していません"
+                else:
+                    return False, f"サブスクリプションが無効（ステータス: {subscription_status}）"
+            
+            # サブスクリプション情報がない場合、usage_logsをチェック
             if self.db_type == 'postgresql':
                 c.execute('''
                     SELECT 
