@@ -340,27 +340,41 @@ def company_registration_success():
     session_id = request.args.get('session_id')
     
     if not session_id:
+        print("❌ セッションIDがありません")
         return redirect('/company-registration')
     
     try:
+        print(f"🔍 セッションID: {session_id}")
+        
         # Stripeからセッション情報を取得
         checkout_session = stripe.checkout.Session.retrieve(session_id)
+        print(f"✅ Stripeセッション取得成功: {checkout_session.id}")
+        print(f"💰 決済ステータス: {checkout_session.payment_status}")
+        print(f"📧 メタデータ: {checkout_session.metadata}")
         
         if checkout_session.payment_status != 'paid':
+            print("❌ 決済が完了していません")
             return redirect('/company-registration-cancel')
         
         # 企業情報をデータベースに保存
+        print("🏢 企業情報を保存中...")
         company_id = create_company_profile(checkout_session.metadata)
+        print(f"✅ 企業情報保存完了: {company_id}")
         
         # LINEアカウントを自動作成
+        print("📱 LINEアカウントを作成中...")
         line_account = create_company_line_account(company_id, checkout_session.metadata)
+        print(f"✅ LINEアカウント作成完了: {line_account}")
         
         # サブスクリプション情報を保存
+        print("💳 サブスクリプション情報を保存中...")
         save_company_subscription(company_id, checkout_session.subscription)
+        print(f"✅ サブスクリプション保存完了: {checkout_session.subscription}")
         
         # 次回請求日を計算
         subscription = stripe.Subscription.retrieve(checkout_session.subscription)
         next_billing_date = datetime.fromtimestamp(subscription.current_period_end).strftime('%Y年%m月%d日')
+        print(f"📅 次回請求日: {next_billing_date}")
         
         return render_template('company_registration_success.html',
                              company_data=checkout_session.metadata,
@@ -370,6 +384,8 @@ def company_registration_success():
         
     except Exception as e:
         print(f"❌ 企業登録成功処理エラー: {e}")
+        import traceback
+        traceback.print_exc()
         return redirect('/company-registration-cancel')
 
 # 企業登録キャンセル時の処理
