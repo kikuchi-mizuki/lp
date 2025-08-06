@@ -1029,7 +1029,7 @@ def line_webhook():
                             else:
                                 print(f'[DEBUG] 企業データが見つかりません: email={normalized_email}')
                                 send_line_message(event['replyToken'], [{"type": "text", "text": "企業データが見つかりません。決済が完了しているかご確認ください。"}])
-                        else:
+                    else:
                             # メールアドレスが見つからない場合、決済データを確認
                             print(f'[DEBUG] メールアドレスが見つかりません: email={normalized_email}')
                             print(f'[DEBUG] 決済データの確認を開始')
@@ -1080,21 +1080,21 @@ def line_webhook():
                                 # 決済データも見つからない場合
                                 print(f'[DEBUG] 決済データも見つかりません: email={normalized_email}')
                                 send_line_message(event['replyToken'], [{"type": "text", "text": 'ご登録メールアドレスが見つかりません。LPでご登録済みかご確認ください。'}])
+            else:
+                print(f'[DEBUG] デフォルト処理: user_id={user_id}, state={state}, text={text}')
+                print(f'[DEBUG] どの条件にも当てはまらないためデフォルト処理に進む: text="{text}", state="{state}"')
+                
+                # メールアドレス連携を促すメッセージを送信
+                if not state or state == 'welcome_sent':
+                    print(f'[DEBUG] メールアドレス連携を促すメッセージを送信: user_id={user_id}')
+                    send_line_message(event['replyToken'], [{"type": "text", "text": "決済済みの方は、登録時のメールアドレスを送信してください。\n\n例: example@example.com\n\n※メールアドレスを送信すると、自動的に企業データと紐付けされます。"}])
                 else:
-                    print(f'[DEBUG] デフォルト処理: user_id={user_id}, state={state}, text={text}')
-                    print(f'[DEBUG] どの条件にも当てはまらないためデフォルト処理に進む: text="{text}", state="{state}"')
-                    
-                    # メールアドレス連携を促すメッセージを送信
-                    if not state or state == 'welcome_sent':
-                        print(f'[DEBUG] メールアドレス連携を促すメッセージを送信: user_id={user_id}')
-                        send_line_message(event['replyToken'], [{"type": "text", "text": "決済済みの方は、登録時のメールアドレスを送信してください。\n\n例: example@example.com\n\n※メールアドレスを送信すると、自動的に企業データと紐付けされます。"}])
-                    else:
-                        # 特定の状態ではデフォルトメッセージを送信
-                        print(f'[DEBUG] 特定状態でのデフォルト処理: state={state}')
-                        send_line_message(event['replyToken'], [{"type": "text", "text": "無効な入力です。メニューから選択してください。"}])
-                conn.close()
-            # リッチメニューのpostbackイベントの処理
-            elif event.get('type') == 'postback':
+                    # 特定の状態ではデフォルトメッセージを送信
+                    print(f'[DEBUG] 特定状態でのデフォルト処理: state={state}')
+                    send_line_message(event['replyToken'], [{"type": "text", "text": "無効な入力です。メニューから選択してください。"}])
+            conn.close()
+        # リッチメニューのpostbackイベントの処理
+        if event.get('type') == 'postback':
                                      user_id = event['source']['userId']
                                      postback_data = event['postback']['data']
                                      conn = get_db_connection()
@@ -1104,7 +1104,6 @@ def line_webhook():
                                      if not user:
                                          send_line_message(event['replyToken'], [{"type": "text", "text": get_not_registered_message()}])
                                          conn.close()
-                                         continue
                                      user_id_db = user[0]
                                      stripe_subscription_id = user[1]
                                      # postbackデータに基づいて処理
