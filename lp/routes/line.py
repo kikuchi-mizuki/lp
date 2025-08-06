@@ -650,12 +650,10 @@ def line_webhook():
                         if current_state is None:
                             print(f'[DEBUG] ユーザー状態がNone、案内文を送信: user_id={user_id}')
                         elif current_state == 'welcome_sent':
-                            print(f'[DEBUG] 既に案内文送信済み、メニューを表示: user_id={user_id}')
-                            # メニューメッセージを送信
-                            from utils.message_templates import get_menu_message
-                            send_line_message(event['replyToken'], [get_menu_message()])
+                            print(f'[DEBUG] 既に案内文送信済み、コマンド処理に移行: user_id={user_id}')
+                            # コマンド処理に移行するため、ここでは何もしない
                             conn.close()
-                            continue
+                            # continueを削除して、コマンド処理に進む
                         
                         # 案内メッセージを送信
                         try:
@@ -764,6 +762,7 @@ def line_webhook():
                     # 状態に基づく処理（優先順位順）
                     print(f'[DEBUG] 状態チェック: state={state}, text={text}')
                     print(f'[DEBUG] メッセージ処理分岐開始: text="{text}", state="{state}"')
+                    print(f'[DEBUG] 条件チェック: text=="追加" = {text == "追加"}, state!="cancel_select" = {state != "cancel_select"}')
                     if state == 'add_select':
                         print(f'[DEBUG] add_select状態での処理: user_id={user_id}, text={text}')
                         if text in ['1', '2', '3', '4']:
