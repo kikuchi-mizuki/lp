@@ -301,7 +301,7 @@ def company_registration():
         checkout_session = stripe.checkout.Session.create(
             payment_method_types=['card'],
             line_items=[{
-                'price': os.getenv('STRIPE_COMPANY_MONTHLY_PRICE_ID', 'price_company_monthly'),
+                'price': MONTHLY_PRICE_ID,
                 'quantity': 1,
             }],
             mode='subscription',
