@@ -669,46 +669,12 @@ def line_webhook():
                         conn.close()
                         continue
                 else:
-                    # 2. companiesテーブルで見つからない場合、usersテーブルで検索
-                    c.execute('SELECT id, company_name, stripe_subscription_id FROM companies WHERE line_user_id = %s', (user_id,))
-                    company = c.fetchone()
-                    print(f'[DEBUG] 既存企業検索結果: {company}')
-                    
-                    if not company:
-                        print(f'[DEBUG] 既存企業が見つからないため、メールアドレス連携を促す')
-                        # メールアドレス連携を促すメッセージを送信
-                        send_line_message(event['replyToken'], [{"type": "text", "text": "決済済みの方は、登録時のメールアドレスを送信してください。\n\n例: example@example.com\n\n※メールアドレスを送信すると、自動的に企業データと紐付けされます。"}])
-                        conn.close()
-                        continue
-                        
-                        # メールアドレス連携による企業紐付け処理は後で実装
-                        # 現在は未紐付け企業の自動紐付けを無効化
-                        print(f'[DEBUG] 企業紐付け処理をスキップ、メールアドレス連携を待機')
-                        conn.close()
-                        continue
-                    else:
-                        company_id = company[0]
-                        stripe_subscription_id = company[2]
-                        
-                        # 既存企業の場合、決済状況を再チェック
-                        print(f'[DEBUG] 既存企業の決済チェック開始: user_id={user_id}')
-                        payment_check = is_paid_user_company_centric(user_id)
-                        print(f'[DEBUG] 既存企業の決済チェック結果: user_id={user_id}, is_paid={payment_check["is_paid"]}, status={payment_check["subscription_status"]}')
-                        
-                        if not payment_check['is_paid']:
-                            print(f'[DEBUG] 既存企業だが未決済: user_id={user_id}, status={payment_check["subscription_status"]}')
-                            # 制限メッセージを送信
-                            restricted_message = get_restricted_message()
-                            send_line_message(event['replyToken'], [restricted_message])
-                            conn.close()
-                            continue
-                        else:
-                            print(f'[DEBUG] 既存企業で決済済み確認: user_id={user_id}')
-                        
-                        # 通常のメッセージ処理に進む（初回案内文の送信は後で処理）
-                    
-                    # ユーザー状態の確認
-                    state = get_user_state(user_id)
+                    # 2. companiesテーブルで見つからない場合、メールアドレス連携を促す
+                    print(f'[DEBUG] 既存企業が見つからないため、メールアドレス連携を促す')
+                    # メールアドレス連携を促すメッセージを送信
+                    send_line_message(event['replyToken'], [{"type": "text", "text": "決済済みの方は、登録時のメールアドレスを送信してください。\n\n例: example@example.com\n\n※メールアドレスを送信すると、自動的に企業データと紐付けされます。"}])
+                    conn.close()
+                    continue
                     print(f'[DEBUG] ユーザー状態確認: user_id={user_id}, state={state}')
                     print(f'[DEBUG] 状態詳細: state={state}, text={text}')
                     
@@ -1129,6 +1095,7 @@ def line_webhook():
                     print(f'[DEBUG] 特定状態でのデフォルト処理: state={state}')
                     send_line_message(event['replyToken'], [{"type": "text", "text": "無効な入力です。メニューから選択してください。"}])
             conn.close()
+        
         # リッチメニューのpostbackイベントの処理
         if event.get('type') == 'postback':
             user_id = event['source']['userId']
