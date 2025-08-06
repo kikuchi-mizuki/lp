@@ -12,15 +12,27 @@ load_dotenv()
 def check_railway_database():
     """Railway本番環境のデータベース状態を確認"""
     
-    # Railway本番環境のデータベース接続情報
-    database_url = os.getenv("DATABASE_URL")
-    if not database_url:
-        database_url = "postgresql://postgres:WZgnjZezoefHmxbwRjUbiPhajtwubmUs@gondola.proxy.rlwy.net:16797/railway"
+    # Railway本番環境のデータベース接続情報（正しい接続情報）
+    host = "gondola.proxy.rlwy.net"
+    port = 16797
+    database = "railway"
+    user = "postgres"
+    password = "WZgnjZezoefHmxbwRjUbiPhajtwubmUs"
     
-    print(f'[DEBUG] Railway接続URL: {database_url}')
+    print(f'[DEBUG] Railway接続情報:')
+    print(f'  ホスト: {host}')
+    print(f'  ポート: {port}')
+    print(f'  データベース: {database}')
+    print(f'  ユーザー: {user}')
     
     try:
-        conn = psycopg2.connect(database_url)
+        conn = psycopg2.connect(
+            host=host,
+            port=port,
+            database=database,
+            user=user,
+            password=password
+        )
         c = conn.cursor()
         
         print(f'[DEBUG] Railwayデータベース接続成功')
@@ -33,7 +45,7 @@ def check_railway_database():
         c.execute("""
             SELECT table_name, column_name, data_type, is_nullable
             FROM information_schema.columns 
-            WHERE table_name IN ('companies', 'company_payments', 'users', 'usage_logs')
+            WHERE table_name IN ('companies', 'company_line_accounts', 'company_subscriptions')
             ORDER BY table_name, ordinal_position
         """)
         
@@ -43,62 +55,54 @@ def check_railway_database():
         
         # 2. companiesテーブルの内容確認
         print("\n=== companiesテーブルの内容 ===")
-        c.execute("SELECT id, company_name, email, line_user_id, stripe_subscription_id, status, created_at FROM companies ORDER BY id")
+        c.execute("SELECT id, company_name, email, status, created_at FROM companies ORDER BY id")
         companies = c.fetchall()
         
         if companies:
             for company in companies:
-                print(f"ID: {company[0]}, 企業名: {company[1]}, メール: {company[2]}, LINE_ID: {company[3]}, Stripe_ID: {company[4]}, ステータス: {company[5]}, 作成日: {company[6]}")
+                print(f"ID: {company[0]}, 企業名: {company[1]}, メール: {company[2]}, ステータス: {company[3]}, 作成日: {company[4]}")
         else:
             print("companiesテーブルにデータがありません")
         
-        # 3. company_paymentsテーブルの内容確認
-        print("\n=== company_paymentsテーブルの内容 ===")
-        c.execute("SELECT id, company_id, subscription_status, current_period_end, created_at FROM company_payments ORDER BY id")
-        payments = c.fetchall()
+        # 3. company_line_accountsテーブルの内容確認
+        print("\n=== company_line_accountsテーブルの内容 ===")
+        c.execute("SELECT id, company_id, content_type, line_channel_id, status, created_at FROM company_line_accounts ORDER BY id")
+        line_accounts = c.fetchall()
         
-        if payments:
-            for payment in payments:
-                print(f"ID: {payment[0]}, 企業ID: {payment[1]}, ステータス: {payment[2]}, 期限: {payment[3]}, 作成日: {payment[4]}")
+        if line_accounts:
+            for account in line_accounts:
+                print(f"ID: {account[0]}, 企業ID: {account[1]}, コンテンツタイプ: {account[2]}, LINEチャンネルID: {account[3]}, ステータス: {account[4]}, 作成日: {account[5]}")
         else:
-            print("company_paymentsテーブルにデータがありません")
+            print("company_line_accountsテーブルにデータがありません")
         
-        # 4. usersテーブルの内容確認
-        print("\n=== usersテーブルの内容 ===")
-        c.execute("SELECT id, email, line_user_id, stripe_subscription_id, created_at FROM users ORDER BY id")
-        users = c.fetchall()
+        # 4. company_subscriptionsテーブルの内容確認
+        print("\n=== company_subscriptionsテーブルの内容 ===")
+        c.execute("SELECT id, company_id, content_type, subscription_status, current_period_end, created_at FROM company_subscriptions ORDER BY id")
+        subscriptions = c.fetchall()
         
-        if users:
-            for user in users:
-                print(f"ID: {user[0]}, メール: {user[1]}, LINE_ID: {user[2]}, Stripe_ID: {user[3]}, 作成日: {user[4]}")
+        if subscriptions:
+            for subscription in subscriptions:
+                print(f"ID: {subscription[0]}, 企業ID: {subscription[1]}, コンテンツタイプ: {subscription[2]}, ステータス: {subscription[3]}, 期限: {subscription[4]}, 作成日: {subscription[5]}")
         else:
-            print("usersテーブルにデータがありません")
+            print("company_subscriptionsテーブルにデータがありません")
         
-        # 5. 特定のLINEユーザーIDでの検索テスト
-        target_line_user_id = "U1b9d0d75b0c770dc1107dde349d572f7"
-        print(f"\n=== 特定LINEユーザーIDでの検索テスト: {target_line_user_id} ===")
-        
-        # companiesテーブルでの検索
-        c.execute("SELECT id, company_name, line_user_id FROM companies WHERE line_user_id = %s", (target_line_user_id,))
-        company_result = c.fetchone()
-        print(f"companiesテーブル検索結果: {company_result}")
-        
-        # usersテーブルでの検索
-        c.execute("SELECT id, email, line_user_id FROM users WHERE line_user_id = %s", (target_line_user_id,))
-        user_result = c.fetchone()
-        print(f"usersテーブル検索結果: {user_result}")
-        
-        # 6. 企業IDが1の場合の詳細確認
+        # 5. 企業IDが1の場合の詳細確認
         print(f"\n=== 企業ID=1の詳細確認 ===")
-        c.execute("SELECT id, company_name, line_user_id, stripe_subscription_id FROM companies WHERE id = 1")
+        c.execute("SELECT id, company_name, email, status FROM companies WHERE id = 1")
         company_1 = c.fetchone()
         print(f"企業ID=1の情報: {company_1}")
         
         if company_1:
             company_id = company_1[0]
-            c.execute("SELECT id, subscription_status, current_period_end FROM company_payments WHERE company_id = %s ORDER BY created_at DESC LIMIT 1", (company_id,))
-            payment_1 = c.fetchone()
-            print(f"企業ID=1の最新決済情報: {payment_1}")
+            # LINEアカウント情報
+            c.execute("SELECT id, content_type, line_channel_id, status FROM company_line_accounts WHERE company_id = %s ORDER BY created_at DESC LIMIT 1", (company_id,))
+            line_account_1 = c.fetchone()
+            print(f"企業ID=1のLINEアカウント情報: {line_account_1}")
+            
+            # サブスクリプション情報
+            c.execute("SELECT id, content_type, subscription_status, current_period_end FROM company_subscriptions WHERE company_id = %s ORDER BY created_at DESC LIMIT 1", (company_id,))
+            subscription_1 = c.fetchone()
+            print(f"企業ID=1のサブスクリプション情報: {subscription_1}")
         
         conn.close()
         
