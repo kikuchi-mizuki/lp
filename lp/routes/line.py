@@ -763,6 +763,31 @@ def line_webhook():
                     print(f'[DEBUG] 状態チェック: state={state}, text={text}')
                     print(f'[DEBUG] メッセージ処理分岐開始: text="{text}", state="{state}"')
                     print(f'[DEBUG] 条件チェック: text=="追加" = {text == "追加"}, state!="cancel_select" = {state != "cancel_select"}')
+                    
+                    # コマンド処理（状態に関係なく）
+                    if text == '追加' and state != 'cancel_select':
+                        print(f'[DEBUG] 追加コマンド受信: user_id={user_id}, state={state}')
+                        set_user_state(user_id, 'add_select')
+                        print(f'[DEBUG] ユーザー状態をadd_selectに設定: user_id={user_id}')
+                        print(f'[DEBUG] handle_add_content_company呼び出し開始: replyToken={event["replyToken"]}, company_id={company_id}, stripe_subscription_id={stripe_subscription_id}')
+                        handle_add_content_company(event['replyToken'], company_id, stripe_subscription_id)
+                        print(f'[DEBUG] handle_add_content_company呼び出し完了')
+                        continue
+                    elif text == 'メニュー' and state != 'cancel_select':
+                        print(f'[DEBUG] メニューコマンド受信: user_id={user_id}, state={state}')
+                        from utils.message_templates import get_menu_message
+                        send_line_message(event['replyToken'], [get_menu_message()])
+                        continue
+                    elif text == 'ヘルプ' and state != 'cancel_select':
+                        print(f'[DEBUG] ヘルプコマンド受信: user_id={user_id}, state={state}')
+                        send_line_message(event['replyToken'], get_help_message_company())
+                        continue
+                    elif text == '状態' and state != 'cancel_select':
+                        print(f'[DEBUG] 状態コマンド受信: user_id={user_id}, state={state}')
+                        handle_status_check_company(event['replyToken'], company_id)
+                        continue
+                    
+                    # 状態に基づく処理
                     if state == 'add_select':
                         print(f'[DEBUG] add_select状態での処理: user_id={user_id}, text={text}')
                         if text in ['1', '2', '3', '4']:
@@ -890,23 +915,6 @@ def line_webhook():
                             send_line_message(event['replyToken'], [{"type": "text", "text": "1、2、3のいずれかを選択してください。\n\nまたは「メニュー」でメインメニューに戻ります。"}])
                     
                     # その他のコマンド処理（add_select状態以外）
-                    elif text == '追加' and state != 'cancel_select':
-                        print(f'[DEBUG] 追加コマンド受信: user_id={user_id}, state={state}')
-                        set_user_state(user_id, 'add_select')
-                        print(f'[DEBUG] ユーザー状態をadd_selectに設定: user_id={user_id}')
-                        print(f'[DEBUG] handle_add_content_company呼び出し開始: replyToken={event["replyToken"]}, company_id={company_id}, stripe_subscription_id={stripe_subscription_id}')
-                        handle_add_content_company(event['replyToken'], company_id, stripe_subscription_id)
-                        print(f'[DEBUG] handle_add_content_company呼び出し完了')
-                    elif text == 'メニュー' and state != 'cancel_select':
-                        print(f'[DEBUG] メニューコマンド受信: user_id={user_id}, state={state}')
-                        from utils.message_templates import get_menu_message
-                        send_line_message(event['replyToken'], [get_menu_message()])
-                    elif text == 'ヘルプ' and state != 'cancel_select':
-                        print(f'[DEBUG] ヘルプコマンド受信: user_id={user_id}, state={state}')
-                        send_line_message(event['replyToken'], get_help_message_company())
-                    elif text == '状態' and state != 'cancel_select':
-                        print(f'[DEBUG] 状態コマンド受信: user_id={user_id}, state={state}')
-                        handle_status_check_company(event['replyToken'], company_id)
                     elif state and state.startswith('confirm_'):
                         # 確認状態での処理
                         if text.lower() in ['はい', 'yes', 'y']:
