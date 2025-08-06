@@ -748,6 +748,9 @@ def line_webhook():
                         send_line_message(event['replyToken'], [{"type": "text", "text": "決済済みの方は、登録時のメールアドレスを送信してください。\n\n例: example@example.com\n\n※メールアドレスを送信すると、自動的に企業データと紐付けされます。"}])
                         conn.close()
                         continue
+                    
+                    # ユーザー状態を取得
+                    state = get_user_state(user_id)
                     print(f'[DEBUG] ユーザー状態確認: user_id={user_id}, state={state}')
                     print(f'[DEBUG] 状態詳細: state={state}, text={text}')
                     
