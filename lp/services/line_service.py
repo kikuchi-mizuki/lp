@@ -87,6 +87,7 @@ def send_line_message(reply_token, messages):
     }
     
     print('[DEBUG] LINE送信内容:', data)
+    print('[DEBUG] LINE API送信開始')
     
     try:
         response = requests.post('https://api.line.me/v2/bot/message/reply', headers=headers, json=data, timeout=10)
@@ -117,6 +118,7 @@ def send_line_message(reply_token, messages):
         
         response.raise_for_status()
         print(f'[DEBUG] LINE API送信成功: status_code={response.status_code}')
+        print('[DEBUG] LINE API送信処理完了')
     except requests.exceptions.Timeout:
         print('❌ LINE API タイムアウトエラー')
         with open('error.log', 'a', encoding='utf-8') as f:
@@ -188,6 +190,7 @@ def send_welcome_with_buttons(reply_token):
         
         response.raise_for_status()
         print(f'[DEBUG] LINE API送信成功: status_code={response.status_code}')
+        print('[DEBUG] send_welcome_with_buttons送信処理完了')
     except Exception as e:
         print(f'LINEテンプレートメッセージ送信エラー: {e}')
         if hasattr(e, 'response') and e.response is not None:
@@ -418,6 +421,7 @@ def setup_rich_menu():
 def handle_add_content(reply_token, user_id_db, stripe_subscription_id):
     try:
         print(f'[DEBUG] handle_add_content開始: user_id_db={user_id_db}, stripe_subscription_id={stripe_subscription_id}')
+        print(f'[DEBUG] reply_token: {reply_token}')
         
         # 企業紐付け完了後のため、制限チェックは不要
         # 通常のコンテンツ選択メニューを表示
@@ -447,12 +451,16 @@ def handle_add_content(reply_token, user_id_db, stripe_subscription_id):
                 ]
             }
         }
+        print(f'[DEBUG] コンテンツ選択メニュー送信開始')
         send_line_message(reply_token, [content_menu])
+        print(f'[DEBUG] コンテンツ選択メニュー送信完了')
     except Exception as e:
-        print(f'コンテンツ選択メニューエラー: {e}')
+        print(f'[DEBUG] コンテンツ選択メニューエラー: {e}')
         import traceback
         traceback.print_exc()
+        print(f'[DEBUG] エラー時の代替メッセージ送信開始')
         send_line_message(reply_token, [{"type": "text", "text": "エラーが発生しました。しばらく時間をおいて再度お試しください。"}])
+        print(f'[DEBUG] エラー時の代替メッセージ送信完了')
 
 def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, content_number):
     try:

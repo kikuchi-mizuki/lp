@@ -610,11 +610,16 @@ def line_webhook():
                 print(f'[DEBUG] テキストメッセージ受信: user_id={user_id}, text={text}')
                 print(f'[DEBUG] イベント全体: {json.dumps(event, ensure_ascii=False, indent=2)}')
                 
+                print(f'[DEBUG] データベース接続開始')
                 conn = get_db_connection()
+                print(f'[DEBUG] データベース接続成功')
                 c = conn.cursor()
+                print(f'[DEBUG] カーソル作成成功')
                 
                 # 1. まずcompaniesテーブルでLINEユーザーIDを検索（決済済みユーザー）
+                print(f'[DEBUG] companiesテーブル検索開始: line_user_id={user_id}')
                 c.execute('SELECT id, company_name, stripe_subscription_id FROM companies WHERE line_user_id = %s', (user_id,))
+                print(f'[DEBUG] SQLクエリ実行完了')
                 company = c.fetchone()
                 print(f'[DEBUG] companiesテーブル検索結果: {company}')
                 
