@@ -1612,6 +1612,47 @@ def debug_railway():
             'error': str(e)
         })
 
+@app.route('/debug/update_company_line_user_id/<int:company_id>/<line_user_id>')
+def debug_update_company_line_user_id(company_id, line_user_id):
+    """デバッグ用：企業データのLINEユーザーIDを直接更新"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 現在の企業データを確認
+        c.execute('SELECT id, company_name, line_user_id, stripe_subscription_id FROM companies WHERE id = %s', (company_id,))
+        company_result = c.fetchone()
+        
+        if not company_result:
+            return jsonify({'error': f'企業ID {company_id} が見つかりません'})
+        
+        company_id_db, company_name, current_line_user_id, stripe_subscription_id = company_result
+        
+        # LINEユーザーIDを更新
+        c.execute('UPDATE companies SET line_user_id = %s WHERE id = %s', (line_user_id, company_id))
+        conn.commit()
+        
+        # 更新後の確認
+        c.execute('SELECT id, company_name, line_user_id, stripe_subscription_id FROM companies WHERE id = %s', (company_id,))
+        updated_company = c.fetchone()
+        
+        conn.close()
+        
+        if updated_company:
+            return jsonify({
+                'success': True,
+                'message': f'企業データのLINEユーザーIDを更新しました',
+                'company_id': company_id,
+                'company_name': updated_company[1],
+                'line_user_id': updated_company[2],
+                'stripe_subscription_id': updated_company[3]
+            })
+        else:
+            return jsonify({'error': '更新後の確認に失敗しました'})
+            
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
 if __name__ == '__main__':
     try:
         # データベース初期化をスキップしてアプリケーションを起動
