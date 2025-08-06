@@ -751,15 +751,15 @@ def line_webhook():
                     
                     # ユーザー状態を取得
                     state = get_user_state(user_id)
-                    print(f'[DEBUG] ユーザー状態確認: user_id={user_id}, state={state}')
-                    print(f'[DEBUG] 状態詳細: state={state}, text={text}')
+                    logger.info(f'[DEBUG] ユーザー状態確認: user_id={user_id}, state={state}')
+                    logger.info(f'[DEBUG] 状態詳細: state={state}, text={text}')
                     
                     # 初回案内文が既に送信されている場合は、通常のメッセージ処理に進む
                     if state == 'welcome_sent':
-                        print(f'[DEBUG] 初回案内文送信済み、通常メッセージ処理に進む: user_id={user_id}')
+                        logger.info(f'[DEBUG] 初回案内文送信済み、通常メッセージ処理に進む: user_id={user_id}')
                         # 通常のメッセージ処理に進む
                     else:
-                        print(f'[DEBUG] ユーザーは特定の状態: user_id={user_id}, state={state}')
+                        logger.info(f'[DEBUG] ユーザーは特定の状態: user_id={user_id}, state={state}')
                     
                     # 状態に基づく処理（優先順位順）
                     import logging
@@ -810,7 +810,7 @@ def line_webhook():
                         continue
                     # 削除関連のコマンドを優先処理
                     elif text == '削除':
-                        print(f'[DEBUG] 削除コマンド受信: user_id={user_id}')
+                        logger.info(f'[DEBUG] 削除コマンド受信: user_id={user_id}')
                         handle_cancel_menu_company(event['replyToken'], company_id, stripe_subscription_id)
                     elif text == 'サブスクリプション解約':
                         handle_subscription_cancel(event['replyToken'], company_id, stripe_subscription_id)
@@ -818,11 +818,11 @@ def line_webhook():
                         set_user_state(user_id, 'cancel_select')
                         handle_cancel_request(event['replyToken'], company_id, stripe_subscription_id)
                     elif state == 'cancel_select':
-                        print(f'[DEBUG] 削除選択処理: user_id={user_id}, state={state}, text={text}')
+                        logger.info(f'[DEBUG] 削除選択処理: user_id={user_id}, state={state}, text={text}')
                         
                         # 削除対象のコンテンツを選択
                         if text in ['1', '2', '3']:
-                            print(f'[DEBUG] 削除対象コンテンツ選択: text={text}')
+                            logger.info(f'[DEBUG] 削除対象コンテンツ選択: text={text}')
                             # 削除確認状態に設定
                             set_user_state(user_id, f'cancel_confirm_{text}')
                             # 削除確認メッセージを送信
