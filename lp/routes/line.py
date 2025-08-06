@@ -890,6 +890,10 @@ def line_webhook():
                         normalized_email = normalize_email(text)
                         print(f'[DEBUG] 正規化後のメールアドレス: {normalized_email}')
                         
+                        # データベース接続を取得
+                        conn = get_db_connection()
+                        c = conn.cursor()
+                        
                         # 1. companiesテーブルでメールアドレスを検索
                         c.execute('SELECT id, company_name FROM companies WHERE email = %s', (normalized_email,))
                         company = c.fetchone()
@@ -936,7 +940,10 @@ def line_webhook():
                             # 企業データが見つからない場合
                             print(f'[DEBUG] 企業データが見つかりません: email={normalized_email}')
                             send_line_message(event['replyToken'], [{"type": "text", "text": 'ご登録メールアドレスが見つかりません。LPでご登録済みかご確認ください。'}])
-                            continue
+                        
+                        # データベース接続を閉じる
+                        conn.close()
+                        continue
             else:
                 print(f'[DEBUG] デフォルト処理: user_id={user_id}, state={state}, text={text}')
                 print(f'[DEBUG] どの条件にも当てはまらないためデフォルト処理に進む: text="{text}", state="{state}"')
