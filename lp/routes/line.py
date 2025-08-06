@@ -1093,8 +1093,8 @@ def line_webhook():
                         print(f'[DEBUG] 特定状態でのデフォルト処理: state={state}')
                         send_line_message(event['replyToken'], [{"type": "text", "text": "無効な入力です。メニューから選択してください。"}])
                 conn.close()
-                    # リッチメニューのpostbackイベントの処理
-                    elif event.get('type') == 'postback':
+            # リッチメニューのpostbackイベントの処理
+            elif event.get('type') == 'postback':
                                      user_id = event['source']['userId']
                                      postback_data = event['postback']['data']
                                      conn = get_db_connection()
