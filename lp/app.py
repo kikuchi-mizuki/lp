@@ -102,9 +102,9 @@ def init_db():
                     company_id INTEGER NOT NULL,
                     content_type VARCHAR(100) NOT NULL,
                     subscription_status VARCHAR(50) DEFAULT 'active',
-                    base_price INTEGER DEFAULT 5000,
+                    base_price INTEGER DEFAULT 3900,
                     additional_price INTEGER DEFAULT 0,
-                    total_price INTEGER DEFAULT 5000,
+                    total_price INTEGER DEFAULT 3900,
                     stripe_subscription_id VARCHAR(255),
                     current_period_end TIMESTAMP,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -156,9 +156,9 @@ def init_db():
                     company_id INTEGER NOT NULL,
                     content_type TEXT NOT NULL,
                     subscription_status TEXT DEFAULT 'active',
-                    base_price INTEGER DEFAULT 5000,
+                    base_price INTEGER DEFAULT 3900,
                     additional_price INTEGER DEFAULT 0,
-                    total_price INTEGER DEFAULT 5000,
+                    total_price INTEGER DEFAULT 3900,
                     stripe_subscription_id TEXT,
                     current_period_end TIMESTAMP,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -471,7 +471,7 @@ def save_company_subscription(company_id, stripe_subscription_id, content_type='
         subscription = stripe.Subscription.retrieve(stripe_subscription_id)
         
         # 料金計算
-        base_price = 5000  # 基本料金（月額5,000円）
+        base_price = 3900  # 基本料金（月額3,900円）
         additional_price = 0  # 追加コンテンツ料金（初期は0）
         total_price = base_price + additional_price
         
@@ -516,7 +516,7 @@ def calculate_company_pricing(company_id, content_types):
     """
     企業の料金計算
     """
-    base_price = 5000  # 基本料金
+    base_price = 3900  # 基本料金
     additional_price_per_content = 1500  # 追加コンテンツ料金
     
     # 基本料金（1つ目のコンテンツは基本料金に含まれる）
