@@ -1997,7 +1997,6 @@ def check_company_restriction_api():
 def get_company_info_api(line_channel_id):
     """
     企業情報取得API
-    
     """
     try:
         from services.company_service import get_company_by_line_channel_id, get_company_line_accounts, get_company_subscriptions
