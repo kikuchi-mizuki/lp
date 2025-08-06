@@ -793,9 +793,9 @@ def line_webhook():
                     
                     # 状態に基づく処理
                     elif state == 'add_select':
-                        print(f'[DEBUG] add_select状態での処理: user_id={user_id}, text={text}')
+                        logger.info(f'[DEBUG] add_select状態での処理: user_id={user_id}, text={text}')
                         if text in ['1', '2', '3', '4']:
-                            print(f'[DEBUG] コンテンツ選択: text={text}')
+                            logger.info(f'[DEBUG] コンテンツ選択: text={text}')
                             set_user_state(user_id, f'confirm_{text}')
                             handle_content_selection(event['replyToken'], company_id, stripe_subscription_id, text)
                         elif text == 'メニュー':
