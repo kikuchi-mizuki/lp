@@ -1273,69 +1273,45 @@ def handle_status_check_company(reply_token, company_id):
         send_line_message(reply_token, [{"type": "text", "text": "❌ エラーが発生しました。しばらく時間をおいて再度お試しください。"}])
 
 def handle_cancel_menu_company(reply_token, company_id, stripe_subscription_id):
-    """企業ユーザー専用：コンテンツ削除メニュー表示"""
+    """企業ユーザー専用：解約メニュー表示"""
     try:
-        # データベースタイプを取得
-        db_type = get_db_type()
-        placeholder = '%s' if db_type == 'postgresql' else '?'
-        
-        conn = get_db_connection()
-        c = conn.cursor()
-        
-        # 企業のコンテンツ一覧を取得
-        c.execute(f'''
-            SELECT content_type, created_at 
-            FROM company_subscriptions 
-            WHERE company_id = {placeholder} AND subscription_status = 'active'
-            ORDER BY created_at DESC
-        ''', (company_id,))
-        
-        active_contents = c.fetchall()
-        conn.close()
-        
-        if not active_contents:
-            send_line_message(reply_token, [{"type": "text", "text": "削除可能なコンテンツがありません。"}])
-            return
-        
-        # 削除メニューを作成
-        actions = []
-        for i, content in enumerate(active_contents, 1):
-            content_type, created_at = content
-            created_date = created_at.strftime('%Y年%m月%d日') if created_at else '不明'
-            actions.append({
-                "type": "postback",
-                "label": f"{i}. {content_type}",
-                "data": f"cancel_content_{i}"
-            })
-        
-        # 戻るボタンを追加
-        actions.append({
-            "type": "message",
-            "label": "戻る",
-            "text": "メニュー"
-        })
-        
         message = {
             "type": "template",
-            "altText": "コンテンツ削除メニュー",
+            "altText": "解約メニュー",
             "template": {
                 "type": "buttons",
-                "title": "削除するコンテンツを選択",
-                "text": "削除したいコンテンツを選択してください：",
-                "actions": actions
+                "title": "解約メニュー",
+                "text": "どの解約を行いますか？",
+                "actions": [
+                    {
+                        "type": "message",
+                        "label": "サブスクリプション解約",
+                        "text": "サブスクリプション解約"
+                    },
+                    {
+                        "type": "message",
+                        "label": "コンテンツ解約",
+                        "text": "コンテンツ解約"
+                    },
+                    {
+                        "type": "message",
+                        "label": "戻る",
+                        "text": "メニュー"
+                    }
+                ]
             }
         }
         
         send_line_message(reply_token, [message])
         
     except Exception as e:
-        print(f'[DEBUG] コンテンツ削除メニューエラー: {e}')
+        print(f'[DEBUG] 解約メニューエラー: {e}')
         import traceback
         traceback.print_exc()
-        send_line_message(reply_token, [{"type": "text", "text": "コンテンツ削除メニューでエラーが発生しました。"}])
+        send_line_message(reply_token, [{"type": "text", "text": "解約メニューでエラーが発生しました。"}])
 
 def handle_cancel_request_company(reply_token, company_id, stripe_subscription_id):
-    """企業ユーザー専用：解約リクエスト処理"""
+    """企業ユーザー専用：個別コンテンツ解約メニュー表示"""
     try:
         # データベースタイプを取得
         db_type = get_db_type()
@@ -1376,7 +1352,7 @@ def handle_cancel_request_company(reply_token, company_id, stripe_subscription_i
                         },
                         {
                             "type": "message",
-                            "label": "メニューに戻る",
+                            "label": "戻る",
                             "text": "メニュー"
                         }
                     ]
@@ -1385,35 +1361,42 @@ def handle_cancel_request_company(reply_token, company_id, stripe_subscription_i
             send_line_message(reply_token, [no_content_message])
             return
         
-        # 解約メニューを表示
-        cancel_menu_text = "解約したいコンテンツを選択してください：\n\n"
-        for i, (content_type, created_at) in enumerate(active_contents, 1):
+        # 解約対象コンテンツの選択メニューを作成
+        actions = []
+        for i, content in enumerate(active_contents, 1):
+            content_type, created_at = content
             created_date = created_at.strftime('%Y年%m月%d日') if created_at else '不明'
-            cancel_menu_text += f"{i}. {content_type} (追加日: {created_date})\n"
+            actions.append({
+                "type": "message",
+                "label": f"{i}. {content_type}",
+                "text": f"{i}"
+            })
         
-        cancel_menu_message = {
+        # 戻るボタンを追加
+        actions.append({
+            "type": "message",
+            "label": "戻る",
+            "text": "メニュー"
+        })
+        
+        message = {
             "type": "template",
-            "altText": "解約メニュー",
+            "altText": "コンテンツ解約選択",
             "template": {
                 "type": "buttons",
-                "title": "解約メニュー",
-                "text": cancel_menu_text,
-                "actions": [
-                    {
-                        "type": "message",
-                        "label": "メニューに戻る",
-                        "text": "メニュー"
-                    }
-                ]
+                "title": "解約するコンテンツを選択",
+                "text": "解約したいコンテンツを選択してください：",
+                "actions": actions
             }
         }
-        send_line_message(reply_token, [cancel_menu_message])
+        
+        send_line_message(reply_token, [message])
         
     except Exception as e:
-        print(f'[ERROR] 企業解約リクエスト処理エラー: {e}')
+        print(f'[DEBUG] コンテンツ解約メニューエラー: {e}')
         import traceback
         traceback.print_exc()
-        send_line_message(reply_token, [{"type": "text", "text": "❌ エラーが発生しました。しばらく時間をおいて再度お試しください。"}])
+        send_line_message(reply_token, [{"type": "text", "text": "コンテンツ解約メニューでエラーが発生しました。"}])
 
 def handle_cancel_selection_company(reply_token, company_id, stripe_subscription_id, selection_text):
     """企業ユーザー専用：解約選択処理"""
