@@ -1438,6 +1438,37 @@ def handle_cancel_selection_company(reply_token, company_id, stripe_subscription
         # 選択されたコンテンツを解約
         for i, (subscription_id, content_type, created_at) in enumerate(active_contents, 1):
             if i in selected_indices:
+                # Stripe UsageRecordを削除（有料コンテンツの場合）
+                try:
+                    # 企業のStripeサブスクリプションIDを取得
+                    c.execute(f'SELECT stripe_subscription_id FROM company_subscriptions WHERE company_id = {placeholder} AND subscription_status = {placeholder} LIMIT 1', (company_id, 'active'))
+                    stripe_result = c.fetchone()
+                    if stripe_result and stripe_result[0]:
+                        stripe_subscription_id = stripe_result[0]
+                        
+                        # Stripeからsubscription_item_id取得
+                        subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+                        USAGE_PRICE_ID = os.getenv('STRIPE_USAGE_PRICE_ID')
+                        
+                        usage_item = None
+                        for item in subscription['items']['data']:
+                            if item['price']['id'] == USAGE_PRICE_ID:
+                                usage_item = item
+                                break
+                        
+                        if usage_item:
+                            # UsageRecordを削除（quantity=1で減算）
+                            stripe.UsageRecord.create(
+                                subscription_item=usage_item['id'],
+                                quantity=1,
+                                timestamp=int(time.time()),
+                                action='set',  # 使用量を0に設定
+                            )
+                            print(f'[DEBUG] Stripe UsageRecord削除成功: content_type={content_type}')
+                except Exception as e:
+                    print(f'[DEBUG] Stripe UsageRecord削除エラー: {e}')
+                    # エラーが発生しても処理は続行
+                
                 # サブスクリプションを停止
                 c.execute(f'''
                     UPDATE company_subscriptions 
