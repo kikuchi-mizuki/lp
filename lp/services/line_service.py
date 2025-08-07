@@ -1438,17 +1438,22 @@ def handle_cancel_selection_company(reply_token, company_id, stripe_subscription
         # 選択されたコンテンツを解約
         for i, (subscription_id, content_type, created_at) in enumerate(active_contents, 1):
             if i in selected_indices:
+                print(f'[DEBUG] 解約処理開始: content_type={content_type}, subscription_id={subscription_id}')
+                
                 # Stripe UsageRecordを削除（有料コンテンツの場合）
                 try:
                     # 企業のStripeサブスクリプションIDを取得
                     c.execute(f'SELECT stripe_subscription_id FROM company_subscriptions WHERE company_id = {placeholder} AND subscription_status = {placeholder} LIMIT 1', (company_id, 'active'))
                     stripe_result = c.fetchone()
+                    print(f'[DEBUG] StripeサブスクリプションID取得結果: {stripe_result}')
+                    
                     if stripe_result and stripe_result[0]:
                         stripe_subscription_id = stripe_result[0]
                         
                         # Stripeからsubscription_item_id取得
                         subscription = stripe.Subscription.retrieve(stripe_subscription_id)
                         USAGE_PRICE_ID = os.getenv('STRIPE_USAGE_PRICE_ID')
+                        print(f'[DEBUG] Stripeサブスクリプション取得: {stripe_subscription_id}, USAGE_PRICE_ID={USAGE_PRICE_ID}')
                         
                         usage_item = None
                         for item in subscription['items']['data']:
@@ -1465,26 +1470,42 @@ def handle_cancel_selection_company(reply_token, company_id, stripe_subscription
                                 action='set',  # 使用量を0に設定
                             )
                             print(f'[DEBUG] Stripe UsageRecord削除成功: content_type={content_type}')
+                        else:
+                            print(f'[DEBUG] UsageItemが見つかりません: USAGE_PRICE_ID={USAGE_PRICE_ID}')
                 except Exception as e:
                     print(f'[DEBUG] Stripe UsageRecord削除エラー: {e}')
+                    import traceback
+                    traceback.print_exc()
                     # エラーが発生しても処理は続行
                 
                 # サブスクリプションを停止
-                c.execute(f'''
-                    UPDATE company_subscriptions 
-                    SET subscription_status = 'canceled', updated_at = CURRENT_TIMESTAMP
-                    WHERE id = {placeholder}
-                ''', (subscription_id,))
+                try:
+                    c.execute(f'''
+                        UPDATE company_subscriptions 
+                        SET subscription_status = 'canceled', updated_at = CURRENT_TIMESTAMP
+                        WHERE id = {placeholder}
+                    ''', (subscription_id,))
+                    print(f'[DEBUG] company_subscriptions更新成功: subscription_id={subscription_id}')
+                except Exception as e:
+                    print(f'[DEBUG] company_subscriptions更新エラー: {e}')
+                    import traceback
+                    traceback.print_exc()
                 
                 # LINEアカウントも停止
-                c.execute(f'''
-                    UPDATE company_line_accounts 
-                    SET status = 'inactive', updated_at = CURRENT_TIMESTAMP
-                    WHERE company_id = {placeholder} AND content_type = {placeholder}
-                ''', (company_id, content_type))
+                try:
+                    c.execute(f'''
+                        UPDATE company_line_accounts 
+                        SET status = 'inactive', updated_at = CURRENT_TIMESTAMP
+                        WHERE company_id = {placeholder} AND content_type = {placeholder}
+                    ''', (company_id, content_type))
+                    print(f'[DEBUG] company_line_accounts更新成功: company_id={company_id}, content_type={content_type}')
+                except Exception as e:
+                    print(f'[DEBUG] company_line_accounts更新エラー: {e}')
+                    import traceback
+                    traceback.print_exc()
                 
                 cancelled.append(content_type)
-                print(f'[DEBUG] 企業コンテンツ解約処理: content_type={content_type}, subscription_id={subscription_id}')
+                print(f'[DEBUG] 企業コンテンツ解約処理完了: content_type={content_type}, subscription_id={subscription_id}')
         
         print(f'[DEBUG] 解約対象コンテンツ数: {len(cancelled)}')
         print(f'[DEBUG] 解約対象: {cancelled}')
