@@ -6,7 +6,7 @@ import stripe
 import traceback
 import time
 from datetime import datetime, timedelta
-from utils.db import get_db_connection
+from utils.db import get_db_connection, get_db_type
 from services.stripe_service import check_subscription_status
 import re
 from services.subscription_period_service import SubscriptionPeriodService
@@ -16,11 +16,15 @@ LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
 
 def send_line_message(reply_token, messages):
     """LINEメッセージ送信（複数メッセージ対応）"""
+    print(f'[DEBUG] send_line_message開始: reply_token={reply_token[:20]}...')
+    
     LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
     
     if not LINE_CHANNEL_ACCESS_TOKEN:
         print('❌ LINE_CHANNEL_ACCESS_TOKENが設定されていません')
         return
+    
+    print(f'[DEBUG] LINE_CHANNEL_ACCESS_TOKEN確認: {LINE_CHANNEL_ACCESS_TOKEN[:20]}...')
     
     # replyTokenの重複使用チェック
     if hasattr(send_line_message, 'used_tokens'):
@@ -51,9 +55,13 @@ def send_line_message(reply_token, messages):
         'Content-Type': 'application/json'
     }
     
+    print(f'[DEBUG] ヘッダー設定完了: Authorization={headers["Authorization"][:20]}...')
+    
     # 単一メッセージの場合はリスト化
     if not isinstance(messages, list):
         messages = [messages]
+    
+    print(f'[DEBUG] メッセージ数: {len(messages)}')
     
     # メッセージの検証と修正
     validated_messages = []
@@ -87,7 +95,9 @@ def send_line_message(reply_token, messages):
     print('[DEBUG] LINE API送信開始')
     
     try:
+        print(f'[DEBUG] LINE APIリクエスト送信: URL=https://api.line.me/v2/bot/message/reply')
         response = requests.post('https://api.line.me/v2/bot/message/reply', headers=headers, json=data, timeout=10)
+        print(f'[DEBUG] LINE APIレスポンス受信: status_code={response.status_code}')
         
         if response.status_code == 400:
             print(f'[DEBUG] LINE API 400エラー詳細: {response.text}')
@@ -136,42 +146,34 @@ def send_line_message(reply_token, messages):
             f.write(traceback.format_exc() + '\n')
 
 def send_welcome_with_buttons(reply_token):
-    """ウェルカムメッセージ（ボタン付き）"""
+    """ボタン付きウェルカムメッセージを送信"""
     welcome_message = {
         "type": "template",
-        "altText": "AI Collections へようこそ",
+        "altText": "ようこそ！AIコレクションズへ",
         "template": {
             "type": "buttons",
-            "title": "AI Collections へようこそ",
-            "text": "AI予定秘書、AI経理秘書、AIタスクコンシェルジュの3つのサービスをご利用いただけます。",
-            "thumbnailImageUrl": "https://ai-collections.herokuapp.com/static/images/logo.png",
-            "imageAspectRatio": "rectangle",
-            "imageSize": "cover",
-            "imageBackgroundColor": "#FFFFFF",
+            "title": "ようこそ！AIコレクションズへ",
+            "text": "企業向けAIツールを効率的に利用しましょう。\n\n何かお手伝いできることはありますか？",
             "actions": [
                 {
-                    "type": "message",
+                    "type": "postback",
                     "label": "コンテンツ追加",
-                    "text": "追加"
+                    "data": "action=add_content"
                 },
                 {
-                    "type": "message",
+                    "type": "postback",
                     "label": "利用状況確認",
-                    "text": "状態"
+                    "data": "action=check_status"
                 },
                 {
-                    "type": "message",
-                    "label": "解約",
-                    "text": "解約"
-                },
-                {
-                    "type": "message",
+                    "type": "postback",
                     "label": "ヘルプ",
-                    "text": "ヘルプ"
+                    "data": "action=help"
                 }
             ]
         }
     }
+    
     send_line_message(reply_token, [welcome_message])
 
 def send_welcome_with_buttons_push(user_id):
@@ -255,7 +257,6 @@ def handle_add_content(reply_token, user_id_db, stripe_subscription_id):
         c = conn.cursor()
         
         # データベースタイプに応じて適切なプレースホルダーを使用
-        from utils.db import get_db_type
         db_type = get_db_type()
         placeholder = '%s' if db_type == 'postgresql' else '?'
         
@@ -269,202 +270,146 @@ def handle_add_content(reply_token, user_id_db, stripe_subscription_id):
         print(f'[DEBUG] 全usage_logs: {all_logs}')
         
         # 同じコンテンツの追加回数を確認
-        c.execute(f'SELECT COUNT(*) FROM usage_logs WHERE user_id = {placeholder} AND content_type = {placeholder}', (user_id_db, content['name']))
-        same_content_count = c.fetchone()[0]
+        for content in available_contents:
+            c.execute(f'SELECT COUNT(*) FROM usage_logs WHERE user_id = {placeholder} AND content_type = {placeholder}', (user_id_db, content['name']))
+            same_content_count = c.fetchone()[0]
+            print(f'[DEBUG] {content["name"]}の追加回数: {same_content_count}')
+        
         conn.close()
         
         print(f'[DEBUG] total_usage_count: {total_usage_count}')
-        print(f'[DEBUG] same_content_count: {same_content_count}')
-        print(f'[DEBUG] content_type: {content["name"]}')
         
-        # 同じコンテンツが既に追加されている場合
-        if same_content_count > 0:
-            already_added_message = {
-                "type": "template",
-                "altText": "すでに追加されています",
-                "template": {
-                    "type": "buttons",
-                    "title": "すでに追加されています",
-                    "text": f"{content['name']}は既に追加済みです。\n\n他のコンテンツを追加するか、利用状況を確認してください。",
-                    "actions": [
-                        {
-                            "type": "message",
-                            "label": "他のコンテンツ追加",
-                            "text": "追加"
-                        },
-                        {
-                            "type": "message",
-                            "label": "利用状況確認",
-                            "text": "状態"
-                        }
-                    ]
-                }
-            }
-            send_line_message(reply_token, [already_added_message])
-            return
+        # コンテンツ選択メニューを作成
+        actions = []
+        for i, content in enumerate(available_contents, 1):
+            actions.append({
+                "type": "postback",
+                "label": f"{i}. {content['name']}",
+                "data": f"content_selection={i}"
+            })
         
-        # サブスクリプションのトライアル期間をチェック
-        try:
-            subscription_status = check_subscription_status(stripe_subscription_id)
-            is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
-            print(f'[DEBUG] サブスクリプション状態: {subscription_status}')
-        except Exception as e:
-            print(f'[DEBUG] Stripeサブスクリプション状態確認エラー: {e}')
-            # エラーの場合はデフォルト値を使用
-            is_trial_period = False
-            subscription_status = {'subscription': {'status': 'error'}}
+        # 戻るボタンを追加
+        actions.append({
+            "type": "message",
+            "label": "戻る",
+            "text": "メニュー"
+        })
         
-        # トライアル期間終了後のコンテンツ追加回数を正しく計算
-        if is_trial_period:
-            # トライアル期間中でも、1個目は無料、2個目以降は有料（トライアル終了後に課金）
-            current_count = total_usage_count + 1
-            is_free = current_count == 1
-            print(f'[DEBUG] トライアル期間中: total_usage_count={total_usage_count}, current_count={current_count}, is_free={is_free}')
-        else:
-            # トライアル期間終了後は、トライアル期間中の追加分を除いて計算
-            # トライアル期間中の追加分を取得
-            try:
-                conn_trial = get_db_connection()
-                c_trial = conn_trial.cursor()
-                
-                # データベースタイプに応じて適切なプレースホルダーを使用
-                db_type = get_db_type()
-                placeholder = '%s' if db_type == 'postgresql' else '?'
-                
-                c_trial.execute(f'''
-                    SELECT COUNT(*) FROM usage_logs 
-                    WHERE user_id = {placeholder} AND pending_charge = FALSE
-                ''', (user_id_db,))
-                trial_additions = c_trial.fetchone()[0]
-                conn_trial.close()
-                
-                # トライアル期間終了後の追加回数
-                post_trial_count = total_usage_count - trial_additions + 1
-                current_count = post_trial_count
-                is_free = current_count == 1
-                print(f'[DEBUG] 通常期間: total_usage_count={total_usage_count}, trial_additions={trial_additions}, current_count={current_count}, is_free={is_free}')
-            except Exception as e:
-                print(f'[DEBUG] トライアル期間計算エラー: {e}')
-                # エラーの場合はシンプルな計算
-                current_count = total_usage_count + 1
-                is_free = current_count == 1
-                print(f'[DEBUG] フォールバック計算: total_usage_count={total_usage_count}, current_count={current_count}, is_free={is_free}')
-        
-        if current_count == 1:
-            price_message = f"料金：無料（{current_count}個目）"
-        else:
-            price_message = f"料金：1,500円（{current_count}個目、月額料金に追加）"
-            print(f'[DEBUG] 2個目以降のコンテンツ追加: is_free={is_free}, current_count={current_count}')
-        
-        # コンテンツ選択メニューを表示
-        content_selection_message = {
+        message = {
             "type": "template",
-            "altText": "コンテンツ選択",
+            "altText": "コンテンツ追加メニュー",
             "template": {
                 "type": "buttons",
-                "title": "コンテンツ選択",
-                "text": "追加したいコンテンツを選択してください：\n\n1. AI予定秘書\n2. AI経理秘書\n3. AIタスクコンシェルジュ",
-                "actions": [
-                    {
-                        "type": "message",
-                        "label": "AI予定秘書",
-                        "text": "1"
-                    },
-                    {
-                        "type": "message",
-                        "label": "AI経理秘書",
-                        "text": "2"
-                    },
-                    {
-                        "type": "message",
-                        "label": "AIタスクコンシェルジュ",
-                        "text": "3"
-                    }
-                ]
+                "title": "追加するコンテンツを選択",
+                "text": f"現在の利用状況：\n• 追加済みコンテンツ：{total_usage_count}件\n\n追加したいコンテンツを選択してください：",
+                "actions": actions
             }
         }
-        send_line_message(reply_token, [content_selection_message])
+        
+        send_line_message(reply_token, [message])
         
     except Exception as e:
-        print(f'コンテンツ追加メニュー表示エラー: {e}')
-        send_line_message(reply_token, [{"type": "text", "text": "❌ エラーが発生しました。しばらく時間をおいて再度お試しください。"}])
+        print(f'[DEBUG] コンテンツ追加エラー: {e}')
+        import traceback
+        traceback.print_exc()
+        send_line_message(reply_token, [{"type": "text", "text": "コンテンツ追加処理でエラーが発生しました。"}])
 
 def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, content_number):
     """コンテンツ選択処理"""
     try:
-        # コンテンツ番号からコンテンツ名を取得
-        content_mapping = {
-            '1': 'AI予定秘書',
-            '2': 'AI経理秘書', 
-            '3': 'AIタスクコンシェルジュ'
-        }
-        
-        content_type = content_mapping.get(content_number)
-        if not content_type:
-            return {
-                'success': False,
-                'error': '無効なコンテンツ番号です'
-            }
-        
-        # データベースタイプに応じて適切なプレースホルダーを使用
-        from utils.db import get_db_type
+        # データベースタイプを取得
         db_type = get_db_type()
         placeholder = '%s' if db_type == 'postgresql' else '?'
         
-        # 解約対象のコンテンツを取得
-        c.execute(f'''
-            SELECT id, content_type, is_free, stripe_usage_record_id 
-            FROM usage_logs 
-            WHERE user_id = {placeholder} AND content_type = {placeholder}
-            ORDER BY created_at DESC
-            LIMIT 1
-        ''', (user_id_db, content_type))
-        
-        usage_log = c.fetchone()
-        if not usage_log:
-            return {
-                'success': False,
-                'error': f'{content_type}は追加されていません'
+        # コンテンツ情報を定義
+        content_info = {
+            '1': {
+                'name': 'AI予定秘書',
+                'price': 1500,
+                "description": '日程調整のストレスから解放される、スケジュール管理の相棒',
+                'usage': 'Googleカレンダーと連携し、LINEで予定の追加・確認・空き時間の提案まで。調整のやりとりに追われる時間を、もっとクリエイティブに使えるように。',
+                'url': 'https://lp-production-9e2c.up.railway.app/schedule',
+                'line_url': 'https://line.me/R/ti/p/@ai_schedule_secretary'
+            },
+            '2': {
+                'name': 'AI経理秘書',
+                'price': 1500,
+                "description": '打合せ後すぐ送れる、スマートな請求書作成アシスタント',
+                'usage': 'LINEで項目を送るだけで、見積書や請求書を即作成。営業から事務処理までを一気通貫でスムーズに。',
+                'url': 'https://lp-production-9e2c.up.railway.app/accounting',
+                'line_url': 'https://line.me/R/ti/p/@ai_accounting_secretary'
+            },
+            '3': {
+                'name': 'AIタスクコンシェルジュ',
+                'price': 1500,
+                "description": '今日やるべきことを、ベストなタイミングで',
+                'usage': '登録したタスクを空き時間に自動で配置し、理想的な1日をAIが提案。「やりたいのにできない」を、「自然にこなせる」毎日に。',
+                'url': 'https://lp-production-9e2c.up.railway.app/task',
+                'line_url': 'https://line.me/R/ti/p/@ai_task_concierge'
             }
+        }
         
-        usage_id, content_type, is_free, stripe_usage_record_id = usage_log
+        if content_number not in content_info:
+            send_line_message(reply_token, [{"type": "text", "text": "無効なコンテンツ番号です。"}])
+            return
         
-        # 解約処理
-        # 1. usage_logsテーブルから削除
-        c.execute(f'DELETE FROM usage_logs WHERE id = {placeholder}', (usage_id,))
+        content = content_info[content_number]
         
-        # 2. StripeのUsage Recordを削除（課金済みの場合）
-        if stripe_usage_record_id and not is_free:
-            try:
-                stripe.UsageRecord.delete(stripe_usage_record_id)
-                print(f'[DEBUG] Stripe Usage Record削除: {stripe_usage_record_id}')
-            except Exception as e:
-                print(f'[DEBUG] Stripe Usage Record削除エラー: {e}')
+        # 既に追加されているコンテンツを確認
+        conn = get_db_connection()
+        c = conn.cursor()
         
-        conn.commit()
+        c.execute(f'SELECT COUNT(*) FROM usage_logs WHERE user_id = {placeholder} AND content_type = {placeholder}', (user_id_db, content['name']))
+        existing_count = c.fetchone()[0]
+        
+        if existing_count > 0:
+            send_line_message(reply_token, [{"type": "text", "text": f"{content['name']}は既に追加済みです。"}])
+            conn.close()
+            return
+        
+        # サブスクリプション状態をチェック
+        subscription_status = check_subscription_status(stripe_subscription_id)
+        is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
+        
+        # 料金計算
+        if is_trial_period:
+            price = 0
+            price_message = "料金：無料（トライアル期間中）"
+        else:
+            price = content['price']
+            price_message = f"料金：{price:,}円（月額料金に追加）"
+        
+        # 確認メッセージを送信
+        confirmation_message = {
+            "type": "template",
+            "altText": "コンテンツ追加確認",
+            "template": {
+                "type": "buttons",
+                "title": f"{content['name']}を追加",
+                "text": f"{content['description']}\n\n{price_message}\n\n追加しますか？",
+                "actions": [
+                    {
+                        "type": "postback",
+                        "label": "はい",
+                        "data": f"confirm_add_{content_number}"
+                    },
+                    {
+                        "type": "postback",
+                        "label": "いいえ",
+                        "data": "cancel_add"
+                    }
+                ]
+            }
+        }
+        
+        send_line_message(reply_token, [confirmation_message])
         conn.close()
         
-        print(f'[DEBUG] 解約処理完了: user_id={user_id_db}, content_type={content_type}')
-        
-        return {
-            'success': True,
-            'content_type': content_type
-        }
-        
     except Exception as e:
-        print(f'[ERROR] 解約確認処理エラー: {e}')
+        print(f'[ERROR] コンテンツ選択処理エラー: {e}')
         import traceback
         traceback.print_exc()
-        return {
-            'success': False,
-            'error': str(e)
-        }
-
-def get_welcome_message():
-    return "ようこそ！LINE連携が完了しました。"
-
-def get_not_registered_message():
-    return "ご登録情報が見つかりません。LPからご登録ください。"
+        send_line_message(reply_token, [{"type": "text", "text": "コンテンツ選択処理でエラーが発生しました。"}])
 
 def handle_cancel_request(reply_token, user_id_db, stripe_subscription_id):
     """解約リクエスト処理"""
@@ -994,226 +939,127 @@ def handle_cancel_confirmation(user_id, content_number):
             'error': str(e)
         }
 
-def handle_content_confirmation(user_id, content_type):
+def handle_content_confirmation(user_id_db, content_type, stripe_subscription_id):
     """コンテンツ確認処理"""
     try:
-        conn = get_db_connection()
-        c = conn.cursor()
-        
-        # データベースタイプに応じて適切なプレースホルダーを使用
+        # データベースタイプを取得
         db_type = get_db_type()
         placeholder = '%s' if db_type == 'postgresql' else '?'
         
-        # ユーザーの現在のサブスクリプション情報を取得
-        c.execute(f'''
-            SELECT stripe_subscription_id, current_period_start, current_period_end
-            FROM subscription_periods
-            WHERE user_id = {placeholder} AND status = 'active'
-            ORDER BY created_at DESC
-            LIMIT 1
-        ''', (user_id,))
-        
-        subscription_info = c.fetchone()
-        
-        if not subscription_info:
-            conn.close()
-            return {
-                'success': False,
-                'error': 'アクティブなサブスクリプションが見つかりません'
-            }
-        
-        stripe_subscription_id, current_period_start, current_period_end = subscription_info
-        
-        # Stripeからサブスクリプション情報を取得
-        try:
-            subscription = stripe.Subscription.retrieve(stripe_subscription_id)
-        except stripe.error.StripeError as e:
-            conn.close()
-            return {
-                'success': False,
-                'error': f'Stripeサブスクリプション取得エラー: {str(e)}'
-            }
-        
-        # サブスクリプション期間を更新（重複を避けるためUPSERT使用）
-        try:
-            c.execute(f'''
-                INSERT INTO subscription_periods (
-                    user_id, stripe_subscription_id, subscription_status, status,
-                    current_period_start, current_period_end,
-                    trial_start, trial_end, created_at, updated_at
-                ) VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
-                ON CONFLICT (user_id, stripe_subscription_id) DO UPDATE SET
-                    subscription_status = EXCLUDED.subscription_status,
-                    status = EXCLUDED.status,
-                    current_period_start = EXCLUDED.current_period_start,
-                    current_period_end = EXCLUDED.current_period_end,
-                    trial_start = EXCLUDED.trial_start,
-                    trial_end = EXCLUDED.trial_end,
-                    updated_at = EXCLUDED.updated_at
-            ''', (
-                user_id,
-                subscription.id,
-                subscription.status,
-                'active',
-                datetime.fromtimestamp(subscription.current_period_start),
-                datetime.fromtimestamp(subscription.current_period_end),
-                datetime.fromtimestamp(subscription.trial_start) if subscription.trial_start else None,
-                datetime.fromtimestamp(subscription.trial_end) if subscription.trial_end else None,
-                datetime.now(),
-                datetime.now()
-            ))
-            
-            conn.commit()
-            
-        except Exception as e:
-            conn.rollback()
-            conn.close()
-            return {
-                'success': False,
-                'error': f'サブスクリプション期間更新エラー: {str(e)}'
-            }
-        
-        # コンテンツ確認ログを記録
-        try:
-            c.execute(f'''
-                INSERT INTO usage_logs (
-                    user_id, content_type, usage_quantity, is_free, pending_charge, created_at
-                ) VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
-            ''', (
-                user_id,
-                content_type,
-                1,  # usage_quantity
-                False,  # is_free
-                True,   # pending_charge
-                datetime.now()
-            ))
-            
-            conn.commit()
-            
-        except Exception as e:
-            conn.rollback()
-            conn.close()
-            return {
-                'success': False,
-                'error': f'使用ログ記録エラー: {str(e)}'
-            }
-        
-        conn.close()
-        
-        # 企業登録フォームへのリンクを生成
-        base_url = os.getenv('BASE_URL', 'https://lp-production-9e2c.up.railway.app')
-        registration_url = f"{base_url}/company-registration?subscription_id={subscription.id}&content_type={content_type}"
-        
-        return {
-            'success': True,
-            'message': 'コンテンツ確認が完了しました',
-            'subscription_status': subscription.status,
-            'trial_end': subscription.trial_end,
-            'registration_url': registration_url
-        }
-        
-    except Exception as e:
-        return {
-            'success': False,
-            'error': f'コンテンツ確認処理エラー: {str(e)}'
-        }
-
-def handle_status_check(reply_token, user_id_db):
-    """ユーザーの利用状況を確認してLINEメッセージで返す"""
-    try:
-        # LINEユーザーIDを直接使用
-        line_user_id = user_id_db
-        
-        # 企業紐付け完了後のため、制限チェックは不要
-        
-        # 決済済みユーザーの場合、企業情報を取得
         conn = get_db_connection()
         c = conn.cursor()
         
-        # 企業情報を取得
-        c.execute('SELECT company_name, stripe_subscription_id FROM companies WHERE line_user_id = %s', (line_user_id,))
-        company = c.fetchone()
+        # サブスクリプション状態をチェック
+        subscription_status = check_subscription_status(stripe_subscription_id)
+        print(f'[DEBUG] サブスクリプション状態: {subscription_status}')
         
-        if not company:
-            send_line_message(reply_token, [{"type": "text", "text": "企業情報が見つかりません。"}])
-            return
+        # 利用可能なコンテンツを定義
+        content_info = {
+            'AI予定秘書': {
+                'price': 1500,
+                "description": '日程調整のストレスから解放される、スケジュール管理の相棒',
+                'usage': 'Googleカレンダーと連携し、LINEで予定の追加・確認・空き時間の提案まで。調整のやりとりに追われる時間を、もっとクリエイティブに使えるように。',
+                'url': 'https://lp-production-9e2c.up.railway.app/schedule',
+                'line_url': 'https://line.me/R/ti/p/@ai_schedule_secretary'
+            },
+            'AI経理秘書': {
+                'price': 1500,
+                "description": '打合せ後すぐ送れる、スマートな請求書作成アシスタント',
+                'usage': 'LINEで項目を送るだけで、見積書や請求書を即作成。営業から事務処理までを一気通貫でスムーズに。',
+                'url': 'https://lp-production-9e2c.up.railway.app/accounting',
+                'line_url': 'https://line.me/R/ti/p/@ai_accounting_secretary'
+            },
+            'AIタスクコンシェルジュ': {
+                'price': 1500,
+                "description": '今日やるべきことを、ベストなタイミングで',
+                'usage': '登録したタスクを空き時間に自動で配置し、理想的な1日をAIが提案。「やりたいのにできない」を、「自然にこなせる」毎日に。',
+                'url': 'https://lp-production-9e2c.up.railway.app/task',
+                'line_url': 'https://line.me/R/ti/p/@ai_task_concierge'
+            }
+        }
         
-        company_name = company[0]
-        stripe_subscription_id = company[1]
+        if content_type not in content_info:
+            print(f'[ERROR] 無効なコンテンツタイプ: {content_type}')
+            return {'success': False, 'error': f'無効なコンテンツタイプ: {content_type}'}
         
-        # 利用状況を取得（企業中心）
-        c.execute('''
-            SELECT content_type, created_at, is_free, subscription_status
+        content = content_info[content_type]
+        
+        # 既に追加されているコンテンツを確認
+        c.execute(f'SELECT COUNT(*) FROM usage_logs WHERE user_id = {placeholder} AND content_type = {placeholder}', (user_id_db, content_type))
+        existing_count = c.fetchone()[0]
+        
+        if existing_count > 0:
+            print(f'[DEBUG] 既に追加済みのコンテンツ: {content_type}')
+            return {'success': False, 'error': f'コンテンツ {content_type} は既に追加されています'}
+        
+        # サブスクリプション状態に基づく処理
+        if subscription_status.get('subscription', {}).get('status') == 'trialing':
+            print(f'[DEBUG] トライアル期間中のため無料で追加')
+            # トライアル期間中は無料で追加
+            c.execute(f'INSERT INTO usage_logs (user_id, content_type, price, status, created_at) VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, NOW())', 
+                     (user_id_db, content_type, 0, 'active'))
+        elif subscription_status.get('subscription', {}).get('status') == 'active':
+            print(f'[DEBUG] アクティブなサブスクリプション、有料で追加')
+            # アクティブなサブスクリプションの場合は有料で追加
+            c.execute(f'INSERT INTO usage_logs (user_id, content_type, price, status, created_at) VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, NOW())', 
+                     (user_id_db, content_type, content['price'], 'active'))
+        else:
+            print(f'[DEBUG] 無効なサブスクリプション状態')
+            return {'success': False, 'error': '有効なサブスクリプションが必要です'}
+        
+        conn.commit()
+        conn.close()
+        
+        return {
+            'success': True,
+            'content_type': content_type,
+            'price': content['price'],
+            'description': content['description'],
+            'usage': content['usage'],
+            'url': content['url']
+        }
+        
+    except Exception as e:
+        print(f'[ERROR] コンテンツ確認処理エラー: {e}')
+        import traceback
+        traceback.print_exc()
+        return {'success': False, 'error': str(e)}
+
+def handle_status_check(reply_token, user_id_db):
+    """利用状況確認"""
+    try:
+        # データベースタイプを取得
+        db_type = get_db_type()
+        placeholder = '%s' if db_type == 'postgresql' else '?'
+        
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 使用量ログを取得
+        c.execute(f'''
+            SELECT content_type, price, created_at 
             FROM usage_logs 
-            WHERE company_id = (SELECT id FROM companies WHERE line_user_id = %s)
+            WHERE user_id = {placeholder} 
             ORDER BY created_at DESC
-        ''', (line_user_id,))
+        ''', (user_id_db,))
+        
         usage_logs = c.fetchall()
         
-        # サブスクリプション状況を確認
-        subscription_status = "無効"
-        if stripe_subscription_id:
-            try:
-                subscription = stripe.Subscription.retrieve(stripe_subscription_id)
-                if subscription.status == 'active':
-                    subscription_status = "有効"
-                elif subscription.status == 'trialing':
-                    subscription_status = "トライアル中"
-                elif subscription.status == 'canceled':
-                    subscription_status = "解約済み"
-                elif subscription.status == 'past_due':
-                    subscription_status = "支払い遅延"
-            
-            except Exception as e:
-                print(f'[DEBUG] Stripe API エラー: {e}')
-                subscription_status = "確認エラー"
-        
-        # メッセージを構築
-        status_message = f"📊 利用状況\n\n"
-        status_message += f"🏢 企業名: {company_name}\n"
-        status_message += f"💳 サブスクリプション: {subscription_status}\n\n"
-        
-        if usage_logs:
-            status_message += "📋 利用コンテンツ:\n"
-            content_count = {}
-            for log in usage_logs:
-                content_type = log[0]
-                created_at = log[1]
-                is_free = log[2]
-                subscription_status = log[3]
-                
-                if content_type not in content_count:
-                    content_count[content_type] = {
-                        'total': 0,
-                        'free': 0,
-                        'paid': 0,
-                        'active': 0
-                    }
-                
-                content_count[content_type]['total'] += 1
-                if is_free:
-                    content_count[content_type]['free'] += 1
-                elif subscription_status == 'active':
-                    content_count[content_type]['active'] += 1
-                else:
-                    content_count[content_type]['paid'] += 1
-            
-            for content_type, counts in content_count.items():
-                status_message += f"• {content_type}: {counts['total']}回利用"
-                if counts['free'] > 0:
-                    status_message += f" (無料: {counts['free']}回)"
-                if counts['paid'] > 0:
-                    status_message += f" (有料: {counts['paid']}回)"
-                if counts['active'] > 0:
-                    status_message += f" (有効: {counts['active']}回)"
-                status_message += "\n"
+        if not usage_logs:
+            status_message = "現在追加されているコンテンツはありません。\n\n「追加」と入力してコンテンツを追加してください。"
         else:
-            status_message += "📋 利用コンテンツ: まだ利用していません\n"
+            status_message = "現在の利用状況：\n\n"
+            total_price = 0
+            
+            for log in usage_logs:
+                content_type, price, created_at = log
+                total_price += price if price else 0
+                created_date = created_at.strftime('%Y年%m月%d日') if created_at else '不明'
+                status_message += f"• {content_type}（{created_date}追加）\n"
+            
+            status_message += f"\n合計料金：{total_price:,}円/月"
         
-        # 一通りの流れが終わった後の案内を追加
-        status_message += "\n💡 何かお手伝いできることはありますか？\n"
-        status_message += "📱 「メニュー」と入力すると、メインメニューに戻れます。\n"
-        status_message += "❓ 使い方がわからない場合は「ヘルプ」と入力してください。"
+        conn.close()
         
         send_line_message(reply_token, [{"type": "text", "text": status_message}])
         
@@ -1314,7 +1160,6 @@ def handle_add_content_company(reply_token, company_id, stripe_subscription_id):
         c = conn.cursor()
         
         # データベースタイプに応じて適切なプレースホルダーを使用
-        from utils.db import get_db_type
         db_type = get_db_type()
         placeholder = '%s' if db_type == 'postgresql' else '?'
         
@@ -1368,108 +1213,99 @@ def handle_add_content_company(reply_token, company_id, stripe_subscription_id):
 def handle_status_check_company(reply_token, company_id):
     """企業ユーザー専用：利用状況確認"""
     try:
-        conn = get_db_connection()
-        c = conn.cursor()
-        
-        # データベースタイプに応じて適切なプレースホルダーを使用
-        from utils.db import get_db_type
+        # データベースタイプを取得
         db_type = get_db_type()
         placeholder = '%s' if db_type == 'postgresql' else '?'
         
-        # 企業基本情報を取得
-        c.execute(f'SELECT company_name, email FROM companies WHERE id = {placeholder}', (company_id,))
-        company_info = c.fetchone()
+        conn = get_db_connection()
+        c = conn.cursor()
         
-        if not company_info:
+        # 企業情報を取得
+        c.execute(f'SELECT company_name FROM companies WHERE id = {placeholder}', (company_id,))
+        company = c.fetchone()
+        
+        if not company:
             send_line_message(reply_token, [{"type": "text", "text": "企業情報が見つかりません。"}])
             conn.close()
             return
-            
-        company_name, email = company_info
         
-        # サブスクリプション情報を取得
+        company_name = company[0]
+        
+        # 企業のコンテンツ一覧を取得
         c.execute(f'''
-            SELECT content_type, subscription_status, base_price, additional_price, total_price, current_period_end 
+            SELECT content_type, total_price, created_at 
             FROM company_subscriptions 
-            WHERE company_id = {placeholder}
+            WHERE company_id = {placeholder} AND subscription_status = 'active'
+            ORDER BY created_at DESC
         ''', (company_id,))
-        subscriptions = c.fetchall()
         
-        # LINEアカウント情報を取得
-        c.execute(f'''
-            SELECT content_type, status, line_channel_id 
-            FROM company_line_accounts 
-            WHERE company_id = {placeholder}
-        ''', (company_id,))
-        line_accounts = c.fetchall()
-        
+        active_contents = c.fetchall()
         conn.close()
         
-        # 利用状況メッセージを作成
-        status_message = f"🏢 {company_name}\n📧 {email}\n\n"
+        # メッセージを構築
+        status_message = f"📊 利用状況\n\n"
+        status_message += f"🏢 企業名: {company_name}\n\n"
         
-        if subscriptions:
-            status_message += "📊 サブスクリプション状況：\n"
-            total_monthly_cost = 0
-            for sub in subscriptions:
-                content_type, status, base_price, additional_price, total_price, period_end = sub
-                status_message += f"• {content_type}: {status}\n"
-                status_message += f"  料金: {total_price:,}円/月\n"
-                if period_end:
-                    status_message += f"  次回請求: {period_end.strftime('%Y/%m/%d')}\n"
-                total_monthly_cost += total_price
-            status_message += f"\n💰 月額合計: {total_monthly_cost:,}円\n\n"
+        if active_contents:
+            status_message += "📋 利用コンテンツ:\n"
+            total_price = 0
+            
+            for content in active_contents:
+                content_type, total_price_content, created_at = content
+                total_price += total_price_content if total_price_content else 0
+                created_date = created_at.strftime('%Y年%m月%d日') if created_at else '不明'
+                status_message += f"• {content_type}（{created_date}追加）\n"
+            
+            status_message += f"\n合計料金：{total_price:,}円/月"
         else:
-            status_message += "📊 サブスクリプション: なし\n\n"
+            status_message += "📋 利用コンテンツ: まだ利用していません\n"
         
-        if line_accounts:
-            status_message += "📱 LINEアカウント状況：\n"
-            for account in line_accounts:
-                content_type, status, line_channel_id = account
-                status_message += f"• {content_type}: {status}\n"
-        else:
-            status_message += "📱 LINEアカウント: なし\n"
+        status_message += "\n💡 何かお手伝いできることはありますか？\n"
+        status_message += "📱 「メニュー」と入力すると、メインメニューに戻れます。\n"
+        status_message += "❓ 使い方がわからない場合は「ヘルプ」と入力してください。"
         
         send_line_message(reply_token, [{"type": "text", "text": status_message}])
         
     except Exception as e:
-        print(f'[DEBUG] 企業利用状況確認エラー: {e}')
+        print(f'[ERROR] 企業利用状況確認エラー: {e}')
         import traceback
         traceback.print_exc()
-        send_line_message(reply_token, [{"type": "text", "text": "利用状況確認でエラーが発生しました。"}])
+        send_line_message(reply_token, [{"type": "text", "text": "❌ エラーが発生しました。しばらく時間をおいて再度お試しください。"}])
 
 def handle_cancel_menu_company(reply_token, company_id, stripe_subscription_id):
     """企業ユーザー専用：コンテンツ削除メニュー表示"""
     try:
-        conn = get_db_connection()
-        c = conn.cursor()
-        
-        # データベースタイプに応じて適切なプレースホルダーを使用
-        from utils.db import get_db_type
+        # データベースタイプを取得
         db_type = get_db_type()
         placeholder = '%s' if db_type == 'postgresql' else '?'
         
-        # アクティブなサブスクリプションを取得
-        c.execute(f'''
-            SELECT content_type, total_price 
-            FROM company_subscriptions 
-            WHERE company_id = {placeholder} AND subscription_status = {placeholder}
-        ''', (company_id, 'active'))
-        active_subscriptions = c.fetchall()
+        conn = get_db_connection()
+        c = conn.cursor()
         
+        # 企業のコンテンツ一覧を取得
+        c.execute(f'''
+            SELECT content_type, created_at 
+            FROM company_subscriptions 
+            WHERE company_id = {placeholder} AND subscription_status = 'active'
+            ORDER BY created_at DESC
+        ''', (company_id,))
+        
+        active_contents = c.fetchall()
         conn.close()
         
-        if not active_subscriptions:
+        if not active_contents:
             send_line_message(reply_token, [{"type": "text", "text": "削除可能なコンテンツがありません。"}])
             return
         
         # 削除メニューを作成
         actions = []
-        for i, (content_type, total_price) in enumerate(active_subscriptions, 1):
+        for i, content in enumerate(active_contents, 1):
+            content_type, created_at = content
+            created_date = created_at.strftime('%Y年%m月%d日') if created_at else '不明'
             actions.append({
                 "type": "postback",
-                "label": f"{i}. {content_type} ({total_price:,}円/月)",
-                "data": f"cancel_selection={content_type}"
+                "label": f"{i}. {content_type}",
+                "data": f"cancel_content_{i}"
             })
         
         # 戻るボタンを追加
@@ -1485,7 +1321,7 @@ def handle_cancel_menu_company(reply_token, company_id, stripe_subscription_id):
             "template": {
                 "type": "buttons",
                 "title": "削除するコンテンツを選択",
-                "text": f"現在のアクティブなコンテンツ：{len(active_subscriptions)}件\n\n削除したいコンテンツを選択してください：",
+                "text": "削除したいコンテンツを選択してください：",
                 "actions": actions
             }
         }
@@ -1493,38 +1329,26 @@ def handle_cancel_menu_company(reply_token, company_id, stripe_subscription_id):
         send_line_message(reply_token, [message])
         
     except Exception as e:
-        print(f'[DEBUG] 企業コンテンツ削除メニューエラー: {e}')
+        print(f'[DEBUG] コンテンツ削除メニューエラー: {e}')
         import traceback
         traceback.print_exc()
         send_line_message(reply_token, [{"type": "text", "text": "コンテンツ削除メニューでエラーが発生しました。"}])
 
-def get_help_message_company():
-    """企業ユーザー専用：ヘルプメッセージ"""
-    return """🤖 AIコレクションズ 企業向けヘルプ
+def get_welcome_message():
+    return "ようこそ！LINE連携が完了しました。"
 
-📋 利用可能なコマンド：
-• 「追加」- 新しいコンテンツを追加
-• 「状態」- 現在の利用状況を確認
-• 「削除」- コンテンツを削除
-• 「メニュー」- メインメニューを表示
-
-💰 料金体系：
-• 基本料金：月額3,900円
-• 追加コンテンツ：1件1,500円/月
-
-📞 サポート：
-ご不明な点がございましたら、お気軽にお問い合わせください。""" 
+def get_not_registered_message():
+    return "ご登録情報が見つかりません。LPからご登録ください。"
 
 def handle_content_confirmation_company(company_id, content_type):
     """企業ユーザー専用：コンテンツ確認処理"""
     try:
-        conn = get_db_connection()
-        c = conn.cursor()
-        
-        # データベースタイプに応じて適切なプレースホルダーを使用
-        from utils.db import get_db_type
+        # データベースタイプを取得
         db_type = get_db_type()
         placeholder = '%s' if db_type == 'postgresql' else '?'
+        
+        conn = get_db_connection()
+        c = conn.cursor()
         
         # 既存のサブスクリプション数を確認
         c.execute(f'SELECT COUNT(*) FROM company_subscriptions WHERE company_id = {placeholder} AND subscription_status = {placeholder}', (company_id, 'active'))
@@ -1577,17 +1401,29 @@ def handle_content_confirmation_company(company_id, content_type):
         }
         
     except Exception as e:
-        print(f'[DEBUG] 企業コンテンツ確認エラー: {e}')
+        print(f'[ERROR] 企業コンテンツ確認処理エラー: {e}')
         import traceback
         traceback.print_exc()
-        if conn:
-            conn.rollback()
-        return {
-            'success': False,
-            'error': str(e)
-        }
+        return {'success': False, 'error': str(e)}
     finally:
         if c:
             c.close()
         if conn:
             conn.close() 
+
+def get_help_message_company():
+    """企業ユーザー専用：ヘルプメッセージ"""
+    return """🤖 AIコレクションズ 企業向けヘルプ
+
+📋 利用可能なコマンド：
+• 「追加」- 新しいコンテンツを追加
+• 「状態」- 現在の利用状況を確認
+• 「削除」- コンテンツを削除
+• 「メニュー」- メインメニューを表示
+
+💰 料金体系：
+• 基本料金：月額3,900円
+• 追加コンテンツ：1件1,500円/月
+
+📞 サポート：
+ご不明な点がございましたら、お気軽にお問い合わせください。""" 
