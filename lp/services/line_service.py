@@ -1214,7 +1214,7 @@ def handle_add_content_company(reply_token, company_id, stripe_subscription_id):
         send_line_message(reply_token, [{"type": "text", "text": "コンテンツ追加処理でエラーが発生しました。"}])
 
 def handle_status_check_company(reply_token, company_id):
-    """企業ユーザー専用：利用状況確認（月額基本料金システム対応）"""
+    """企業ユーザー専用：利用状況確認（月額基本料金システム対応・請求期間表示）"""
     try:
         # データベースタイプを取得
         db_type = get_db_type()
@@ -1243,9 +1243,9 @@ def handle_status_check_company(reply_token, company_id):
         
         monthly_subscription = c.fetchone()
         
-        # アクティブなコンテンツ追加を取得
+        # アクティブなコンテンツ追加を取得（請求期間も含む）
         c.execute(f'''
-            SELECT content_type, additional_price, created_at 
+            SELECT content_type, additional_price, created_at, billing_end_date
             FROM company_content_additions 
             WHERE company_id = {placeholder} AND status = 'active'
             ORDER BY created_at DESC
@@ -1278,17 +1278,35 @@ def handle_status_check_company(reply_token, company_id):
             total_additional_price = 0
             
             for content in active_contents:
-                content_type, additional_price, created_at = content
+                content_type, additional_price, created_at, billing_end_date = content
                 total_additional_price += additional_price if additional_price else 0
                 created_date = created_at.strftime('%Y年%m月%d日') if created_at else '不明'
                 price_text = f"（+{additional_price:,}円/月）" if additional_price > 0 else "（基本料金に含まれる）"
-                status_message += f"• {content_type}{price_text}（{created_date}追加）\n"
+                
+                # 請求期間の表示
+                billing_text = ""
+                if billing_end_date:
+                    billing_date = billing_end_date.strftime('%Y年%m月%d日')
+                    billing_text = f"（請求期限: {billing_date}）"
+                
+                status_message += f"• {content_type}{price_text}{billing_text}（{created_date}追加）\n"
             
             # 合計料金計算
             total_monthly_price = (monthly_base_price if monthly_subscription else 0) + total_additional_price
             status_message += f"\n💰 合計料金: {total_monthly_price:,}円/月"
             status_message += f"\n  └ 基本料金: {monthly_base_price if monthly_subscription else 0:,}円"
             status_message += f"\n  └ 追加料金: {total_additional_price:,}円"
+            
+            # 請求期間の統一性を確認
+            if monthly_subscription and current_period_end:
+                all_same_billing = all(
+                    content[3] and content[3].date() == current_period_end.date() 
+                    for content in active_contents if content[3]
+                )
+                if all_same_billing:
+                    status_message += f"\n✅ すべてのコンテンツの請求期間が統一されています"
+                else:
+                    status_message += f"\n⚠️ 一部のコンテンツの請求期間が異なります"
         else:
             status_message += "📋 利用コンテンツ: まだ追加していません\n"
             if monthly_subscription:
@@ -1670,7 +1688,7 @@ def get_not_registered_message():
     return "ご登録情報が見つかりません。LPからご登録ください。"
 
 def handle_content_confirmation_company(company_id, content_type):
-    """企業ユーザー専用：コンテンツ追加確認処理（月額基本料金システム対応）"""
+    """企業ユーザー専用：コンテンツ追加確認処理（月額基本料金システム対応・Stripe請求期間同期）"""
     try:
         print(f'[DEBUG] 企業コンテンツ確認処理開始: company_id={company_id}, content_type={content_type}')
         
@@ -1683,7 +1701,7 @@ def handle_content_confirmation_company(company_id, content_type):
         
         # 月額基本サブスクリプションの確認
         c.execute(f'''
-            SELECT subscription_status 
+            SELECT subscription_status, stripe_subscription_id, current_period_end
             FROM company_monthly_subscriptions 
             WHERE company_id = {placeholder}
         ''', (company_id,))
@@ -1695,14 +1713,29 @@ def handle_content_confirmation_company(company_id, content_type):
                 'error': '❌ 月額基本サブスクリプションが見つかりません。\n\n💳 まず月額基本料金の決済を完了してください。'
             }
         
-        subscription_status = monthly_subscription[0]
+        subscription_status, stripe_subscription_id, current_period_end = monthly_subscription
         if subscription_status != 'active':
             return {
                 'success': False, 
                 'error': '❌ 月額基本サブスクリプションが非アクティブです。\n\n💳 月額基本料金の決済を完了してからコンテンツを追加してください。'
             }
         
-        print(f'[DEBUG] 月額基本サブスクリプション確認: status={subscription_status}')
+        print(f'[DEBUG] 月額基本サブスクリプション確認: status={subscription_status}, stripe_id={stripe_subscription_id}')
+        
+        # Stripeサブスクリプションの請求期間を取得
+        stripe_period_end = None
+        if stripe_subscription_id:
+            try:
+                import stripe
+                stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+                
+                subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+                stripe_period_end = subscription.current_period_end
+                print(f'[DEBUG] Stripe請求期間終了: {stripe_period_end}')
+                
+            except Exception as e:
+                print(f'[DEBUG] Stripe請求期間取得エラー: {e}')
+                # Stripeエラーが発生しても処理を続行
         
         # 既存のコンテンツ追加をチェック
         c.execute(f'''
@@ -1722,14 +1755,16 @@ def handle_content_confirmation_company(company_id, content_type):
                     'error': f'✅ {content_type}は既に追加済みです。\n\n📱 他のコンテンツを追加する場合は、再度「追加」を選択してください。\n\n💡 現在の利用状況を確認する場合は「状態」を選択してください。'
                 }
             elif status == 'inactive':
-                # 非アクティブの場合は再アクティブ化
+                # 非アクティブの場合は再アクティブ化（請求期間を同期）
+                billing_end_date = stripe_period_end if stripe_period_end else current_period_end
+                
                 c.execute(f'''
                     UPDATE company_content_additions 
                     SET status = 'active', created_at = CURRENT_TIMESTAMP
                     WHERE id = {placeholder}
                 ''', (addition_id,))
                 conn.commit()
-                print(f'[DEBUG] 非アクティブコンテンツを再アクティブ化: addition_id={addition_id}')
+                print(f'[DEBUG] 非アクティブコンテンツを再アクティブ化: addition_id={addition_id}, billing_end={billing_end_date}')
                 
                 return {
                     'success': True,
@@ -1738,7 +1773,8 @@ def handle_content_confirmation_company(company_id, content_type):
                     'description': f'{content_type}を再アクティブ化しました',
                     'url': 'https://lp-production-9e2c.up.railway.app',
                     'usage': 'LINEアカウントからご利用いただけます',
-                    'additional_price': additional_price
+                    'additional_price': additional_price,
+                    'billing_end_date': billing_end_date
                 }
         
         # コンテンツ情報を定義
@@ -1785,15 +1821,19 @@ def handle_content_confirmation_company(company_id, content_type):
         existing_count = c.fetchone()[0]
         print(f'[DEBUG] 既存アクティブコンテンツ数: {existing_count}')
         
-        # 新しいコンテンツ追加を登録
+        # 請求期間を月額サブスクリプションに合わせる
+        billing_end_date = stripe_period_end if stripe_period_end else current_period_end
+        print(f'[DEBUG] 請求期間同期: billing_end_date={billing_end_date}')
+        
+        # 新しいコンテンツ追加を登録（請求期間を同期）
         c.execute(f'''
             INSERT INTO company_content_additions 
-            (company_id, content_type, additional_price, status)
-            VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder})
-        ''', (company_id, content_type, additional_price, 'active'))
+            (company_id, content_type, additional_price, status, billing_end_date)
+            VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
+        ''', (company_id, content_type, additional_price, 'active', billing_end_date))
         
         conn.commit()
-        print(f'[DEBUG] コンテンツ追加登録完了: company_id={company_id}, content_type={content_type}, additional_price={additional_price}')
+        print(f'[DEBUG] コンテンツ追加登録完了: company_id={company_id}, content_type={content_type}, additional_price={additional_price}, billing_end={billing_end_date}')
         
         conn.close()
         
@@ -1804,7 +1844,8 @@ def handle_content_confirmation_company(company_id, content_type):
             'description': content['description'],
             'usage': content['usage'],
             'url': content['url'],
-            'additional_price': additional_price
+            'additional_price': additional_price,
+            'billing_end_date': billing_end_date
         }
         
     except Exception as e:
