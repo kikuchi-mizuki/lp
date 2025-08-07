@@ -412,7 +412,7 @@ def company_registration_success():
         
         # サブスクリプション情報を保存
         print("💳 サブスクリプション情報を保存中...")
-        save_company_subscription(company_id, checkout_session.subscription)
+        save_company_subscription(company_id, checkout_session.subscription)  # content_typeを指定しない
         print(f"✅ サブスクリプション保存完了: {checkout_session.subscription}")
         
         # 次回請求日を計算
@@ -545,9 +545,10 @@ def create_company_line_account(company_id, company_data):
         raise
 
 # 企業サブスクリプション情報をデータベースに保存
-def save_company_subscription(company_id, stripe_subscription_id, content_type='AI予定秘書'):
+def save_company_subscription(company_id, stripe_subscription_id, content_type=None):
     """
     企業サブスクリプション情報をデータベースに保存（料金管理強化）
+    content_typeがNoneの場合は月額基本料金のみ保存
     """
     conn = None
     c = None
@@ -567,25 +568,30 @@ def save_company_subscription(company_id, stripe_subscription_id, content_type='
         conn = get_db_connection()
         c = conn.cursor()
         
-        c.execute('''
-            INSERT INTO company_subscriptions 
-            (company_id, content_type, subscription_status, base_price, additional_price, 
-             total_price, stripe_subscription_id, current_period_end)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        ''', (
-            company_id,
-            content_type,
-            subscription.status,
-            base_price,
-            additional_price,
-            total_price,
-            stripe_subscription_id,
-            current_period_end
-        ))
+        # content_typeが指定されている場合のみコンテンツを保存
+        if content_type:
+            c.execute('''
+                INSERT INTO company_subscriptions 
+                (company_id, content_type, subscription_status, base_price, additional_price, 
+                 total_price, stripe_subscription_id, current_period_end)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            ''', (
+                company_id,
+                content_type,
+                subscription.status,
+                base_price,
+                additional_price,
+                total_price,
+                stripe_subscription_id,
+                current_period_end
+            ))
+            print(f"✅ 企業サブスクリプションを保存しました: {company_id}, コンテンツ: {content_type}, 料金: {total_price}円")
+        else:
+            # 月額基本料金のみ保存（コンテンツは手動追加まで待機）
+            print(f"✅ 企業サブスクリプション基本料金のみ保存: {company_id}, 料金: {total_price}円")
+            print(f"📝 コンテンツは手動で追加してください")
         
         conn.commit()
-        
-        print(f"✅ 企業サブスクリプションを保存しました: {company_id}, 料金: {total_price}円")
         
     except Exception as e:
         print(f"❌ 企業サブスクリプション保存エラー: {e}")
