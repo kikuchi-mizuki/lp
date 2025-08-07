@@ -328,12 +328,12 @@ def company_registration():
         data = request.get_json()
         company_name = data.get('company_name')
         email = data.get('email')
-        content_type = data.get('content_type', 'ai_schedule')  # デフォルトはAI予定秘書
+        content_type = data.get('content_type', 'AI予定秘書')  # デフォルトはAI予定秘書
     else:
         # フォームからの送信
         company_name = request.form.get('company_name')
         email = request.form.get('email')
-        content_type = request.form.get('content_type', 'ai_schedule')
+        content_type = request.form.get('content_type', 'AI予定秘書')
     
     if not company_name or not email:
         return jsonify({'error': '企業名とメールアドレスは必須です'}), 400
@@ -519,7 +519,7 @@ def create_company_line_account(company_id, company_data):
         raise
 
 # 企業サブスクリプション情報をデータベースに保存
-def save_company_subscription(company_id, stripe_subscription_id, content_type='ai_schedule'):
+def save_company_subscription(company_id, stripe_subscription_id, content_type='AI予定秘書'):
     """
     企業サブスクリプション情報をデータベースに保存（料金管理強化）
     """
@@ -1100,7 +1100,7 @@ def add_company_data():
         new_company_data = {
             'company_name': 'テスト企業株式会社',
             'email': 'test_company@example.com',
-            'content_type': 'ai_schedule',
+            'content_type': 'AI予定秘書',
             'line_channel_id': 'U231cdb3fc0687f3abc7bcaba5214dfff',
             'line_channel_access_token': 'test_token_' + str(int(time.time()))
         }

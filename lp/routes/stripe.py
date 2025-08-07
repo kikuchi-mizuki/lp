@@ -284,7 +284,7 @@ def stripe_webhook():
                 c.execute('''
                     INSERT INTO company_subscriptions (company_id, content_type, subscription_status, stripe_subscription_id, current_period_end, base_price, additional_price, total_price)
                     VALUES (%s, %s, 'active', %s, %s, 3900, 0, 3900)
-                ''', (company_id, 'ai_schedule', subscription_id, datetime.now() + timedelta(days=30)))
+                ''', (company_id, 'AI予定秘書', subscription_id, datetime.now() + timedelta(days=30)))
                 
                 conn.commit()
                 print(f'新規ユーザー登録完了: email={email}, customer_id={customer_id}, subscription_id={subscription_id}')
@@ -337,7 +337,7 @@ def stripe_webhook():
                         subscription_status = 'active',
                         stripe_subscription_id = EXCLUDED.stripe_subscription_id,
                         current_period_end = EXCLUDED.current_period_end
-                ''', (company_id, 'ai_schedule', subscription_id, datetime.now() + timedelta(days=30)))
+                ''', (company_id, 'AI予定秘書', subscription_id, datetime.now() + timedelta(days=30)))
                 
                 print(f'[DEBUG] サブスクリプション情報保存完了: company_id={company_id}')
                 
