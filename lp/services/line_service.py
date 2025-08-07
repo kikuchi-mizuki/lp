@@ -1615,34 +1615,82 @@ def get_not_registered_message():
     return "ご登録情報が見つかりません。LPからご登録ください。"
 
 def handle_content_confirmation_company(company_id, content_type):
-    """企業ユーザー専用：コンテンツ確認処理"""
+    """企業ユーザー専用：コンテンツ追加確認処理"""
     try:
-        # データベースタイプを取得
-        db_type = get_db_type()
-        placeholder = '%s' if db_type == 'postgresql' else '?'
+        print(f'[DEBUG] 企業コンテンツ確認処理開始: company_id={company_id}, content_type={content_type}')
         
         conn = get_db_connection()
         c = conn.cursor()
         
-        # 企業情報を取得
-        c.execute(f'SELECT stripe_subscription_id FROM company_subscriptions WHERE company_id = {placeholder} AND subscription_status = {placeholder} LIMIT 1', (company_id, 'active'))
-        company_result = c.fetchone()
-        if not company_result:
-            return {'success': False, 'error': '企業の決済情報が見つかりません'}
+        # 既存のコンテンツをチェック
+        c.execute(f'''
+            SELECT id, content_type, subscription_status 
+            FROM company_subscriptions 
+            WHERE company_id = {placeholder} AND content_type = {placeholder}
+        ''', (company_id, content_type))
         
-        stripe_subscription_id = company_result[0]
+        existing_content = c.fetchone()
+        if existing_content:
+            subscription_id, existing_content_type, status = existing_content
+            print(f'[DEBUG] 既存コンテンツ発見: subscription_id={subscription_id}, content_type={existing_content_type}, status={status}')
+            
+            if status == 'active':
+                return {
+                    'success': False, 
+                    'error': f'{content_type}は既に追加済みです。'
+                }
+            elif status == 'canceled':
+                # キャンセル済みの場合は再アクティブ化
+                c.execute(f'''
+                    UPDATE company_subscriptions 
+                    SET subscription_status = 'active', updated_at = CURRENT_TIMESTAMP
+                    WHERE id = {placeholder}
+                ''', (subscription_id,))
+                conn.commit()
+                print(f'[DEBUG] キャンセル済みコンテンツを再アクティブ化: subscription_id={subscription_id}')
+                
+                return {
+                    'success': True,
+                    'company_id': company_id,
+                    'content_type': content_type,
+                    'description': f'{content_type}を再アクティブ化しました',
+                    'url': 'https://lp-production-9e2c.up.railway.app',
+                    'usage': 'LINEアカウントからご利用いただけます',
+                    'is_free': False
+                }
         
-        # サブスクリプション状態をチェック
-        subscription_status = check_subscription_status(stripe_subscription_id)
-        print(f'[DEBUG] サブスクリプション状態: {subscription_status}')
+        # コンテンツ情報を取得
+        content_info = {
+            'AI予定秘書': {
+                'description': 'AIが予定管理をサポート',
+                'url': 'https://ai-schedule.example.com',
+                'usage': '予定を入力すると、AIが最適なスケジュールを提案します'
+            },
+            'AI経理秘書': {
+                'description': 'AIが経理業務をサポート',
+                'url': 'https://ai-accounting.example.com',
+                'usage': '経理データを入力すると、AIが自動で仕訳を提案します'
+            },
+            'AIタスクコンシェルジュ': {
+                'description': 'AIがタスク管理をサポート',
+                'url': 'https://ai-task.example.com',
+                'usage': 'タスクを入力すると、AIが優先順位を提案します'
+            }
+        }
         
-        # 既存のサブスクリプション数を確認
-        c.execute(f'SELECT COUNT(*) FROM company_subscriptions WHERE company_id = {placeholder} AND subscription_status = {placeholder}', (company_id, 'active'))
+        # 既存のコンテンツ数を取得
+        c.execute(f'''
+            SELECT COUNT(*) 
+            FROM company_subscriptions 
+            WHERE company_id = {placeholder} AND subscription_status = 'active'
+        ''', (company_id,))
+        
         existing_count = c.fetchone()[0]
+        print(f'[DEBUG] 既存コンテンツ数: {existing_count}')
         
-        # 料金計算（1個目は無料）
-        base_price = 3900
-        additional_price_per_content = 1500
+        # 料金計算
+        base_price = 3900  # 基本料金
+        additional_price_per_content = 1500  # 追加コンテンツ料金
         
         if existing_count == 0:
             # 初回コンテンツ（無料）
@@ -1653,90 +1701,84 @@ def handle_content_confirmation_company(company_id, content_type):
             total_price = existing_count * additional_price_per_content
             is_first_content = False
         
-        # コンテンツ詳細情報
-        content_details = {
-            'AI予定秘書': {
-                'description': '日程調整のストレスから解放される、スケジュール管理の相棒',
-                'url': 'https://lp-production-9e2c.up.railway.app/schedule',
-                'usage': 'Googleカレンダーと連携し、LINEで予定の追加・確認・空き時間の提案まで。調整のやりとりに追われる時間を、もっとクリエイティブに使えるように。'
-            },
-            'AI経理秘書': {
-                'description': '打合せ後すぐ送れる、スマートな請求書作成アシスタント',
-                'url': 'https://lp-production-9e2c.up.railway.app/accounting',
-                'usage': 'LINEで項目を送るだけで、見積書や請求書を即作成。営業から事務処理までを一気通貫でスムーズに。'
-            },
-            'AIタスクコンシェルジュ': {
-                'description': '今日やるべきことを、ベストなタイミングで',
-                'url': 'https://lp-production-9e2c.up.railway.app/task',
-                'usage': '登録したタスクを空き時間に自動で配置し、理想的な1日をAIが提案。「やりたいのにできない」を、「自然にこなせる」毎日に。'
-            }
-        }
+        # 企業のStripeサブスクリプションIDを取得
+        c.execute(f'''
+            SELECT stripe_subscription_id 
+            FROM company_subscriptions 
+            WHERE company_id = {placeholder} AND subscription_status = 'active' 
+            LIMIT 1
+        ''', (company_id,))
         
-        content_info = content_details.get(content_type, {
-            'description': '新しいコンテンツが利用可能になりました',
-            'url': 'https://lp-production-9e2c.up.railway.app',
-            'usage': 'LINEアカウントからご利用いただけます'
-        })
+        stripe_result = c.fetchone()
+        if not stripe_result:
+            return {'success': False, 'error': 'Stripeサブスクリプションが見つかりません'}
         
-        # サブスクリプション状態に基づく処理
+        stripe_subscription_id = stripe_result[0]
+        print(f'[DEBUG] StripeサブスクリプションID: {stripe_subscription_id}')
+        
+        # サブスクリプション状態をチェック
+        subscription_status = check_subscription_status(stripe_subscription_id)
         is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
+        
         is_free = is_trial_period or is_first_content  # トライアル期間中または初回コンテンツは無料
         
-        # 有料の場合のみStripe処理
+        # Stripe UsageRecord作成（有料の場合のみ）
         usage_record = None
         if not is_free:
-            print(f"コンテンツ追加処理開始: subscription_id={stripe_subscription_id}")
-            
-            # Stripeからsubscription_item_id取得
-            subscription = stripe.Subscription.retrieve(stripe_subscription_id)
-            print(f"サブスクリプション詳細: {subscription}")
-            
-            # 環境変数からUSAGE_PRICE_IDを取得
-            USAGE_PRICE_ID = os.getenv('STRIPE_USAGE_PRICE_ID')
-            
-            usage_item = None
-            for item in subscription['items']['data']:
-                print(f"アイテム確認: price_id={item['price']['id']}, usage_price_id={USAGE_PRICE_ID}")
-                if item['price']['id'] == USAGE_PRICE_ID:
-                    usage_item = item
-                    print(f"従量課金アイテム発見: {item}")
-                    break
-            
-            if not usage_item:
-                print(f"従量課金アイテムが見つかりません: usage_price_id={USAGE_PRICE_ID}")
-                print(f"利用可能なアイテム: {[item['price']['id'] for item in subscription['items']['data']]}")
-                
-                # 従量課金アイテムを自動追加
-                try:
-                    print(f"従量課金アイテムを自動追加中...")
-                    usage_item = stripe.SubscriptionItem.create(
-                        subscription=stripe_subscription_id,
-                        price=USAGE_PRICE_ID
-                    )
-                    print(f"従量課金アイテム追加成功: {usage_item.id}")
-                except Exception as add_error:
-                    print(f"従量課金アイテム追加エラー: {add_error}")
-                    return {'success': False, 'error': f'従量課金アイテムの追加に失敗しました: {str(add_error)}'}
-            
-            subscription_item_id = usage_item['id']
-            print(f"従量課金アイテムID: {subscription_item_id}")
-            
-            # Usage Record作成
             try:
-                # 月額サブスクリプションの請求期間を取得
+                # Stripeサブスクリプションを取得
                 subscription = stripe.Subscription.retrieve(stripe_subscription_id)
-                current_period_start = subscription.current_period_start
+                USAGE_PRICE_ID = os.getenv('STRIPE_USAGE_PRICE_ID')
+                print(f'[DEBUG] Stripeサブスクリプション取得: {stripe_subscription_id}, USAGE_PRICE_ID={USAGE_PRICE_ID}')
                 
-                usage_record = stripe.UsageRecord.create(
-                    subscription_item=subscription_item_id,
-                    quantity=1,
-                    timestamp=current_period_start,  # 月額サブスクリプションの請求期間開始時に合わせる
-                    action='increment',
-                )
-                print(f"Usage Record作成成功: {usage_record.id}")
-            except Exception as usage_error:
-                print(f"Usage Record作成エラー: {usage_error}")
-                return {'success': False, 'error': f'使用量記録の作成に失敗しました: {str(usage_error)}'}
+                # 従量課金アイテムを検索
+                usage_item = None
+                for item in subscription['items']['data']:
+                    print(f"アイテム確認: price_id={item['price']['id']}, usage_price_id={USAGE_PRICE_ID}")
+                    if item['price']['id'] == USAGE_PRICE_ID:
+                        usage_item = item
+                        print(f"従量課金アイテム発見: {item}")
+                        break
+                
+                if not usage_item:
+                    print(f"従量課金アイテムが見つかりません: usage_price_id={USAGE_PRICE_ID}")
+                    print(f"利用可能なアイテム: {[item['price']['id'] for item in subscription['items']['data']]}")
+                    
+                    # 従量課金アイテムを自動追加
+                    try:
+                        print(f"従量課金アイテムを自動追加中...")
+                        usage_item = stripe.SubscriptionItem.create(
+                            subscription=stripe_subscription_id,
+                            price=USAGE_PRICE_ID
+                        )
+                        print(f"従量課金アイテム追加成功: {usage_item.id}")
+                    except Exception as add_error:
+                        print(f"従量課金アイテム追加エラー: {add_error}")
+                        return {'success': False, 'error': f'従量課金アイテムの追加に失敗しました: {str(add_error)}'}
+                
+                subscription_item_id = usage_item['id']
+                print(f"従量課金アイテムID: {subscription_item_id}")
+                
+                # Usage Record作成
+                try:
+                    # 月額サブスクリプションの請求期間を取得
+                    subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+                    current_period_start = subscription.current_period_start
+                    
+                    usage_record = stripe.UsageRecord.create(
+                        subscription_item=subscription_item_id,
+                        quantity=1,
+                        timestamp=current_period_start,  # 月額サブスクリプションの請求期間開始時に合わせる
+                        action='increment',
+                    )
+                    print(f"Usage Record作成成功: {usage_record.id}")
+                except Exception as usage_error:
+                    print(f"Usage Record作成エラー: {usage_error}")
+                    return {'success': False, 'error': f'使用量記録の作成に失敗しました: {str(usage_error)}'}
+            
+            except Exception as e:
+                print(f'[DEBUG] Stripe処理エラー: {e}')
+                return {'success': False, 'error': f'Stripe処理に失敗しました: {str(e)}'}
         
         # 新しいサブスクリプションを作成
         if db_type == 'postgresql':
