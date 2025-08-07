@@ -636,8 +636,15 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
         except Exception as e:
             print(f'[ERROR] 状態コマンド処理エラー: {e}')
     else:
-        # デフォルトメッセージ
-        send_line_message(event['replyToken'], [{"type": "text", "text": "無効な入力です。メニューから選択してください。"}])
+        # 無効な入力の場合、メニューを表示
+        try:
+            from utils.message_templates import get_menu_message
+            send_line_message(event['replyToken'], [get_menu_message()])
+            print(f'[DEBUG] 無効な入力に対するメニュー表示完了: text={text}')
+        except Exception as e:
+            print(f'[ERROR] メニュー表示エラー: {e}')
+            # フォールバックメッセージ
+            send_line_message(event['replyToken'], [{"type": "text", "text": "メニューから選択してください。"}])
 
 def handle_postback_event(event):
     """postbackイベントの処理"""
