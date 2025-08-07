@@ -1795,7 +1795,7 @@ def handle_content_confirmation_company(company_id, content_type):
         # 既存のアクティブコンテンツ数を取得
         c.execute(f'''
             SELECT COUNT(*) 
-            FROM company_content_additions 
+            FROM company_line_accounts 
             WHERE company_id = {placeholder} AND status = 'active'
         ''', (company_id,))
         
@@ -1806,15 +1806,50 @@ def handle_content_confirmation_company(company_id, content_type):
         billing_end_date = stripe_period_end if stripe_period_end else current_period_end
         print(f'[DEBUG] 請求期間同期: billing_end_date={billing_end_date}')
         
-        # 新しいコンテンツ追加を登録（請求期間を同期）
+        # 新しいLINEアカウントを登録
         c.execute(f'''
-            INSERT INTO company_content_additions 
-            (company_id, content_type, additional_price, status, billing_end_date)
+            INSERT INTO company_line_accounts 
+            (company_id, content_type, line_channel_id, line_channel_access_token, status)
             VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
-        ''', (company_id, content_type, additional_price, 'active', billing_end_date))
+        ''', (company_id, content_type, f'U{company_id}_{int(time.time())}', 'temp_token', 'active'))
         
         conn.commit()
-        print(f'[DEBUG] コンテンツ追加登録完了: company_id={company_id}, content_type={content_type}, additional_price={additional_price}, billing_end={billing_end_date}')
+        print(f'[DEBUG] LINEアカウント登録完了: company_id={company_id}, content_type={content_type}')
+        
+        # Stripeの請求項目を更新（追加料金が必要なコンテンツの場合）
+        if additional_price > 0 and stripe_subscription_id:
+            try:
+                import stripe
+                stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+                
+                # 現在のアクティブコンテンツ数を取得（追加料金が必要なもののみ）
+                c.execute(f'''
+                    SELECT COUNT(*) 
+                    FROM company_line_accounts 
+                    WHERE company_id = {placeholder} AND status = 'active' 
+                    AND content_type IN ('AIタスクコンシェルジュ', 'AI経理秘書')
+                ''', (company_id,))
+                
+                additional_content_count = c.fetchone()[0]
+                print(f'[DEBUG] 追加料金コンテンツ数: {additional_content_count}')
+                
+                # Stripeサブスクリプションを取得
+                subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+                
+                # 追加料金の請求項目を更新
+                for item in subscription.items.data:
+                    if "追加" in (item.price.nickname or ""):
+                        print(f'[DEBUG] Stripe請求項目を更新: {item.id}, 数量={additional_content_count}')
+                        stripe.SubscriptionItem.modify(
+                            item.id,
+                            quantity=additional_content_count
+                        )
+                        print(f'[DEBUG] Stripe請求項目更新完了')
+                        break
+                        
+            except Exception as e:
+                print(f'[DEBUG] Stripe請求項目更新エラー: {e}')
+                # Stripeエラーが発生しても処理を続行
         
         return {
             'success': True,
