@@ -1410,8 +1410,10 @@ def handle_cancel_request_company(reply_token, company_id, stripe_subscription_i
         send_line_message(reply_token, [{"type": "text", "text": "コンテンツ解約メニューでエラーが発生しました。"}])
 
 def handle_cancel_selection_company(reply_token, company_id, stripe_subscription_id, selection_text):
-    """企業ユーザー専用：解約選択処理"""
+    """企業ユーザー専用：解約選択処理（新しいシステム対応）"""
     try:
+        print(f'[DEBUG] 企業解約選択処理開始: company_id={company_id}, selection_text={selection_text}')
+        
         # データベースタイプを取得
         db_type = get_db_type()
         placeholder = '%s' if db_type == 'postgresql' else '?'
@@ -1419,25 +1421,25 @@ def handle_cancel_selection_company(reply_token, company_id, stripe_subscription
         conn = get_db_connection()
         c = conn.cursor()
         
-        # 企業のアクティブなコンテンツを取得
+        # 企業のアクティブなLINEアカウントを取得
         c.execute(f'''
             SELECT id, content_type, created_at 
-            FROM company_subscriptions 
-            WHERE company_id = {placeholder} AND subscription_status = 'active'
+            FROM company_line_accounts 
+            WHERE company_id = {placeholder} AND status = 'active'
             ORDER BY created_at DESC
         ''', (company_id,))
         
-        active_contents = c.fetchall()
+        active_accounts = c.fetchall()
         
         # 選択された番号を解析
         numbers = smart_number_extraction(selection_text)
-        valid_numbers, invalid_reasons, duplicates = validate_selection_numbers(numbers, len(active_contents))
+        valid_numbers, invalid_reasons, duplicates = validate_selection_numbers(numbers, len(active_accounts))
         selected_indices = valid_numbers
         
         print(f'[DEBUG] 選択テキスト: {selection_text}')
         print(f'[DEBUG] 抽出された数字: {numbers}')
         print(f'[DEBUG] 有効な選択インデックス: {selected_indices}')
-        print(f'[DEBUG] 最大選択可能数: {len(active_contents)}')
+        print(f'[DEBUG] 最大選択可能数: {len(active_accounts)}')
         
         if invalid_reasons:
             print(f'[DEBUG] 無効な入力: {invalid_reasons}')
@@ -1447,73 +1449,68 @@ def handle_cancel_selection_company(reply_token, company_id, stripe_subscription
         cancelled = []
         
         # 選択されたコンテンツを解約
-        for i, (subscription_id, content_type, created_at) in enumerate(active_contents, 1):
+        for i, (account_id, content_type, created_at) in enumerate(active_accounts, 1):
             if i in selected_indices:
-                print(f'[DEBUG] 解約処理開始: content_type={content_type}, subscription_id={subscription_id}')
+                print(f'[DEBUG] 解約処理開始: content_type={content_type}, account_id={account_id}')
                 
-                # Stripe UsageRecordを削除（有料コンテンツの場合）
-                try:
-                    # 企業のStripeサブスクリプションIDを取得
-                    c.execute(f'SELECT stripe_subscription_id FROM company_subscriptions WHERE company_id = {placeholder} AND subscription_status = {placeholder} LIMIT 1', (company_id, 'active'))
-                    stripe_result = c.fetchone()
-                    print(f'[DEBUG] StripeサブスクリプションID取得結果: {stripe_result}')
-                    
-                    if stripe_result and stripe_result[0]:
-                        stripe_subscription_id = stripe_result[0]
+                # 追加料金が必要なコンテンツかチェック
+                additional_price = 0
+                if content_type in ["AIタスクコンシェルジュ", "AI経理秘書"]:
+                    additional_price = 1500
+                
+                # Stripeの請求項目を更新（追加料金が必要なコンテンツの場合）
+                if additional_price > 0 and stripe_subscription_id:
+                    try:
+                        import stripe
+                        stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
                         
-                        # Stripeからsubscription_item_id取得
+                        # 現在のアクティブコンテンツ数を取得（追加料金が必要なもののみ）
+                        c.execute(f'''
+                            SELECT COUNT(*) 
+                            FROM company_line_accounts 
+                            WHERE company_id = {placeholder} AND status = 'active' 
+                            AND content_type IN ('AIタスクコンシェルジュ', 'AI経理秘書')
+                        ''', (company_id,))
+                        
+                        current_count = c.fetchone()[0]
+                        # 解約後の数量を計算（現在の数量 - 1）
+                        new_count = max(0, current_count - 1)
+                        print(f'[DEBUG] 追加料金コンテンツ数: 現在={current_count}, 解約後={new_count}')
+                        
+                        # Stripeサブスクリプションを取得
                         subscription = stripe.Subscription.retrieve(stripe_subscription_id)
-                        USAGE_PRICE_ID = os.getenv('STRIPE_USAGE_PRICE_ID')
-                        print(f'[DEBUG] Stripeサブスクリプション取得: {stripe_subscription_id}, USAGE_PRICE_ID={USAGE_PRICE_ID}')
                         
-                        usage_item = None
-                        for item in subscription['items']['data']:
-                            if item['price']['id'] == USAGE_PRICE_ID:
-                                usage_item = item
+                        # 追加料金の請求項目を更新
+                        for item in subscription.items.data:
+                            if "追加" in (item.price.nickname or ""):
+                                print(f'[DEBUG] Stripe請求項目を更新: {item.id}, 数量={new_count}')
+                                stripe.SubscriptionItem.modify(
+                                    item.id,
+                                    quantity=new_count
+                                )
+                                print(f'[DEBUG] Stripe請求項目更新完了')
                                 break
-                        
-                        if usage_item:
-                            # UsageRecordを削除（quantity=1で減算）
-                            import time
-                            stripe.UsageRecord.create(
-                                subscription_item=usage_item['id'],
-                                quantity=1,
-                                timestamp=int(time.time()),
-                                action='decrement',  # 使用量を減算
-                            )
-                            print(f'[DEBUG] Stripe UsageRecord削除成功: content_type={content_type}')
-                        else:
-                            print(f'[DEBUG] UsageItemが見つかりません: USAGE_PRICE_ID={USAGE_PRICE_ID}')
-                except Exception as e:
-                    print(f'[DEBUG] Stripe UsageRecord削除エラー: {e}')
-                    import traceback
-                    traceback.print_exc()
-                    # エラーが発生しても処理は続行
+                                
+                    except Exception as e:
+                        print(f'[DEBUG] Stripe請求項目更新エラー: {e}')
+                        # Stripeエラーが発生しても処理を続行
                 
                 # データベース更新処理
                 try:
-                    # サブスクリプションを停止
-                    c.execute(f'''
-                        UPDATE company_subscriptions 
-                        SET subscription_status = 'canceled'
-                        WHERE id = {placeholder}
-                    ''', (subscription_id,))
-                    print(f'[DEBUG] company_subscriptions更新成功: subscription_id={subscription_id}')
-                    
-                    # LINEアカウントも停止
+                    # LINEアカウントを非アクティブ化
                     c.execute(f'''
                         UPDATE company_line_accounts 
                         SET status = 'inactive'
-                        WHERE company_id = {placeholder} AND content_type = {placeholder}
-                    ''', (company_id, content_type))
-                    print(f'[DEBUG] company_line_accounts更新成功: company_id={company_id}, content_type={content_type}')
+                        WHERE id = {placeholder}
+                    ''', (account_id,))
+                    print(f'[DEBUG] company_line_accounts更新成功: account_id={account_id}')
                     
                     # トランザクションをコミット
                     conn.commit()
                     print(f'[DEBUG] データベーストランザクションコミット成功')
                     
                     cancelled.append(content_type)
-                    print(f'[DEBUG] 企業コンテンツ解約処理完了: content_type={content_type}, subscription_id={subscription_id}')
+                    print(f'[DEBUG] 企業コンテンツ解約処理完了: content_type={content_type}, account_id={account_id}')
                     
                 except Exception as e:
                     print(f'[DEBUG] データベース更新エラー: {e}')
@@ -1536,7 +1533,7 @@ def handle_cancel_selection_company(reply_token, company_id, stripe_subscription
         if cancelled:
             # 解約完了メッセージを送信
             cancelled_text = '\n'.join([f'• {content}' for content in cancelled])
-            success_message = f'以下のコンテンツの解約を受け付けました：\n\n{cancelled_text}'
+            success_message = f'以下のコンテンツの解約を受け付けました：\n\n{cancelled_text}\n\n次回請求から追加料金が反映されます。'
             send_line_message(reply_token, [{"type": "text", "text": success_message}])
         else:
             # 解約対象がない場合
@@ -1548,10 +1545,7 @@ def handle_cancel_selection_company(reply_token, company_id, stripe_subscription
         traceback.print_exc()
         send_line_message(reply_token, [{"type": "text", "text": "❌ 解約処理に失敗しました。しばらく時間をおいて再度お試しください。"}])
     finally:
-        # データベース接続を確実にクローズ
-        if 'c' in locals():
-            c.close()
-        if 'conn' in locals():
+        if conn:
             conn.close()
 
 def handle_subscription_cancel_company(reply_token, company_id, stripe_subscription_id):
