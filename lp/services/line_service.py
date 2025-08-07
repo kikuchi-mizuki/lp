@@ -1445,11 +1445,12 @@ def handle_cancel_selection_company(reply_token, company_id, stripe_subscription
                         
                         if usage_item:
                             # UsageRecordを削除（quantity=1で減算）
+                            import time
                             stripe.UsageRecord.create(
                                 subscription_item=usage_item['id'],
                                 quantity=1,
                                 timestamp=int(time.time()),
-                                action='set',  # 使用量を0に設定
+                                action='decrement',  # 使用量を減算
                             )
                             print(f'[DEBUG] Stripe UsageRecord削除成功: content_type={content_type}')
                         else:
@@ -1702,13 +1703,15 @@ def handle_content_confirmation_company(company_id, content_type):
         base_price = 3900  # 基本料金
         additional_price_per_content = 1500  # 追加コンテンツ料金
         
+        # 新しく追加するコンテンツの料金を計算
+        # 既に追加済みのコンテンツがある場合は、追加料金のみ
         if existing_count == 0:
             # 初回コンテンツ（無料）
             total_price = 0
             is_first_content = True
         else:
             # 追加コンテンツ（1,500円/個）
-            total_price = existing_count * additional_price_per_content
+            total_price = additional_price_per_content  # 新しく追加するコンテンツ1個分のみ
             is_first_content = False
         
         # 企業のStripeサブスクリプションIDを取得
