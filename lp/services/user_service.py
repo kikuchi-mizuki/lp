@@ -206,11 +206,11 @@ def is_paid_user_company_centric(line_user_id):
         company_id, company_name, email, status = result
         print(f'[DEBUG] 企業情報取得: company_id={company_id}, company_name={company_name}, email={email}, status={status}')
         
-        # 企業の決済状況をチェック（activeステータスのみ）
+        # 企業の決済状況をチェック（月額料金で判断）
         c.execute('''
-            SELECT subscription_status, current_period_end
+            SELECT subscription_status, current_period_end, total_price
             FROM company_subscriptions 
-            WHERE company_id = %s AND subscription_status = 'active'
+            WHERE company_id = %s 
             ORDER BY created_at DESC 
             LIMIT 1
         ''', (company_id,))
