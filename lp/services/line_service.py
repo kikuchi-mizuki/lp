@@ -1644,7 +1644,7 @@ def handle_content_confirmation_company(company_id, content_type):
             if status == 'active':
                 return {
                     'success': False, 
-                    'error': f'{content_type}は既に追加済みです。'
+                    'error': f'✅ {content_type}は既に追加済みです。\n\n📱 他のコンテンツを追加する場合は、再度「追加」を選択してください。\n\n💡 現在の利用状況を確認する場合は「状態」を選択してください。'
                 }
             elif status == 'canceled':
                 # キャンセル済みの場合は再アクティブ化
