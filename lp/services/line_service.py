@@ -283,9 +283,9 @@ def handle_add_content(reply_token, user_id_db, stripe_subscription_id):
         actions = []
         for i, content in enumerate(available_contents, 1):
             actions.append({
-                "type": "postback",
+                "type": "message",
                 "label": f"{i}. {content['name']}",
-                "data": f"content_selection={i}"
+                "text": f"{i}"
             })
         
         # 戻るボタンを追加
@@ -1179,9 +1179,9 @@ def handle_add_content_company(reply_token, company_id, stripe_subscription_id):
         actions = []
         for i, content in enumerate(available_contents, 1):
             actions.append({
-                "type": "postback",
+                "type": "message",
                 "label": f"{i}. {content['name']}",
-                "data": f"content_selection={i}"
+                "text": f"{i}"
             })
         
         # 戻るボタンを追加
@@ -1644,6 +1644,31 @@ def handle_content_confirmation_company(company_id, content_type):
             # 追加コンテンツ（基本料金 + 追加料金）
             total_price = base_price + (existing_count * additional_price_per_content)
         
+        # コンテンツ詳細情報
+        content_details = {
+            'AI予定秘書': {
+                'description': '日程調整のストレスから解放される、スケジュール管理の相棒',
+                'url': 'https://lp-production-9e2c.up.railway.app/schedule',
+                'usage': 'Googleカレンダーと連携し、LINEで予定の追加・確認・空き時間の提案まで。調整のやりとりに追われる時間を、もっとクリエイティブに使えるように。'
+            },
+            'AI経理秘書': {
+                'description': '打合せ後すぐ送れる、スマートな請求書作成アシスタント',
+                'url': 'https://lp-production-9e2c.up.railway.app/accounting',
+                'usage': 'LINEで項目を送るだけで、見積書や請求書を即作成。営業から事務処理までを一気通貫でスムーズに。'
+            },
+            'AIタスクコンシェルジュ': {
+                'description': '今日やるべきことを、ベストなタイミングで',
+                'url': 'https://lp-production-9e2c.up.railway.app/task',
+                'usage': '登録したタスクを空き時間に自動で配置し、理想的な1日をAIが提案。「やりたいのにできない」を、「自然にこなせる」毎日に。'
+            }
+        }
+        
+        content_info = content_details.get(content_type, {
+            'description': '新しいコンテンツが利用可能になりました',
+            'url': 'https://lp-production-9e2c.up.railway.app',
+            'usage': 'LINEアカウントからご利用いただけます'
+        })
+        
         # 新しいサブスクリプションを作成
         if db_type == 'postgresql':
             # PostgreSQL用の日付計算
@@ -1676,7 +1701,10 @@ def handle_content_confirmation_company(company_id, content_type):
             'company_id': company_id,
             'content_type': content_type,
             'total_price': total_price,
-            'line_channel_id': line_channel_id
+            'line_channel_id': line_channel_id,
+            'description': content_info['description'],
+            'url': content_info['url'],
+            'usage': content_info['usage']
         }
         
     except Exception as e:

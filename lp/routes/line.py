@@ -613,6 +613,7 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
     # 基本的なコマンド処理
     if text == '追加':
         try:
+            set_user_state(user_id, 'add_select')
             handle_add_content_company(event['replyToken'], company_id, stripe_subscription_id)
             print(f'[DEBUG] 追加コマンド処理完了')
         except Exception as e:
@@ -655,6 +656,39 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
             print(f'[DEBUG] コンテンツ解約コマンド処理完了')
         except Exception as e:
             print(f'[ERROR] コンテンツ解約コマンド処理エラー: {e}')
+    elif state == 'add_select':
+        print(f'[DEBUG] コンテンツ選択処理: user_id={user_id}, state={state}, text={text}')
+        
+        # コンテンツ選択
+        if text in ['1', '2', '3']:
+            print(f'[DEBUG] コンテンツ選択: text={text}')
+            # コンテンツ確認処理
+            content_mapping = {
+                '1': 'AI予定秘書',
+                '2': 'AI経理秘書',
+                '3': 'AIタスクコンシェルジュ'
+            }
+            content_type = content_mapping.get(text)
+            if content_type:
+                result = handle_content_confirmation_company(company_id, content_type)
+                if result['success']:
+                    # 成功メッセージを送信
+                    success_message = f"🎉 {content_type}を追加しました！\n\n✨ {result.get('description', '新しいコンテンツが利用可能になりました')}\n\n🔗 アクセスURL：\n{result.get('url', 'https://lp-production-9e2c.up.railway.app')}\n\n💡 使い方：\n{result.get('usage', 'LINEアカウントからご利用いただけます')}\n\n📱 何かお手伝いできることはありますか？\n• 「追加」：他のコンテンツを追加\n• 「状態」：利用状況を確認\n• 「メニュー」：メインメニューに戻る\n• 「ヘルプ」：使い方を確認"
+                    send_line_message(event['replyToken'], [{"type": "text", "text": success_message}])
+                else:
+                    send_line_message(event['replyToken'], [{"type": "text", "text": f"❌ {content_type}の追加に失敗しました。もう一度お試しください。"}])
+            set_user_state(user_id, 'welcome_sent')
+            return
+        # 「メニュー」コマンドの場合は状態をリセットしてメニューを表示
+        elif text == 'メニュー':
+            set_user_state(user_id, 'welcome_sent')
+            from utils.message_templates import get_menu_message_company
+            send_line_message(event['replyToken'], [get_menu_message_company()])
+            return
+        else:
+            # 無効な入力の場合、コンテンツ選択を促すメッセージを送信
+            send_line_message(event['replyToken'], [{"type": "text", "text": "1〜3の数字でコンテンツを選択してください。\n\nまたは「メニュー」でメインメニューに戻ります。"}])
+            return
     elif state == 'cancel_select':
         print(f'[DEBUG] 解約選択処理: user_id={user_id}, state={state}, text={text}')
         
