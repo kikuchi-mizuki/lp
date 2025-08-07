@@ -613,6 +613,7 @@ def handle_text_message(event):
         try:
             conn = get_db_connection()
             c = conn.cursor()
+            print(f'[DEBUG] データベース接続成功')
             
             # メールアドレスで企業データを検索
             c.execute('SELECT id, company_name, email FROM companies WHERE email = %s', (normalized_email,))
@@ -631,18 +632,22 @@ def handle_text_message(event):
                 # 企業向けの案内メッセージを送信
                 try:
                     from services.line_service import send_company_welcome_message
+                    print(f'[DEBUG] 企業向け案内メッセージ送信開始: user_id={user_id}, company_name={company_name}')
                     send_company_welcome_message(user_id, company_name, email)
                     print(f'[DEBUG] 企業向け案内メッセージ送信完了: user_id={user_id}')
                 except Exception as e:
                     print(f'[DEBUG] 企業向け案内メッセージ送信エラー: {e}')
                     import traceback
                     traceback.print_exc()
+                    # エラーが発生しても成功メッセージを送信
+                    send_line_message(event['replyToken'], [{"type": "text", "text": f"✅ 企業データとの紐付けが完了しました！\n\n企業名: {company_name}\nメールアドレス: {email}\n\nこれでAIコレクションズをご利用いただけます。"}])
                     
             else:
                 print(f'[DEBUG] 企業データが見つかりません: email={normalized_email}')
                 send_line_message(event['replyToken'], [{"type": "text", "text": "企業データが見つかりません。決済が完了しているかご確認ください。"}])
             
             conn.close()
+            print(f'[DEBUG] メールアドレス連携処理完了')
             return
             
         except Exception as e:
@@ -866,3 +871,54 @@ https://lp-production-9e2c.up.railway.app
 
 友達が登録すると、あなたにも特典があります！"""
         send_line_message(event['replyToken'], [{"type": "text", "text": share_message}]) 
+
+@line_bp.route('/line/debug/test_email_linking/<email>')
+def debug_test_email_linking(email):
+    """デバッグ用：メールアドレス連携処理のテスト"""
+    try:
+        print(f'[DEBUG] メールアドレス連携テスト開始: email={email}')
+        
+        def normalize_email(email):
+            email = email.strip().lower()
+            email = unicodedata.normalize('NFKC', email)
+            return email
+        
+        normalized_email = normalize_email(email)
+        print(f'[DEBUG] 正規化後のメールアドレス: {normalized_email}')
+        
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # メールアドレスで企業データを検索
+        c.execute('SELECT id, company_name, email FROM companies WHERE email = %s', (normalized_email,))
+        company = c.fetchone()
+        print(f'[DEBUG] 企業データ検索結果: {company}')
+        
+        if company:
+            company_id, company_name, email = company
+            print(f'[DEBUG] 企業データ発見: company_id={company_id}, company_name={company_name}')
+            
+            return jsonify({
+                'success': True,
+                'company_id': company_id,
+                'company_name': company_name,
+                'email': email,
+                'message': f'企業データが見つかりました: {company_name}'
+            })
+        else:
+            print(f'[DEBUG] 企業データが見つかりません: email={normalized_email}')
+            return jsonify({
+                'success': False,
+                'message': f'企業データが見つかりません: {normalized_email}'
+            })
+        
+        conn.close()
+        
+    except Exception as e:
+        print(f'[DEBUG] メールアドレス連携テストエラー: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }) 

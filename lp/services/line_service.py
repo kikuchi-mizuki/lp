@@ -1834,6 +1834,8 @@ def send_company_welcome_message(line_user_id, company_name, email):
             }
         }
         
+        print(f'[DEBUG] 案内メッセージ作成完了: {welcome_message}')
+        
         # プッシュメッセージとして送信
         success = send_line_message_push(line_user_id, [welcome_message])
         
