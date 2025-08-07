@@ -797,27 +797,37 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
         # 解約対象のコンテンツを選択
         if text in ['1', '2', '3']:
             print(f'[DEBUG] 解約対象コンテンツ選択: text={text}')
-            # 解約確認状態に設定
-            set_user_state(user_id, f'cancel_confirm_{text}')
-            # 解約確認メッセージを送信
-            handle_cancel_selection_company(event['replyToken'], company_id, stripe_subscription_id, text)
-            return
+            
+            # 選択されたコンテンツを解約
+            try:
+                # 選択されたコンテンツのインデックスを取得
+                selected_index = int(text)
+                print(f'[DEBUG] 解約対象インデックス: {selected_index}')
+                
+                # 解約処理を実行
+                result = handle_cancel_selection_company(event['replyToken'], company_id, stripe_subscription_id, f"{selected_index}")
+                
+                if result:
+                    print(f'[DEBUG] 解約処理完了: {result}')
+                else:
+                    print(f'[DEBUG] 解約処理失敗')
+                
+                # 状態をリセット
+                set_user_state(user_id, 'welcome_sent')
+                return
+                
+            except Exception as e:
+                print(f'[ERROR] 解約処理エラー: {e}')
+                import traceback
+                traceback.print_exc()
+                send_line_message(event['replyToken'], [{"type": "text", "text": "解約処理中にエラーが発生しました。もう一度お試しください。"}])
+                return
+                
         # 「メニュー」コマンドの場合は状態をリセットしてメニューを表示
         elif text == 'メニュー':
             set_user_state(user_id, 'welcome_sent')
             from utils.message_templates import get_menu_message_company
             send_line_message(event['replyToken'], [get_menu_message_company()])
-            return
-        # 主要なコマンドの場合は通常の処理に切り替え
-        elif text == '追加':
-            set_user_state(user_id, 'add_select')
-            handle_add_content_company(event['replyToken'], company_id, stripe_subscription_id)
-            return
-        elif text == '状態':
-            handle_status_check_company(event['replyToken'], company_id)
-            return
-        elif text == 'ヘルプ':
-            send_line_message(event['replyToken'], get_help_message_company())
             return
         else:
             # 無効な入力の場合、解約選択を促すメッセージを送信
