@@ -420,6 +420,32 @@ def company_registration_success():
         next_billing_date = datetime.fromtimestamp(subscription.current_period_end).strftime('%Y年%m月%d日')
         print(f"📅 次回請求日: {next_billing_date}")
         
+        # LINE案内メッセージを送信
+        try:
+            from services.line_service import send_company_welcome_message
+            company_name = checkout_session.metadata.get('company_name', '企業')
+            email = checkout_session.metadata.get('email', '')
+            
+            # 企業のLINEユーザーIDを取得（後でLINE連携時に更新される）
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute('SELECT line_user_id FROM companies WHERE id = %s', (company_id,))
+            result = c.fetchone()
+            conn.close()
+            
+            if result and result[0]:
+                line_user_id = result[0]
+                print(f"📱 LINE案内メッセージを送信中: line_user_id={line_user_id}")
+                send_company_welcome_message(line_user_id, company_name, email)
+                print(f"✅ LINE案内メッセージ送信完了")
+            else:
+                print(f"📱 LINE連携未完了のため案内メッセージ送信をスキップ")
+                
+        except Exception as e:
+            print(f"❌ LINE案内メッセージ送信エラー: {e}")
+            import traceback
+            traceback.print_exc()
+        
         return render_template('company_registration_success.html',
                              company_data=checkout_session.metadata,
                              company_id=company_id,

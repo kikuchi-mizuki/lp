@@ -1796,3 +1796,98 @@ def get_help_message_company():
 
 📞 サポート：
 ご不明な点がございましたら、お気軽にお問い合わせください。""" 
+
+def send_company_welcome_message(line_user_id, company_name, email):
+    """企業向けのLINE案内メッセージを送信"""
+    try:
+        print(f'[DEBUG] 企業向け案内メッセージ送信開始: line_user_id={line_user_id}, company_name={company_name}')
+        
+        # 企業向けの案内メッセージを作成
+        welcome_message = {
+            "type": "template",
+            "altText": "AIコレクションズ 企業向けサービスへようこそ",
+            "template": {
+                "type": "buttons",
+                "title": f"🎉 {company_name}様、ようこそ！",
+                "text": f"AIコレクションズの企業向けサービスにご登録いただき、ありがとうございます。\n\n📧 登録メール: {email}\n💰 月額料金: ¥3,900\n\n以下のメニューから操作してください：",
+                "thumbnailImageUrl": "https://ai-collections.herokuapp.com/static/images/logo.png",
+                "imageAspectRatio": "rectangle",
+                "imageSize": "cover",
+                "imageBackgroundColor": "#FFFFFF",
+                "actions": [
+                    {
+                        "type": "message",
+                        "label": "コンテンツ追加",
+                        "text": "追加"
+                    },
+                    {
+                        "type": "message",
+                        "label": "利用状況確認",
+                        "text": "状態"
+                    },
+                    {
+                        "type": "message",
+                        "label": "ヘルプ",
+                        "text": "ヘルプ"
+                    }
+                ]
+            }
+        }
+        
+        # プッシュメッセージとして送信
+        success = send_line_message_push(line_user_id, [welcome_message])
+        
+        if success:
+            print(f'[DEBUG] 企業向け案内メッセージ送信成功: line_user_id={line_user_id}')
+            return True
+        else:
+            print(f'[DEBUG] 企業向け案内メッセージ送信失敗: line_user_id={line_user_id}')
+            return False
+            
+    except Exception as e:
+        print(f'[DEBUG] 企業向け案内メッセージ送信エラー: {e}')
+        import traceback
+        traceback.print_exc()
+        return False
+
+def send_line_message_push(user_id, messages):
+    """プッシュメッセージとしてLINEメッセージを送信"""
+    try:
+        LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
+        print(f'[DEBUG] LINE_CHANNEL_ACCESS_TOKEN確認: {LINE_CHANNEL_ACCESS_TOKEN[:20]}...')
+        
+        headers = {
+            'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}',
+            'Content-Type': 'application/json'
+        }
+        print(f'[DEBUG] ヘッダー設定完了: Authorization=Bearer {LINE_CHANNEL_ACCESS_TOKEN[:20]}...')
+        
+        data = {
+            'to': user_id,
+            'messages': messages
+        }
+        
+        print(f'[DEBUG] メッセージ数: {len(messages)}')
+        print(f'[DEBUG] LINE送信内容: {data}')
+        
+        response = requests.post(
+            'https://api.line.me/v2/bot/message/push',
+            headers=headers,
+            json=data
+        )
+        
+        print(f'[DEBUG] LINE API送信開始')
+        print(f'[DEBUG] LINE APIリクエスト送信: URL=https://api.line.me/v2/bot/message/push')
+        print(f'[DEBUG] LINE APIレスポンス受信: status_code={response.status_code}')
+        
+        if response.status_code == 200:
+            print(f'[DEBUG] LINE API送信成功: status_code={response.status_code}')
+            print(f'[DEBUG] LINE API送信処理完了')
+            return True
+        else:
+            print(f'[DEBUG] LINE API送信失敗: status_code={response.status_code}, response={response.text}')
+            return False
+            
+    except Exception as e:
+        print(f'[DEBUG] LINE送信エラー: {e}')
+        return False

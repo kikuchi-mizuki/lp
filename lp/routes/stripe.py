@@ -91,11 +91,16 @@ def stripe_webhook():
                 # LINE連携済みの場合、案内メッセージを送信
                 if line_user_id:
                     try:
-                        from services.line_service import send_welcome_with_buttons_push
-                        send_welcome_with_buttons_push(line_user_id)
-                        print(f'[DEBUG] 決済完了時の案内文送信完了: line_user_id={line_user_id}')
+                        from services.line_service import send_company_welcome_message
+                        # 企業情報を取得
+                        c.execute('SELECT company_name FROM companies WHERE id = %s', (company_id,))
+                        company_result = c.fetchone()
+                        company_name = company_result[0] if company_result else '企業'
+                        
+                        send_company_welcome_message(line_user_id, company_name, email)
+                        print(f'[DEBUG] 決済完了時の企業向け案内文送信完了: line_user_id={line_user_id}')
                     except Exception as e:
-                        print(f'[DEBUG] 決済完了時の案内文送信エラー: {e}')
+                        print(f'[DEBUG] 決済完了時の企業向け案内文送信エラー: {e}')
                         import traceback
                         traceback.print_exc()
                 else:
@@ -227,11 +232,16 @@ def stripe_webhook():
                 # LINE連携済みの場合、案内メッセージを送信
                 if line_user_id:
                     try:
-                        from services.line_service import send_welcome_with_buttons_push
-                        send_welcome_with_buttons_push(line_user_id)
-                        print(f'[DEBUG] 決済完了時の案内文送信完了: line_user_id={line_user_id}')
+                        from services.line_service import send_company_welcome_message
+                        # 企業情報を取得
+                        c.execute('SELECT company_name FROM companies WHERE id = %s', (company_id,))
+                        company_result = c.fetchone()
+                        company_name = company_result[0] if company_result else '企業'
+                        
+                        send_company_welcome_message(line_user_id, company_name, email)
+                        print(f'[DEBUG] 決済完了時の企業向け案内文送信完了: line_user_id={line_user_id}')
                     except Exception as e:
-                        print(f'[DEBUG] 決済完了時の案内文送信エラー: {e}')
+                        print(f'[DEBUG] 決済完了時の企業向け案内文送信エラー: {e}')
                         import traceback
                         traceback.print_exc()
                 else:
@@ -256,11 +266,16 @@ def stripe_webhook():
                         
                         # 案内メッセージを送信
                         try:
-                            from services.line_service import send_welcome_with_buttons_push
-                            send_welcome_with_buttons_push(user_id)
-                            print(f'[DEBUG] 決済完了時の自動案内文送信完了: user_id={user_id}')
+                            from services.line_service import send_company_welcome_message
+                            # 企業情報を取得
+                            c.execute('SELECT company_name FROM companies WHERE id = %s', (company_id,))
+                            company_result = c.fetchone()
+                            company_name = company_result[0] if company_result else '企業'
+                            
+                            send_company_welcome_message(user_id, company_name, email)
+                            print(f'[DEBUG] 決済完了時の自動企業向け案内文送信完了: user_id={user_id}')
                         except Exception as e:
-                            print(f'[DEBUG] 決済完了時の自動案内文送信エラー: {e}')
+                            print(f'[DEBUG] 決済完了時の自動企業向け案内文送信エラー: {e}')
                             import traceback
                             traceback.print_exc()
                     else:
