@@ -1759,14 +1759,6 @@ def handle_content_confirmation_company(company_id, content_type):
                 VALUES ({placeholder}, {placeholder}, 'active', {placeholder}, {placeholder}, {placeholder}, DATE_ADD(NOW(), INTERVAL 1 MONTH))
             ''', (company_id, content_type, base_price, additional_price_per_content, total_price))
         
-        # 新しいLINEアカウントを作成
-        line_channel_id = f"company_{company_id}_{content_type}_{int(time.time())}"
-        c.execute(f'''
-            INSERT INTO company_line_accounts 
-            (company_id, content_type, line_channel_id, line_channel_access_token, status) 
-            VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, 'active')
-        ''', (company_id, content_type, line_channel_id, 'default_token'))
-        
         conn.commit()
         conn.close()
         
@@ -1775,7 +1767,6 @@ def handle_content_confirmation_company(company_id, content_type):
             'company_id': company_id,
             'content_type': content_type,
             'total_price': total_price,
-            'line_channel_id': line_channel_id,
             'description': content_info['description'],
             'url': content_info['url'],
             'usage': content_info['usage'],
