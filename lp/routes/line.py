@@ -714,11 +714,16 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
             print(f'[ERROR] 追加コマンド処理エラー: {e}')
     elif text == 'メニュー':
         try:
+            print(f'[DEBUG] メニューコマンド受信: user_id={user_id}')
             from utils.message_templates import get_menu_message_company
             send_line_message(event['replyToken'], [get_menu_message_company()])
             print(f'[DEBUG] メニューコマンド処理完了')
         except Exception as e:
             print(f'[ERROR] メニューコマンド処理エラー: {e}')
+            import traceback
+            traceback.print_exc()
+            # エラー時のフォールバックメッセージ
+            send_line_message(event['replyToken'], [{"type": "text", "text": "📱 メニュー\n\n• 「追加」：コンテンツを追加\n• 「状態」：利用状況を確認\n• 「解約」：解約メニューを表示\n• 「ヘルプ」：使い方を確認"}])
     elif text == 'ヘルプ':
         try:
             send_line_message(event['replyToken'], get_help_message_company())
@@ -840,15 +845,18 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
             send_line_message(event['replyToken'], [{"type": "text", "text": "1〜3の数字で解約するコンテンツを選択してください。\n\nまたは「メニュー」でメインメニューに戻ります。"}])
             return
     else:
-        # 無効な入力の場合、メニューを表示
+        # 登録されていないメッセージの場合、メニューを表示
+        print(f'[DEBUG] 登録されていないメッセージ: user_id={user_id}, text="{text}"')
         try:
             from utils.message_templates import get_menu_message_company
             send_line_message(event['replyToken'], [get_menu_message_company()])
-            print(f'[DEBUG] 無効な入力に対するメニュー表示完了: text={text}')
+            print(f'[DEBUG] メニュー表示完了: text="{text}"')
         except Exception as e:
             print(f'[ERROR] メニュー表示エラー: {e}')
+            import traceback
+            traceback.print_exc()
             # フォールバックメッセージ
-            send_line_message(event['replyToken'], [{"type": "text", "text": "メニューから選択してください。"}])
+            send_line_message(event['replyToken'], [{"type": "text", "text": "📱 メニューから選択してください。\n\n• 「追加」：コンテンツを追加\n• 「状態」：利用状況を確認\n• 「解約」：解約メニューを表示\n• 「ヘルプ」：使い方を確認"}])
 
 def handle_postback_event(event):
     """postbackイベントの処理"""
