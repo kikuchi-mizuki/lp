@@ -1710,7 +1710,18 @@ def handle_content_confirmation_company(company_id, content_type):
             if not usage_item:
                 print(f"従量課金アイテムが見つかりません: usage_price_id={USAGE_PRICE_ID}")
                 print(f"利用可能なアイテム: {[item['price']['id'] for item in subscription['items']['data']]}")
-                return {'success': False, 'error': '従量課金アイテムが見つかりません'}
+                
+                # 従量課金アイテムを自動追加
+                try:
+                    print(f"従量課金アイテムを自動追加中...")
+                    usage_item = stripe.SubscriptionItem.create(
+                        subscription=stripe_subscription_id,
+                        price=USAGE_PRICE_ID
+                    )
+                    print(f"従量課金アイテム追加成功: {usage_item.id}")
+                except Exception as add_error:
+                    print(f"従量課金アイテム追加エラー: {add_error}")
+                    return {'success': False, 'error': f'従量課金アイテムの追加に失敗しました: {str(add_error)}'}
             
             subscription_item_id = usage_item['id']
             print(f"従量課金アイテムID: {subscription_item_id}")
