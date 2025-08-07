@@ -1728,10 +1728,14 @@ def handle_content_confirmation_company(company_id, content_type):
             
             # Usage Record作成
             try:
+                # 月額サブスクリプションの請求期間を取得
+                subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+                current_period_start = subscription.current_period_start
+                
                 usage_record = stripe.UsageRecord.create(
                     subscription_item=subscription_item_id,
                     quantity=1,
-                    timestamp=int(time.time()),
+                    timestamp=current_period_start,  # 月額サブスクリプションの請求期間開始時に合わせる
                     action='increment',
                 )
                 print(f"Usage Record作成成功: {usage_record.id}")
