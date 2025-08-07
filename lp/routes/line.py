@@ -702,6 +702,7 @@ def get_company_info(user_id):
 def handle_command(event, user_id, text, company_id, stripe_subscription_id):
     """コマンド処理"""
     state = get_user_state(user_id)
+    print(f'[DEBUG] handle_command開始: user_id={user_id}, text={text}, state={state}')
     
     # 基本的なコマンド処理
     if text == '追加':
@@ -792,7 +793,7 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
             send_line_message(event['replyToken'], [{"type": "text", "text": "1〜3の数字でコンテンツを選択してください。\n\nまたは「メニュー」でメインメニューに戻ります。"}])
             return
     elif state == 'cancel_select':
-        print(f'[DEBUG] 解約選択処理: user_id={user_id}, state={state}, text={text}')
+        print(f'[DEBUG] 解約選択処理開始: user_id={user_id}, state={state}, text={text}')
         
         # 解約対象のコンテンツを選択
         if text in ['1', '2', '3']:
@@ -805,7 +806,9 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
                 print(f'[DEBUG] 解約対象インデックス: {selected_index}')
                 
                 # 解約処理を実行
+                print(f'[DEBUG] handle_cancel_selection_company呼び出し開始')
                 result = handle_cancel_selection_company(event['replyToken'], company_id, stripe_subscription_id, f"{selected_index}")
+                print(f'[DEBUG] handle_cancel_selection_company呼び出し完了: result={result}')
                 
                 if result:
                     print(f'[DEBUG] 解約処理完了: {result}')
@@ -814,6 +817,7 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
                 
                 # 状態をリセット
                 set_user_state(user_id, 'welcome_sent')
+                print(f'[DEBUG] ユーザー状態をリセット: user_id={user_id}')
                 return
                 
             except Exception as e:
@@ -825,11 +829,13 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
                 
         # 「メニュー」コマンドの場合は状態をリセットしてメニューを表示
         elif text == 'メニュー':
+            print(f'[DEBUG] メニューコマンド処理: user_id={user_id}')
             set_user_state(user_id, 'welcome_sent')
             from utils.message_templates import get_menu_message_company
             send_line_message(event['replyToken'], [get_menu_message_company()])
             return
         else:
+            print(f'[DEBUG] 無効な入力: user_id={user_id}, text={text}')
             # 無効な入力の場合、解約選択を促すメッセージを送信
             send_line_message(event['replyToken'], [{"type": "text", "text": "1〜3の数字で解約するコンテンツを選択してください。\n\nまたは「メニュー」でメインメニューに戻ります。"}])
             return
