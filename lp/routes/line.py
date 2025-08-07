@@ -670,13 +670,22 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
             }
             content_type = content_mapping.get(text)
             if content_type:
-                result = handle_content_confirmation_company(company_id, content_type)
-                if result['success']:
-                    # 成功メッセージを送信
-                    success_message = f"🎉 {content_type}を追加しました！\n\n✨ {result.get('description', '新しいコンテンツが利用可能になりました')}\n\n🔗 アクセスURL：\n{result.get('url', 'https://lp-production-9e2c.up.railway.app')}\n\n💡 使い方：\n{result.get('usage', 'LINEアカウントからご利用いただけます')}\n\n📱 何かお手伝いできることはありますか？\n• 「追加」：他のコンテンツを追加\n• 「状態」：利用状況を確認\n• 「メニュー」：メインメニューに戻る\n• 「ヘルプ」：使い方を確認"
-                    send_line_message(event['replyToken'], [{"type": "text", "text": success_message}])
-                else:
-                    send_line_message(event['replyToken'], [{"type": "text", "text": f"❌ {content_type}の追加に失敗しました。もう一度お試しください。"}])
+                try:
+                    result = handle_content_confirmation_company(company_id, content_type)
+                    print(f'[DEBUG] コンテンツ追加結果: {result}')
+                    if result['success']:
+                        # 成功メッセージを送信
+                        success_message = f"🎉 {content_type}を追加しました！\n\n✨ {result.get('description', '新しいコンテンツが利用可能になりました')}\n\n🔗 アクセスURL：\n{result.get('url', 'https://lp-production-9e2c.up.railway.app')}\n\n💡 使い方：\n{result.get('usage', 'LINEアカウントからご利用いただけます')}\n\n📱 何かお手伝いできることはありますか？\n• 「追加」：他のコンテンツを追加\n• 「状態」：利用状況を確認\n• 「メニュー」：メインメニューに戻る\n• 「ヘルプ」：使い方を確認"
+                        send_line_message(event['replyToken'], [{"type": "text", "text": success_message}])
+                    else:
+                        error_message = f"❌ {content_type}の追加に失敗しました。\n\nエラー: {result.get('error', '不明なエラー')}\n\nもう一度お試しください。"
+                        send_line_message(event['replyToken'], [{"type": "text", "text": error_message}])
+                except Exception as e:
+                    print(f'[ERROR] コンテンツ追加処理エラー: {e}')
+                    import traceback
+                    traceback.print_exc()
+                    error_message = f"❌ {content_type}の追加中にエラーが発生しました。\n\nエラー: {str(e)}\n\nもう一度お試しください。"
+                    send_line_message(event['replyToken'], [{"type": "text", "text": error_message}])
             set_user_state(user_id, 'welcome_sent')
             return
         # 「メニュー」コマンドの場合は状態をリセットしてメニューを表示
