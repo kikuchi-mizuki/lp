@@ -1712,17 +1712,17 @@ def handle_content_confirmation_company(company_id, content_type):
                 print(f'[DEBUG] Stripe請求期間取得エラー: {e}')
                 # Stripeエラーが発生しても処理を続行
         
-        # 既存のコンテンツ追加をチェック
+        # 既存のLINEアカウントをチェック
         c.execute(f'''
-            SELECT id, content_type, status, additional_price
-            FROM company_content_additions 
+            SELECT id, content_type, status
+            FROM company_line_accounts 
             WHERE company_id = {placeholder} AND content_type = {placeholder}
         ''', (company_id, content_type))
         
-        existing_content = c.fetchone()
-        if existing_content:
-            addition_id, existing_content_type, status, additional_price = existing_content
-            print(f'[DEBUG] 既存コンテンツ追加発見: addition_id={addition_id}, content_type={existing_content_type}, status={status}, additional_price={additional_price}')
+        existing_account = c.fetchone()
+        if existing_account:
+            account_id, existing_content_type, status = existing_account
+            print(f'[DEBUG] 既存LINEアカウント発見: account_id={account_id}, content_type={existing_content_type}, status={status}')
             
             if status == 'active':
                 return {
@@ -1730,16 +1730,53 @@ def handle_content_confirmation_company(company_id, content_type):
                     'error': f'✅ {content_type}は既に追加済みです。\n\n📱 他のコンテンツを追加する場合は、再度「追加」を選択してください。\n\n💡 現在の利用状況を確認する場合は「状態」を選択してください。'
                 }
             elif status == 'inactive':
-                # 非アクティブの場合は再アクティブ化（請求期間を同期）
-                billing_end_date = stripe_period_end if stripe_period_end else current_period_end
-                
+                # 非アクティブの場合は再アクティブ化
                 c.execute(f'''
-                    UPDATE company_content_additions 
+                    UPDATE company_line_accounts 
                     SET status = 'active', created_at = CURRENT_TIMESTAMP
                     WHERE id = {placeholder}
-                ''', (addition_id,))
+                ''', (account_id,))
                 conn.commit()
-                print(f'[DEBUG] 非アクティブコンテンツを再アクティブ化: addition_id={addition_id}, billing_end={billing_end_date}')
+                print(f'[DEBUG] 非アクティブLINEアカウントを再アクティブ化: account_id={account_id}')
+                
+                # Stripeの請求項目を更新（追加料金が必要なコンテンツの場合）
+                additional_price = 0
+                if content_type in ["AIタスクコンシェルジュ", "AI経理秘書"]:
+                    additional_price = 1500
+                
+                if additional_price > 0 and stripe_subscription_id:
+                    try:
+                        import stripe
+                        stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+                        
+                        # 現在のアクティブコンテンツ数を取得（追加料金が必要なもののみ）
+                        c.execute(f'''
+                            SELECT COUNT(*) 
+                            FROM company_line_accounts 
+                            WHERE company_id = {placeholder} AND status = 'active' 
+                            AND content_type IN ('AIタスクコンシェルジュ', 'AI経理秘書')
+                        ''', (company_id,))
+                        
+                        additional_content_count = c.fetchone()[0]
+                        print(f'[DEBUG] 追加料金コンテンツ数: {additional_content_count}')
+                        
+                        # Stripeサブスクリプションを取得
+                        subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+                        
+                        # 追加料金の請求項目を更新
+                        for item in subscription.items.data:
+                            if "追加" in (item.price.nickname or ""):
+                                print(f'[DEBUG] Stripe請求項目を更新: {item.id}, 数量={additional_content_count}')
+                                stripe.SubscriptionItem.modify(
+                                    item.id,
+                                    quantity=additional_content_count
+                                )
+                                print(f'[DEBUG] Stripe請求項目更新完了')
+                                break
+                                
+                    except Exception as e:
+                        print(f'[DEBUG] Stripe請求項目更新エラー: {e}')
+                        # Stripeエラーが発生しても処理を続行
                 
                 return {
                     'success': True,
@@ -1748,8 +1785,7 @@ def handle_content_confirmation_company(company_id, content_type):
                     'description': f'{content_type}を再アクティブ化しました',
                     'url': 'https://lp-production-9e2c.up.railway.app',
                     'usage': 'LINEアカウントからご利用いただけます',
-                    'additional_price': additional_price,
-                    'billing_end_date': billing_end_date
+                    'additional_price': additional_price
                 }
         
         # コンテンツ情報を定義
