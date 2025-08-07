@@ -7,20 +7,14 @@ import unicodedata
 import logging
 from services.line_service import send_line_message
 from services.line_service import (
-    handle_add_content, handle_content_selection, handle_cancel_request,
-    handle_cancel_selection, handle_subscription_cancel, handle_cancel_menu,
-    handle_status_check, send_welcome_with_buttons, get_welcome_message,
-    get_not_registered_message, extract_numbers_from_text, validate_selection_numbers,
-    smart_number_extraction, handle_cancel_confirmation, handle_content_confirmation,
     handle_add_content_company, handle_status_check_company, handle_cancel_menu_company,
     handle_content_confirmation_company, handle_cancel_request_company, 
     handle_cancel_selection_company, handle_subscription_cancel_company
 )
-from utils.message_templates import get_menu_message, get_help_message, get_default_message, get_help_message_company, get_menu_message_company
+from utils.message_templates import get_menu_message_company, get_help_message_company
 from utils.db import get_db_connection
 from models.user_state import get_user_state, set_user_state, clear_user_state, init_user_states_table
-from services.user_service import is_paid_user, is_paid_user_company_centric, get_restricted_message, is_paid_user_by_email, update_line_user_id_for_email
-# from services.cancellation_service import is_content_cancelled, get_restriction_message_for_content  # 削除された関数
+from services.user_service import is_paid_user_company_centric, get_restricted_message
 
 line_bp = Blueprint('line', __name__)
 

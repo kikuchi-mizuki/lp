@@ -1,5 +1,6 @@
 import os
 import sys
+import logging
 
 # Add the current directory to Python path for production deployment
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -45,6 +46,9 @@ from routes.debug import debug_bp
 from datetime import datetime
 
 load_dotenv()
+
+# ロガーの設定
+logger = logging.getLogger(__name__)
 
 stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
 

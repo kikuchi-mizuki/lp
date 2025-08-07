@@ -18,8 +18,6 @@ def send_line_message(reply_token, messages):
     """LINEメッセージ送信（複数メッセージ対応）"""
     print(f'[DEBUG] send_line_message開始: reply_token={reply_token[:20]}...')
     
-    LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
-    
     if not LINE_CHANNEL_ACCESS_TOKEN:
         print('❌ LINE_CHANNEL_ACCESS_TOKENが設定されていません')
         return
@@ -99,51 +97,32 @@ def send_line_message(reply_token, messages):
         response = requests.post('https://api.line.me/v2/bot/message/reply', headers=headers, json=data, timeout=10)
         print(f'[DEBUG] LINE APIレスポンス受信: status_code={response.status_code}')
         
-        if response.status_code == 400:
-            print(f'[DEBUG] LINE API 400エラー詳細: {response.text}')
-            try:
-                error_detail = response.json()
-                print(f'[DEBUG] LINE API エラー詳細JSON: {error_detail}')
-                if 'message' in error_detail:
-                    if 'reply token' in error_detail['message'].lower():
-                        print(f'[DEBUG] replyTokenエラー: {error_detail["message"]}')
-                        # replyTokenエラーの場合は、トークンを削除して再試行を許可
-                        send_line_message.used_tokens.discard(reply_token)
-                        if reply_token in send_line_message.token_times:
-                            del send_line_message.token_times[reply_token]
-                        # replyTokenエラーの場合は、エラーとして処理せずに正常終了
-                        print(f'[DEBUG] replyTokenエラーのため、メッセージ送信をスキップします')
-                        return
-                    elif 'invalid' in error_detail['message'].lower():
-                        print(f'[DEBUG] 無効なリクエストエラー: {error_detail["message"]}')
-                        # 無効なリクエストの場合は、エラーとして処理
-                        raise Exception(f'LINE API 無効なリクエスト: {error_detail["message"]}')
-            except Exception as parse_error:
-                print(f'[DEBUG] LINE API エラー詳細（JSON解析失敗）: {response.text}')
-                # JSON解析に失敗した場合は、エラーとして処理
-                raise Exception(f'LINE API 400エラー: {response.text}')
-        
-        response.raise_for_status()
-        print(f'[DEBUG] LINE API送信成功: status_code={response.status_code}')
-        print('[DEBUG] LINE API送信処理完了')
+        if response.status_code == 200:
+            print('[DEBUG] LINE送信成功')
+            return True
+        else:
+            print(f'[ERROR] LINE送信失敗: status_code={response.status_code}, response={response.text}')
+            return False
+            
     except requests.exceptions.Timeout:
-        print('❌ LINE API タイムアウトエラー')
+        print('[ERROR] LINE API送信タイムアウト')
+        # エラーログに記録
         with open('error.log', 'a', encoding='utf-8') as f:
-            f.write(f'{datetime.now().isoformat()} - LINE API タイムアウトエラー\n')
+            f.write(f'{datetime.now().isoformat()} - LINE API送信タイムアウト\n')
+        return False
+    except requests.exceptions.RequestException as e:
+        print(f'[ERROR] LINE API送信エラー: {e}')
+        # エラーログに記録
+        with open('error.log', 'a', encoding='utf-8') as f:
+            f.write(f'{datetime.now().isoformat()} - LINE API送信エラー: {str(e)}\n')
+        return False
     except Exception as e:
-        print(f'LINEメッセージ送信エラー: {e}')
-        if hasattr(e, 'response') and e.response is not None:
-            print(f'LINE API エラー詳細: {e.response.text}')
-            print(f'LINE API レスポンスヘッダー: {e.response.headers}')
-            print(f'LINE API リクエストデータ: {data}')
-        traceback.print_exc()
-        # エラー詳細をerror.logにも追記
+        print(f'[ERROR] LINE送信予期しないエラー: {e}')
+        # エラーログに記録
         with open('error.log', 'a', encoding='utf-8') as f:
-            f.write(f'{datetime.now().isoformat()} - LINEメッセージ送信エラー: {str(e)}\n')
-            if hasattr(e, 'response') and e.response is not None:
-                f.write(f'LINE API エラー詳細: {e.response.text}\n')
-                f.write(f'LINE API リクエストデータ: {data}\n')
+            f.write(f'{datetime.now().isoformat()} - LINE送信予期しないエラー: {str(e)}\n')
             f.write(traceback.format_exc() + '\n')
+        return False
 
 def send_welcome_with_buttons(reply_token):
     """ボタン付きウェルカムメッセージを送信"""
@@ -1689,6 +1668,7 @@ def get_not_registered_message():
 
 def handle_content_confirmation_company(company_id, content_type):
     """企業ユーザー専用：コンテンツ追加確認処理（月額基本料金システム対応・Stripe請求期間同期）"""
+    conn = None
     try:
         print(f'[DEBUG] 企業コンテンツ確認処理開始: company_id={company_id}, content_type={content_type}')
         
@@ -1835,8 +1815,6 @@ def handle_content_confirmation_company(company_id, content_type):
         conn.commit()
         print(f'[DEBUG] コンテンツ追加登録完了: company_id={company_id}, content_type={content_type}, additional_price={additional_price}, billing_end={billing_end_date}')
         
-        conn.close()
-        
         return {
             'success': True,
             'company_id': company_id,
@@ -1853,6 +1831,9 @@ def handle_content_confirmation_company(company_id, content_type):
         import traceback
         traceback.print_exc()
         return {'success': False, 'error': str(e)}
+    finally:
+        if conn:
+            conn.close()
 
 def get_help_message_company():
     """企業ユーザー専用：ヘルプメッセージ"""
