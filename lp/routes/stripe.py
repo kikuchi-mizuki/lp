@@ -280,11 +280,8 @@ def stripe_webhook():
                 company_id = c.fetchone()[0]
                 print(f'[DEBUG] 企業データ作成: company_id={company_id}, company_name={company_name}')
                 
-                # company_subscriptionsテーブルにサブスクリプション情報を保存
-                c.execute('''
-                    INSERT INTO company_subscriptions (company_id, content_type, subscription_status, stripe_subscription_id, current_period_end, base_price, additional_price, total_price)
-                    VALUES (%s, %s, 'active', %s, %s, 3900, 0, 3900)
-                ''', (company_id, 'AI予定秘書', subscription_id, datetime.now() + timedelta(days=30)))
+                # 月額料金決済時はコンテンツを自動追加しない
+                # ユーザーが手動でコンテンツを追加するまで待機
                 
                 conn.commit()
                 print(f'新規ユーザー登録完了: email={email}, customer_id={customer_id}, subscription_id={subscription_id}')
@@ -329,15 +326,8 @@ def stripe_webhook():
                 # 企業データは既に存在するため、サブスクリプション情報を更新
                 print(f'[DEBUG] 既存企業データのサブスクリプション更新: company_id={company_id}')
                 
-                # company_subscriptionsテーブルにサブスクリプション情報を保存
-                c.execute('''
-                    INSERT INTO company_subscriptions (company_id, content_type, subscription_status, stripe_subscription_id, current_period_end, base_price, additional_price, total_price)
-                    VALUES (%s, %s, 'active', %s, %s, 3900, 0, 3900)
-                    ON CONFLICT (company_id, content_type) DO UPDATE SET
-                        subscription_status = 'active',
-                        stripe_subscription_id = EXCLUDED.stripe_subscription_id,
-                        current_period_end = EXCLUDED.current_period_end
-                ''', (company_id, 'AI予定秘書', subscription_id, datetime.now() + timedelta(days=30)))
+                # 月額料金決済時はコンテンツを自動追加しない
+                # ユーザーが手動でコンテンツを追加するまで待機
                 
                 print(f'[DEBUG] サブスクリプション情報保存完了: company_id={company_id}')
                 
