@@ -676,6 +676,12 @@ def handle_text_message(event):
     
     company_id, stripe_subscription_id = company_info
     
+    # stripe_subscription_idがNoneの場合の処理
+    if not stripe_subscription_id:
+        print(f'[DEBUG] stripe_subscription_idがNone: company_id={company_id}')
+        send_line_message(event['replyToken'], [{"type": "text", "text": "決済情報が見つかりません。決済が完了しているかご確認ください。"}])
+        return
+    
     # 決済状況をチェック
     payment_check = is_paid_user_company_centric(user_id)
     if not payment_check['is_paid']:
@@ -707,6 +713,7 @@ def get_company_info(user_id):
     c.execute('SELECT stripe_subscription_id FROM company_subscriptions WHERE company_id = %s AND subscription_status = %s LIMIT 1', (company_id, 'active'))
     subscription = c.fetchone()
     stripe_subscription_id = subscription[0] if subscription else None
+    print(f'[DEBUG] stripe_subscription_id取得結果: {stripe_subscription_id}')
     
     conn.close()
     return (company_id, stripe_subscription_id)
