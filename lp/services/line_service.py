@@ -1630,10 +1630,10 @@ def handle_content_confirmation_company(company_id, content_type):
         c = conn.cursor()
         
         # 企業情報を取得
-        c.execute(f'SELECT stripe_subscription_id FROM companies WHERE id = {placeholder}', (company_id,))
+        c.execute(f'SELECT stripe_subscription_id FROM company_payments WHERE company_id = {placeholder} AND subscription_status = {placeholder}', (company_id, 'active'))
         company_result = c.fetchone()
         if not company_result:
-            return {'success': False, 'error': '企業情報が見つかりません'}
+            return {'success': False, 'error': '企業の決済情報が見つかりません'}
         
         stripe_subscription_id = company_result[0]
         
