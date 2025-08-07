@@ -138,7 +138,7 @@ def is_paid_user(line_user_id):
 
 def is_paid_user_company_centric(line_user_id):
     """
-    企業ID中心統合に対応した決済状況チェック（PostgreSQL対応）
+    企業ID中心統合に対応した決済状況チェック（新しい請求システム対応）
     
     Args:
         line_user_id (str): LINEユーザーID
@@ -165,24 +165,13 @@ def is_paid_user_company_centric(line_user_id):
             database_url = "postgresql://postgres:WZgnjZezoefHmxbwRjUbiPhajtwubmUs@gondola.proxy.rlwy.net:16797/railway"
         
         print(f'[DEBUG] PostgreSQL接続開始: {database_url[:50]}...')
-        print(f'[DEBUG] 実際の接続URL: {database_url}')
-        print(f'[DEBUG] 環境変数DATABASE_URL: {os.getenv("DATABASE_URL", "未設定")}')
-        print(f'[DEBUG] 環境変数RAILWAY_DATABASE_URL: {os.getenv("RAILWAY_DATABASE_URL", "未設定")}')
         
         conn = psycopg2.connect(database_url)
         c = conn.cursor()
         print(f'[DEBUG] PostgreSQL接続成功')
-        print(f'[DEBUG] 接続先ホスト: {conn.info.host}')
-        print(f'[DEBUG] 接続先データベース: {conn.info.dbname}')
-        print(f'[DEBUG] 接続先ユーザー: {conn.info.user}')
         
         # 企業情報を取得（LINEユーザーIDで検索）
-        print(f'[DEBUG] 検索用LINEユーザーID: line_user_id={line_user_id}, type={type(line_user_id)}')
-        
-        # テーブル構造を確認
-        c.execute("SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'companies' AND column_name = 'line_user_id'")
-        column_info = c.fetchone()
-        print(f'[DEBUG] line_user_idカラム情報: {column_info}')
+        print(f'[DEBUG] 検索用LINEユーザーID: line_user_id={line_user_id}')
         
         c.execute('''
             SELECT id, company_name, email, status
@@ -206,17 +195,15 @@ def is_paid_user_company_centric(line_user_id):
         company_id, company_name, email, status = result
         print(f'[DEBUG] 企業情報取得: company_id={company_id}, company_name={company_name}, email={email}, status={status}')
         
-        # 企業の決済状況をチェック（月額料金で判断）
+        # 新しい請求システム：月額基本サブスクリプションの決済状況をチェック
         c.execute('''
-            SELECT subscription_status, current_period_end, total_price
-            FROM company_subscriptions 
-            WHERE company_id = %s 
-            ORDER BY created_at DESC 
-            LIMIT 1
+            SELECT subscription_status, current_period_end, monthly_base_price
+            FROM company_monthly_subscriptions 
+            WHERE company_id = %s
         ''', (company_id,))
         
         payment_result = c.fetchone()
-        print(f'[DEBUG] 決済状況検索結果: company_id={company_id}, payment_result={payment_result}')
+        print(f'[DEBUG] 月額基本サブスクリプション検索結果: company_id={company_id}, payment_result={payment_result}')
         
         conn.close()
         print(f'[DEBUG] データベース接続終了')
@@ -224,7 +211,8 @@ def is_paid_user_company_centric(line_user_id):
         # 決済状況の判定
         if payment_result and payment_result[0] == 'active':
             current_period_end = payment_result[1]
-            print(f'[DEBUG] 有効な決済: company_id={company_id}, status=active, period_end={current_period_end}')
+            monthly_base_price = payment_result[2]
+            print(f'[DEBUG] 有効な月額基本サブスクリプション: company_id={company_id}, status=active, period_end={current_period_end}, base_price={monthly_base_price}')
             
             # 期限切れチェック
             if current_period_end:
@@ -236,41 +224,33 @@ def is_paid_user_company_centric(line_user_id):
                 if current_period_end.tzinfo is None:
                     current_period_end = current_period_end.replace(tzinfo=jst)
                 
-                if current_period_end > current_time:
-                    print(f'[DEBUG] 有効期限内: company_id={company_id}')
-                    return {
-                        'is_paid': True,
-                        'subscription_status': 'active',
-                        'message': None,
-                        'redirect_url': None
-                    }
-                else:
-                    print(f'[DEBUG] 期限切れ: company_id={company_id}, period_end={current_period_end}, current_time={current_time}')
+                if current_time > current_period_end:
+                    print(f'[DEBUG] 期限切れ: current_time={current_time}, period_end={current_period_end}')
                     return {
                         'is_paid': False,
                         'subscription_status': 'expired',
-                        'message': 'サブスクリプションの有効期限が切れています。',
+                        'message': '月額基本料金の支払い期限が切れています。',
                         'redirect_url': 'https://line.me/R/ti/p/@ai_collections'
                     }
-            else:
-                print(f'[DEBUG] 期限未設定: company_id={company_id}')
-                return {
-                    'is_paid': True,
-                    'subscription_status': 'active',
-                    'message': None,
-                    'redirect_url': None
-                }
+            
+            print(f'[DEBUG] 有効な決済確認: company_id={company_id}')
+            return {
+                'is_paid': True,
+                'subscription_status': 'active',
+                'message': None,
+                'redirect_url': None
+            }
         else:
-            print(f'[DEBUG] 無効な決済または未決済: company_id={company_id}, payment_status={payment_result[0] if payment_result else "none"}')
+            print(f'[DEBUG] 無効な決済: company_id={company_id}, payment_result={payment_result}')
             return {
                 'is_paid': False,
-                'subscription_status': payment_result[0] if payment_result else 'not_paid',
+                'subscription_status': 'not_paid',
                 'message': '決済済みユーザーのみご利用いただけます。',
                 'redirect_url': 'https://line.me/R/ti/p/@ai_collections'
             }
             
     except Exception as e:
-        print(f'[ERROR] 企業ID中心統合決済状況チェックエラー: {e}')
+        print(f'[ERROR] is_paid_user_company_centricエラー: {e}')
         import traceback
         traceback.print_exc()
         return {
