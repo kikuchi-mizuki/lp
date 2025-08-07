@@ -525,22 +525,56 @@ def line_webhook():
     return jsonify({'status': 'ok'})
 
 def handle_follow_event(event):
-    """友達追加イベントの処理"""
+    """フォローイベントの処理"""
     user_id = event['source']['userId']
-    print(f'[DEBUG] 友達追加イベント: user_id={user_id}')
-    
-    # 既に案内文が送信されているかチェック
-    if get_user_state(user_id) == 'welcome_sent':
-        print(f'[DEBUG] 既に案内文送信済み、スキップ: user_id={user_id}')
-        return
+    print(f'[DEBUG] フォローイベント受信: user_id={user_id}')
     
     try:
-        send_welcome_with_buttons(event['replyToken'])
-        print(f'[DEBUG] ウェルカムメッセージ送信完了: user_id={user_id}')
-        set_user_state(user_id, 'welcome_sent')
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 1. 既存の企業データでLINEユーザーIDが未設定のものを検索
+        c.execute('''
+            SELECT id, company_name, email 
+            FROM companies 
+            WHERE line_user_id IS NULL 
+            ORDER BY created_at DESC 
+            LIMIT 1
+        ''')
+        
+        unlinked_company = c.fetchone()
+        
+        if unlinked_company:
+            company_id, company_name, email = unlinked_company
+            print(f'[DEBUG] 未紐付け企業データ発見: company_id={company_id}, company_name={company_name}')
+            
+            # 企業データにLINEユーザーIDを設定
+            c.execute('UPDATE companies SET line_user_id = %s WHERE id = %s', (user_id, company_id))
+            conn.commit()
+            print(f'[DEBUG] 企業データとLINEユーザーIDを紐付け: user_id={user_id}, company_id={company_id}')
+            
+            # 企業向けの案内メッセージを送信
+            try:
+                from services.line_service import send_company_welcome_message
+                send_company_welcome_message(user_id, company_name, email)
+                print(f'[DEBUG] 企業向け案内メッセージ送信完了: user_id={user_id}')
+            except Exception as e:
+                print(f'[DEBUG] 企業向け案内メッセージ送信エラー: {e}')
+                import traceback
+                traceback.print_exc()
+                
+        else:
+            print(f'[DEBUG] 未紐付け企業データが見つかりません: user_id={user_id}')
+            # メールアドレス連携を促すメッセージを送信
+            send_line_message(event['replyToken'], [{"type": "text", "text": "決済済みの方は、登録時のメールアドレスを送信してください。\n\n例: example@example.com\n\n※メールアドレスを送信すると、自動的に企業データと紐付けされます。"}])
+        
+        conn.close()
+        
     except Exception as e:
-        print(f'[DEBUG] ウェルカムメッセージ送信エラー: {e}')
-        set_user_state(user_id, 'welcome_sent')
+        print(f'[DEBUG] フォローイベント処理エラー: {e}')
+        import traceback
+        traceback.print_exc()
+        send_line_message(event['replyToken'], [{"type": "text", "text": "決済済みの方は、登録時のメールアドレスを送信してください。\n\n例: example@example.com\n\n※メールアドレスを送信すると、自動的に企業データと紐付けされます。"}])
 
 def handle_unfollow_event(event):
     """友達削除イベントの処理"""
@@ -564,11 +598,65 @@ def handle_text_message(event):
     text = event['message']['text']
     print(f'[DEBUG] テキストメッセージ受信: user_id={user_id}, text={text}')
     
+    # メールアドレス連携処理
+    if '@' in text and '.' in text and len(text) < 100:
+        print(f'[DEBUG] メールアドレス連携処理開始: user_id={user_id}, text={text}')
+        
+        def normalize_email(email):
+            email = email.strip().lower()
+            email = unicodedata.normalize('NFKC', email)
+            return email
+        
+        normalized_email = normalize_email(text)
+        print(f'[DEBUG] 正規化後のメールアドレス: {normalized_email}')
+        
+        try:
+            conn = get_db_connection()
+            c = conn.cursor()
+            
+            # メールアドレスで企業データを検索
+            c.execute('SELECT id, company_name, email FROM companies WHERE email = %s', (normalized_email,))
+            company = c.fetchone()
+            print(f'[DEBUG] 企業データ検索結果: {company}')
+            
+            if company:
+                company_id, company_name, email = company
+                print(f'[DEBUG] 企業データ発見: company_id={company_id}, company_name={company_name}')
+                
+                # 企業データにLINEユーザーIDを設定
+                c.execute('UPDATE companies SET line_user_id = %s WHERE id = %s', (user_id, company_id))
+                conn.commit()
+                print(f'[DEBUG] 企業データとLINEユーザーIDを紐付け: user_id={user_id}, company_id={company_id}')
+                
+                # 企業向けの案内メッセージを送信
+                try:
+                    from services.line_service import send_company_welcome_message
+                    send_company_welcome_message(user_id, company_name, email)
+                    print(f'[DEBUG] 企業向け案内メッセージ送信完了: user_id={user_id}')
+                except Exception as e:
+                    print(f'[DEBUG] 企業向け案内メッセージ送信エラー: {e}')
+                    import traceback
+                    traceback.print_exc()
+                    
+            else:
+                print(f'[DEBUG] 企業データが見つかりません: email={normalized_email}')
+                send_line_message(event['replyToken'], [{"type": "text", "text": "企業データが見つかりません。決済が完了しているかご確認ください。"}])
+            
+            conn.close()
+            return
+            
+        except Exception as e:
+            print(f'[DEBUG] メールアドレス連携処理エラー: {e}')
+            import traceback
+            traceback.print_exc()
+            send_line_message(event['replyToken'], [{"type": "text", "text": "メールアドレス連携処理中にエラーが発生しました。もう一度お試しください。"}])
+            return
+    
     # 企業情報を取得
     company_info = get_company_info(user_id)
     if not company_info:
-        # 企業が見つからない場合
-        send_line_message(event['replyToken'], [{"type": "text", "text": "企業登録が完了していません。LPで企業登録を行ってください。"}])
+        # 企業が見つからない場合、メールアドレス連携を促す
+        send_line_message(event['replyToken'], [{"type": "text", "text": "決済済みの方は、登録時のメールアドレスを送信してください。\n\n例: example@example.com\n\n※メールアドレスを送信すると、自動的に企業データと紐付けされます。"}])
         return
     
     company_id, stripe_subscription_id = company_info
