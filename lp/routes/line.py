@@ -794,8 +794,10 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
             send_line_message(event['replyToken'], [get_menu_message_company()])
             return
         else:
-            # 無効な入力の場合、コンテンツ選択を促すメッセージを送信
-            send_line_message(event['replyToken'], [{"type": "text", "text": "1〜3の数字でコンテンツを選択してください。\n\nまたは「メニュー」でメインメニューに戻ります。"}])
+            # 無効な入力の場合、メインメニューを表示
+            set_user_state(user_id, 'welcome_sent')
+            from utils.message_templates import get_menu_message_company
+            send_line_message(event['replyToken'], [get_menu_message_company()])
             return
     elif state == 'cancel_select':
         print(f'[DEBUG] 解約選択処理開始: user_id={user_id}, state={state}, text={text}')
@@ -841,8 +843,10 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
             return
         else:
             print(f'[DEBUG] 無効な入力: user_id={user_id}, text={text}')
-            # 無効な入力の場合、解約選択を促すメッセージを送信
-            send_line_message(event['replyToken'], [{"type": "text", "text": "1〜3の数字で解約するコンテンツを選択してください。\n\nまたは「メニュー」でメインメニューに戻ります。"}])
+            # 無効な入力の場合、メインメニューを表示
+            set_user_state(user_id, 'welcome_sent')
+            from utils.message_templates import get_menu_message_company
+            send_line_message(event['replyToken'], [get_menu_message_company()])
             return
     else:
         # 登録されていないメッセージの場合、メニューを表示

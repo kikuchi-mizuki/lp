@@ -1619,6 +1619,10 @@ def handle_content_confirmation_company(company_id, content_type):
     try:
         print(f'[DEBUG] 企業コンテンツ確認処理開始: company_id={company_id}, content_type={content_type}')
         
+        # データベースタイプを取得
+        db_type = get_db_type()
+        placeholder = '%s' if db_type == 'postgresql' else '?'
+        
         conn = get_db_connection()
         c = conn.cursor()
         
@@ -1799,14 +1803,36 @@ def handle_content_confirmation_company(company_id, content_type):
         conn.commit()
         conn.close()
         
+        # コンテンツ情報を取得
+        content_info = {
+            'AI予定秘書': {
+                'description': 'AIが予定管理をサポート',
+                'url': 'https://ai-schedule.example.com',
+                'usage': '予定を入力すると、AIが最適なスケジュールを提案します'
+            },
+            'AI経理秘書': {
+                'description': 'AIが経理業務をサポート',
+                'url': 'https://ai-accounting.example.com',
+                'usage': '経理データを入力すると、AIが自動で仕訳を提案します'
+            },
+            'AIタスクコンシェルジュ': {
+                'description': 'AIがタスク管理をサポート',
+                'url': 'https://ai-task.example.com',
+                'usage': 'タスクを入力すると、AIが優先順位を提案します'
+            }
+        }
+        
+        # 選択されたコンテンツの情報を取得
+        selected_content = content_info.get(content_type, {})
+        
         return {
             'success': True,
             'company_id': company_id,
             'content_type': content_type,
             'total_price': total_price,
-            'description': content_info['description'],
-            'url': content_info['url'],
-            'usage': content_info['usage'],
+            'description': selected_content.get('description', f'{content_type}の説明'),
+            'url': selected_content.get('url', 'https://lp-production-9e2c.up.railway.app'),
+            'usage': selected_content.get('usage', 'LINEアカウントからご利用いただけます'),
             'is_free': is_free,
             'usage_record_id': usage_record.id if usage_record else None
         }
