@@ -993,19 +993,19 @@ def handle_content_confirmation(user_id_db, content_type, stripe_subscription_id
             return {'success': False, 'error': f'コンテンツ {content_type} は既に追加されています'}
         
         # サブスクリプション状態に基づく処理
-        if subscription_status.get('subscription', {}).get('status') == 'trialing':
-            print(f'[DEBUG] トライアル期間中のため無料で追加')
-            # トライアル期間中は無料で追加
+        is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
+        is_free = is_trial_period or is_first_content  # トライアル期間中または初回コンテンツは無料
+        
+        if is_free:
+            print(f'[DEBUG] トライアル期間中または初回コンテンツのため無料で追加')
+            # トライアル期間中または初回コンテンツは無料で追加
             c.execute(f'INSERT INTO usage_logs (user_id, content_type, price, status, created_at) VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, NOW())', 
                      (user_id_db, content_type, 0, 'active'))
-        elif subscription_status.get('subscription', {}).get('status') == 'active':
-            print(f'[DEBUG] アクティブなサブスクリプション、有料で追加')
-            # アクティブなサブスクリプションの場合は有料で追加
+        else:
+            print(f'[DEBUG] 有料コンテンツ追加')
+            # 有料コンテンツの場合はStripe処理を実行
             c.execute(f'INSERT INTO usage_logs (user_id, content_type, price, status, created_at) VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, NOW())', 
                      (user_id_db, content_type, content['price'], 'active'))
-        else:
-            print(f'[DEBUG] 無効なサブスクリプション状態')
-            return {'success': False, 'error': '有効なサブスクリプションが必要です'}
         
         conn.commit()
         conn.close()
@@ -1645,16 +1645,18 @@ def handle_content_confirmation_company(company_id, content_type):
         c.execute(f'SELECT COUNT(*) FROM company_subscriptions WHERE company_id = {placeholder} AND subscription_status = {placeholder}', (company_id, 'active'))
         existing_count = c.fetchone()[0]
         
-        # 料金計算
+        # 料金計算（1個目は無料）
         base_price = 3900
         additional_price_per_content = 1500
         
         if existing_count == 0:
-            # 初回コンテンツ（基本料金のみ）
-            total_price = base_price
+            # 初回コンテンツ（無料）
+            total_price = 0
+            is_first_content = True
         else:
-            # 追加コンテンツ（基本料金 + 追加料金）
-            total_price = base_price + (existing_count * additional_price_per_content)
+            # 追加コンテンツ（1,500円/個）
+            total_price = existing_count * additional_price_per_content
+            is_first_content = False
         
         # コンテンツ詳細情報
         content_details = {
@@ -1683,7 +1685,7 @@ def handle_content_confirmation_company(company_id, content_type):
         
         # サブスクリプション状態に基づく処理
         is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
-        is_free = is_trial_period
+        is_free = is_trial_period or is_first_content  # トライアル期間中または初回コンテンツは無料
         
         # 有料の場合のみStripe処理
         usage_record = None
