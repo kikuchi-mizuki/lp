@@ -1478,85 +1478,69 @@ def handle_cancel_selection_company(reply_token, company_id, stripe_subscription
                     traceback.print_exc()
                     # エラーが発生しても処理は続行
                 
-                # サブスクリプションを停止
+                # データベース更新処理
                 try:
+                    # サブスクリプションを停止
                     c.execute(f'''
                         UPDATE company_subscriptions 
                         SET subscription_status = 'canceled', updated_at = CURRENT_TIMESTAMP
                         WHERE id = {placeholder}
                     ''', (subscription_id,))
                     print(f'[DEBUG] company_subscriptions更新成功: subscription_id={subscription_id}')
-                except Exception as e:
-                    print(f'[DEBUG] company_subscriptions更新エラー: {e}')
-                    import traceback
-                    traceback.print_exc()
-                
-                # LINEアカウントも停止
-                try:
+                    
+                    # LINEアカウントも停止
                     c.execute(f'''
                         UPDATE company_line_accounts 
                         SET status = 'inactive', updated_at = CURRENT_TIMESTAMP
                         WHERE company_id = {placeholder} AND content_type = {placeholder}
                     ''', (company_id, content_type))
                     print(f'[DEBUG] company_line_accounts更新成功: company_id={company_id}, content_type={content_type}')
+                    
+                    # トランザクションをコミット
+                    conn.commit()
+                    print(f'[DEBUG] データベーストランザクションコミット成功')
+                    
+                    cancelled.append(content_type)
+                    print(f'[DEBUG] 企業コンテンツ解約処理完了: content_type={content_type}, subscription_id={subscription_id}')
+                    
                 except Exception as e:
-                    print(f'[DEBUG] company_line_accounts更新エラー: {e}')
+                    print(f'[DEBUG] データベース更新エラー: {e}')
                     import traceback
                     traceback.print_exc()
-                
-                cancelled.append(content_type)
-                print(f'[DEBUG] 企業コンテンツ解約処理完了: content_type={content_type}, subscription_id={subscription_id}')
+                    
+                    # トランザクションをロールバック
+                    try:
+                        conn.rollback()
+                        print(f'[DEBUG] データベーストランザクションロールバック成功')
+                    except Exception as rollback_error:
+                        print(f'[DEBUG] ロールバックエラー: {rollback_error}')
+                    
+                    # エラーが発生した場合は処理をスキップ
+                    continue
         
         print(f'[DEBUG] 解約対象コンテンツ数: {len(cancelled)}')
         print(f'[DEBUG] 解約対象: {cancelled}')
         
-        # データベースの変更をコミット
-        conn.commit()
-        conn.close()
-        
         if cancelled:
-            # 1通目: 解約完了のテキストメッセージ
-            cancel_text_message = {
-                "type": "text",
-                "text": f"以下のコンテンツの解約を受け付けました：\n\n" + "\n".join([f"• {content}" for content in cancelled])
-            }
-            send_line_message(reply_token, [cancel_text_message])
-            
-            # 2通目: 公式LINE利用制限メッセージ
-            line_restriction_message = {
-                "type": "template",
-                "altText": "公式LINEの利用制限",
-                "template": {
-                    "type": "buttons",
-                    "title": "公式LINEの利用制限",
-                    "text": f"解約されたコンテンツの公式LINEは利用できなくなります。\n\n解約されたコンテンツ：\n" + "\n".join([f"• {content}" for content in cancelled]),
-                    "thumbnailImageUrl": "https://ai-collections.herokuapp.com/static/images/logo.png",
-                    "imageAspectRatio": "rectangle",
-                    "imageSize": "cover",
-                    "imageBackgroundColor": "#FFFFFF",
-                    "actions": [
-                        {
-                            "type": "message",
-                            "label": "他のコンテンツ追加",
-                            "text": "追加"
-                        },
-                        {
-                            "type": "message",
-                            "label": "利用状況確認",
-                            "text": "状態"
-                        }
-                    ]
-                }
-            }
-            send_line_message(reply_token, [line_restriction_message])
+            # 解約完了メッセージを送信
+            cancelled_text = '\n'.join([f'• {content}' for content in cancelled])
+            success_message = f'以下のコンテンツの解約を受け付けました：\n\n{cancelled_text}'
+            send_line_message(reply_token, [{"type": "text", "text": success_message}])
         else:
-            send_line_message(reply_token, [{"type": "text", "text": "有効な番号が選択されませんでした。もう一度お試しください。"}])
-        
+            # 解約対象がない場合
+            send_line_message(reply_token, [{"type": "text", "text": "解約対象のコンテンツが見つかりませんでした。"}])
+    
     except Exception as e:
         print(f'[ERROR] 企業解約選択処理エラー: {e}')
         import traceback
         traceback.print_exc()
         send_line_message(reply_token, [{"type": "text", "text": "❌ 解約処理に失敗しました。しばらく時間をおいて再度お試しください。"}])
+    finally:
+        # データベース接続を確実にクローズ
+        if 'c' in locals():
+            c.close()
+        if 'conn' in locals():
+            conn.close()
 
 def handle_subscription_cancel_company(reply_token, company_id, stripe_subscription_id):
     """企業ユーザー専用：サブスクリプション全体の解約処理"""
