@@ -1223,7 +1223,7 @@ def handle_status_check_company(reply_token, company_id):
         c.execute(f'''
             SELECT content_type, status, created_at
             FROM company_line_accounts 
-            WHERE company_id = {placeholder}
+            WHERE company_id = {placeholder} AND status = 'active'
             ORDER BY created_at DESC
         ''', (company_id,))
         
@@ -1248,14 +1248,12 @@ def handle_status_check_company(reply_token, company_id):
         else:
             status_message += "❌ 月額基本サブスクリプションが見つかりません\n\n"
         
-        # 実際のLINEアカウント利用状況
+        # アクティブなLINEアカウント利用状況のみ表示
         if line_accounts:
             status_message += "📋 利用コンテンツ:\n"
-            active_count = 0
             
             for account in line_accounts:
                 content_type, status, created_at = account
-                status_text = "アクティブ" if status == "active" else "非アクティブ"
                 created_date = created_at.strftime('%Y年%m月%d日') if created_at else '不明'
                 
                 # 料金情報を取得（content_typeに基づいて）
@@ -1268,10 +1266,7 @@ def handle_status_check_company(reply_token, company_id):
                     additional_price = 0
                 
                 price_text = f"（+{additional_price:,}円/月）" if additional_price > 0 else "（基本料金に含まれる）"
-                status_message += f"• {content_type} - {status_text}{price_text}（{created_date}追加）\n"
-                
-                if status == "active":
-                    active_count += 1
+                status_message += f"• {content_type}{price_text}（{created_date}追加）\n"
         else:
             status_message += "📋 利用コンテンツ: まだ追加していません\n"
         
