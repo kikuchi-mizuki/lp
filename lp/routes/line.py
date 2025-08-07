@@ -13,9 +13,10 @@ from services.line_service import (
     get_not_registered_message, extract_numbers_from_text, validate_selection_numbers,
     smart_number_extraction, handle_cancel_confirmation, handle_content_confirmation,
     handle_add_content_company, handle_status_check_company, handle_cancel_menu_company,
-    handle_content_confirmation_company
+    handle_content_confirmation_company, handle_cancel_request_company, 
+    handle_cancel_selection_company, handle_subscription_cancel_company
 )
-from utils.message_templates import get_menu_message, get_help_message, get_default_message, get_help_message_company
+from utils.message_templates import get_menu_message, get_help_message, get_default_message, get_help_message_company, get_menu_message_company
 from utils.db import get_db_connection
 from models.user_state import get_user_state, set_user_state, clear_user_state, init_user_states_table
 from services.user_service import is_paid_user, is_paid_user_company_centric, get_restricted_message, is_paid_user_by_email, update_line_user_id_for_email
@@ -618,8 +619,8 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
             print(f'[ERROR] 追加コマンド処理エラー: {e}')
     elif text == 'メニュー':
         try:
-            from utils.message_templates import get_menu_message
-            send_line_message(event['replyToken'], [get_menu_message()])
+            from utils.message_templates import get_menu_message_company
+            send_line_message(event['replyToken'], [get_menu_message_company()])
             print(f'[DEBUG] メニューコマンド処理完了')
         except Exception as e:
             print(f'[ERROR] メニューコマンド処理エラー: {e}')
@@ -635,11 +636,62 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
             print(f'[DEBUG] 状態コマンド処理完了')
         except Exception as e:
             print(f'[ERROR] 状態コマンド処理エラー: {e}')
+    elif text == '解約':
+        try:
+            handle_cancel_menu_company(event['replyToken'], company_id, stripe_subscription_id)
+            print(f'[DEBUG] 解約コマンド処理完了')
+        except Exception as e:
+            print(f'[ERROR] 解約コマンド処理エラー: {e}')
+    elif text == 'サブスクリプション解約':
+        try:
+            handle_subscription_cancel_company(event['replyToken'], company_id, stripe_subscription_id)
+            print(f'[DEBUG] サブスクリプション解約コマンド処理完了')
+        except Exception as e:
+            print(f'[ERROR] サブスクリプション解約コマンド処理エラー: {e}')
+    elif text == 'コンテンツ解約':
+        try:
+            set_user_state(user_id, 'cancel_select')
+            handle_cancel_request_company(event['replyToken'], company_id, stripe_subscription_id)
+            print(f'[DEBUG] コンテンツ解約コマンド処理完了')
+        except Exception as e:
+            print(f'[ERROR] コンテンツ解約コマンド処理エラー: {e}')
+    elif state == 'cancel_select':
+        print(f'[DEBUG] 解約選択処理: user_id={user_id}, state={state}, text={text}')
+        
+        # 解約対象のコンテンツを選択
+        if text in ['1', '2', '3']:
+            print(f'[DEBUG] 解約対象コンテンツ選択: text={text}')
+            # 解約確認状態に設定
+            set_user_state(user_id, f'cancel_confirm_{text}')
+            # 解約確認メッセージを送信
+            handle_cancel_selection_company(event['replyToken'], company_id, stripe_subscription_id, text)
+            return
+        # 「メニュー」コマンドの場合は状態をリセットしてメニューを表示
+        elif text == 'メニュー':
+            set_user_state(user_id, 'welcome_sent')
+            from utils.message_templates import get_menu_message_company
+            send_line_message(event['replyToken'], [get_menu_message_company()])
+            return
+        # 主要なコマンドの場合は通常の処理に切り替え
+        elif text == '追加':
+            set_user_state(user_id, 'add_select')
+            handle_add_content_company(event['replyToken'], company_id, stripe_subscription_id)
+            return
+        elif text == '状態':
+            handle_status_check_company(event['replyToken'], company_id)
+            return
+        elif text == 'ヘルプ':
+            send_line_message(event['replyToken'], get_help_message_company())
+            return
+        else:
+            # 無効な入力の場合、解約選択を促すメッセージを送信
+            send_line_message(event['replyToken'], [{"type": "text", "text": "1〜3の数字で解約するコンテンツを選択してください。\n\nまたは「メニュー」でメインメニューに戻ります。"}])
+            return
     else:
         # 無効な入力の場合、メニューを表示
         try:
-            from utils.message_templates import get_menu_message
-            send_line_message(event['replyToken'], [get_menu_message()])
+            from utils.message_templates import get_menu_message_company
+            send_line_message(event['replyToken'], [get_menu_message_company()])
             print(f'[DEBUG] 無効な入力に対するメニュー表示完了: text={text}')
         except Exception as e:
             print(f'[ERROR] メニュー表示エラー: {e}')

@@ -1334,6 +1334,285 @@ def handle_cancel_menu_company(reply_token, company_id, stripe_subscription_id):
         traceback.print_exc()
         send_line_message(reply_token, [{"type": "text", "text": "コンテンツ削除メニューでエラーが発生しました。"}])
 
+def handle_cancel_request_company(reply_token, company_id, stripe_subscription_id):
+    """企業ユーザー専用：解約リクエスト処理"""
+    try:
+        # データベースタイプを取得
+        db_type = get_db_type()
+        placeholder = '%s' if db_type == 'postgresql' else '?'
+        
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 企業のアクティブなコンテンツを取得
+        c.execute(f'''
+            SELECT content_type, created_at 
+            FROM company_subscriptions 
+            WHERE company_id = {placeholder} AND subscription_status = 'active'
+            ORDER BY created_at DESC
+        ''', (company_id,))
+        
+        active_contents = c.fetchall()
+        conn.close()
+        
+        print(f'[DEBUG] 企業解約対象コンテンツ取得: company_id={company_id}, count={len(active_contents)}')
+        for content in active_contents:
+            print(f'[DEBUG] コンテンツ: {content}')
+        
+        if not active_contents:
+            # 解約対象のコンテンツがない場合
+            no_content_message = {
+                "type": "template",
+                "altText": "解約対象なし",
+                "template": {
+                    "type": "buttons",
+                    "title": "解約対象なし",
+                    "text": "現在、解約可能なコンテンツはありません。\n\nコンテンツを追加してから解約してください。",
+                    "actions": [
+                        {
+                            "type": "message",
+                            "label": "コンテンツ追加",
+                            "text": "追加"
+                        },
+                        {
+                            "type": "message",
+                            "label": "メニューに戻る",
+                            "text": "メニュー"
+                        }
+                    ]
+                }
+            }
+            send_line_message(reply_token, [no_content_message])
+            return
+        
+        # 解約メニューを表示
+        cancel_menu_text = "解約したいコンテンツを選択してください：\n\n"
+        for i, (content_type, created_at) in enumerate(active_contents, 1):
+            created_date = created_at.strftime('%Y年%m月%d日') if created_at else '不明'
+            cancel_menu_text += f"{i}. {content_type} (追加日: {created_date})\n"
+        
+        cancel_menu_message = {
+            "type": "template",
+            "altText": "解約メニュー",
+            "template": {
+                "type": "buttons",
+                "title": "解約メニュー",
+                "text": cancel_menu_text,
+                "actions": [
+                    {
+                        "type": "message",
+                        "label": "メニューに戻る",
+                        "text": "メニュー"
+                    }
+                ]
+            }
+        }
+        send_line_message(reply_token, [cancel_menu_message])
+        
+    except Exception as e:
+        print(f'[ERROR] 企業解約リクエスト処理エラー: {e}')
+        import traceback
+        traceback.print_exc()
+        send_line_message(reply_token, [{"type": "text", "text": "❌ エラーが発生しました。しばらく時間をおいて再度お試しください。"}])
+
+def handle_cancel_selection_company(reply_token, company_id, stripe_subscription_id, selection_text):
+    """企業ユーザー専用：解約選択処理"""
+    try:
+        # データベースタイプを取得
+        db_type = get_db_type()
+        placeholder = '%s' if db_type == 'postgresql' else '?'
+        
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 企業のアクティブなコンテンツを取得
+        c.execute(f'''
+            SELECT id, content_type, created_at 
+            FROM company_subscriptions 
+            WHERE company_id = {placeholder} AND subscription_status = 'active'
+            ORDER BY created_at DESC
+        ''', (company_id,))
+        
+        active_contents = c.fetchall()
+        
+        # 選択された番号を解析
+        numbers = smart_number_extraction(selection_text)
+        valid_numbers, invalid_reasons, duplicates = validate_selection_numbers(numbers, len(active_contents))
+        selected_indices = valid_numbers
+        
+        print(f'[DEBUG] 選択テキスト: {selection_text}')
+        print(f'[DEBUG] 抽出された数字: {numbers}')
+        print(f'[DEBUG] 有効な選択インデックス: {selected_indices}')
+        print(f'[DEBUG] 最大選択可能数: {len(active_contents)}')
+        
+        if invalid_reasons:
+            print(f'[DEBUG] 無効な入力: {invalid_reasons}')
+        if duplicates:
+            print(f'[DEBUG] 重複除去: {duplicates}')
+        
+        cancelled = []
+        
+        # 選択されたコンテンツを解約
+        for i, (subscription_id, content_type, created_at) in enumerate(active_contents, 1):
+            if i in selected_indices:
+                # サブスクリプションを停止
+                c.execute(f'''
+                    UPDATE company_subscriptions 
+                    SET subscription_status = 'canceled', updated_at = CURRENT_TIMESTAMP
+                    WHERE id = {placeholder}
+                ''', (subscription_id,))
+                
+                # LINEアカウントも停止
+                c.execute(f'''
+                    UPDATE company_line_accounts 
+                    SET status = 'inactive', updated_at = CURRENT_TIMESTAMP
+                    WHERE company_id = {placeholder} AND content_type = {placeholder}
+                ''', (company_id, content_type))
+                
+                cancelled.append(content_type)
+                print(f'[DEBUG] 企業コンテンツ解約処理: content_type={content_type}, subscription_id={subscription_id}')
+        
+        print(f'[DEBUG] 解約対象コンテンツ数: {len(cancelled)}')
+        print(f'[DEBUG] 解約対象: {cancelled}')
+        
+        # データベースの変更をコミット
+        conn.commit()
+        conn.close()
+        
+        if cancelled:
+            # 1通目: 解約完了のテキストメッセージ
+            cancel_text_message = {
+                "type": "text",
+                "text": f"以下のコンテンツの解約を受け付けました：\n\n" + "\n".join([f"• {content}" for content in cancelled])
+            }
+            send_line_message(reply_token, [cancel_text_message])
+            
+            # 2通目: 公式LINE利用制限メッセージ
+            line_restriction_message = {
+                "type": "template",
+                "altText": "公式LINEの利用制限",
+                "template": {
+                    "type": "buttons",
+                    "title": "公式LINEの利用制限",
+                    "text": f"解約されたコンテンツの公式LINEは利用できなくなります。\n\n解約されたコンテンツ：\n" + "\n".join([f"• {content}" for content in cancelled]),
+                    "thumbnailImageUrl": "https://ai-collections.herokuapp.com/static/images/logo.png",
+                    "imageAspectRatio": "rectangle",
+                    "imageSize": "cover",
+                    "imageBackgroundColor": "#FFFFFF",
+                    "actions": [
+                        {
+                            "type": "message",
+                            "label": "他のコンテンツ追加",
+                            "text": "追加"
+                        },
+                        {
+                            "type": "message",
+                            "label": "利用状況確認",
+                            "text": "状態"
+                        }
+                    ]
+                }
+            }
+            send_line_message(reply_token, [line_restriction_message])
+        else:
+            send_line_message(reply_token, [{"type": "text", "text": "有効な番号が選択されませんでした。もう一度お試しください。"}])
+        
+    except Exception as e:
+        print(f'[ERROR] 企業解約選択処理エラー: {e}')
+        import traceback
+        traceback.print_exc()
+        send_line_message(reply_token, [{"type": "text", "text": "❌ 解約処理に失敗しました。しばらく時間をおいて再度お試しください。"}])
+
+def handle_subscription_cancel_company(reply_token, company_id, stripe_subscription_id):
+    """企業ユーザー専用：サブスクリプション全体の解約処理"""
+    try:
+        # サブスクリプション状態をチェック
+        subscription_status = check_subscription_status(stripe_subscription_id)
+        is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
+        
+        if is_trial_period:
+            # トライアル期間中の場合は、期間終了時に解約
+            try:
+                stripe.Subscription.modify(
+                    stripe_subscription_id,
+                    cancel_at_period_end=True
+                )
+                cancel_message = {
+                    "type": "template",
+                    "altText": "サブスクリプション解約予定",
+                    "template": {
+                        "type": "buttons",
+                        "title": "サブスクリプション解約予定",
+                        "text": "サブスクリプションが期間終了時に解約予定になりました。\n\nトライアル期間終了までご利用いただけます。",
+                        "actions": [
+                            {
+                                "type": "message",
+                                "label": "メニューに戻る",
+                                "text": "メニュー"
+                            }
+                        ]
+                    }
+                }
+                send_line_message(reply_token, [cancel_message])
+            except Exception as e:
+                print(f'[DEBUG] Stripe解約エラー: {e}')
+                error_message = {
+                    "type": "text",
+                    "text": "❌ 解約処理中にエラーが発生しました。しばらく時間をおいて再度お試しください。"
+                }
+                send_line_message(reply_token, [error_message])
+        else:
+            # 通常期間の場合は、即座に解約
+            try:
+                stripe.Subscription.delete(stripe_subscription_id)
+                
+                # データベースも更新
+                conn = get_db_connection()
+                c = conn.cursor()
+                c.execute('''
+                    UPDATE company_subscriptions 
+                    SET subscription_status = 'canceled', updated_at = CURRENT_TIMESTAMP
+                    WHERE company_id = %s
+                ''', (company_id,))
+                c.execute('''
+                    UPDATE company_line_accounts 
+                    SET status = 'inactive', updated_at = CURRENT_TIMESTAMP
+                    WHERE company_id = %s
+                ''', (company_id,))
+                conn.commit()
+                conn.close()
+                
+                cancel_message = {
+                    "type": "template",
+                    "altText": "サブスクリプション解約完了",
+                    "template": {
+                        "type": "buttons",
+                        "title": "サブスクリプション解約完了",
+                        "text": "サブスクリプションを解約しました。\n\nご利用ありがとうございました。",
+                        "actions": [
+                            {
+                                "type": "message",
+                                "label": "メニューに戻る",
+                                "text": "メニュー"
+                            }
+                        ]
+                    }
+                }
+                send_line_message(reply_token, [cancel_message])
+            except Exception as e:
+                print(f'[DEBUG] Stripe解約エラー: {e}')
+                error_message = {
+                    "type": "text",
+                    "text": "❌ 解約処理中にエラーが発生しました。しばらく時間をおいて再度お試しください。"
+                }
+                send_line_message(reply_token, [error_message])
+    
+    except Exception as e:
+        print(f'[ERROR] 企業サブスクリプション解約処理エラー: {e}')
+        import traceback
+        traceback.print_exc()
+        send_line_message(reply_token, [{"type": "text", "text": "❌ エラーが発生しました。しばらく時間をおいて再度お試しください。"}])
+
 def get_welcome_message():
     return "ようこそ！LINE連携が完了しました。"
 
