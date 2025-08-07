@@ -702,7 +702,8 @@ def get_company_info(user_id):
 def handle_command(event, user_id, text, company_id, stripe_subscription_id):
     """コマンド処理"""
     state = get_user_state(user_id)
-    print(f'[DEBUG] handle_command開始: user_id={user_id}, text={text}, state={state}')
+    print(f'[DEBUG] handle_command開始: user_id={user_id}, text="{text}", state="{state}"')
+    print(f'[DEBUG] 企業情報: company_id={company_id}, stripe_subscription_id={stripe_subscription_id}')
     
     # 基本的なコマンド処理
     if text == '追加':
@@ -853,9 +854,10 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
             return
     else:
         # 登録されていないメッセージの場合、メニューを表示
-        print(f'[DEBUG] 登録されていないメッセージ: user_id={user_id}, text="{text}"')
+        print(f'[DEBUG] 登録されていないメッセージ: user_id={user_id}, text="{text}", state="{state}"')
         try:
             from utils.message_templates import get_menu_message_company
+            print(f'[DEBUG] メニューメッセージ送信開始: reply_token={event["replyToken"][:20]}...')
             send_line_message(event['replyToken'], [get_menu_message_company()])
             print(f'[DEBUG] メニュー表示完了: text="{text}"')
         except Exception as e:
