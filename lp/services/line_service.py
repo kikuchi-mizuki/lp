@@ -1214,7 +1214,7 @@ def handle_add_content_company(reply_token, company_id, stripe_subscription_id):
         send_line_message(reply_token, [{"type": "text", "text": "コンテンツ追加処理でエラーが発生しました。"}])
 
 def handle_status_check_company(reply_token, company_id):
-    """企業ユーザー専用：利用状況確認"""
+    """企業ユーザー専用：利用状況確認（月額基本料金システム対応）"""
     try:
         # データベースタイプを取得
         db_type = get_db_type()
@@ -1234,11 +1234,20 @@ def handle_status_check_company(reply_token, company_id):
         
         company_name = company[0]
         
-        # 企業のコンテンツ一覧を取得
+        # 月額基本サブスクリプション情報を取得
         c.execute(f'''
-            SELECT content_type, total_price, created_at 
-            FROM company_subscriptions 
-            WHERE company_id = {placeholder} AND subscription_status = 'active'
+            SELECT subscription_status, monthly_base_price, current_period_end
+            FROM company_monthly_subscriptions 
+            WHERE company_id = {placeholder}
+        ''', (company_id,))
+        
+        monthly_subscription = c.fetchone()
+        
+        # アクティブなコンテンツ追加を取得
+        c.execute(f'''
+            SELECT content_type, additional_price, created_at 
+            FROM company_content_additions 
+            WHERE company_id = {placeholder} AND status = 'active'
             ORDER BY created_at DESC
         ''', (company_id,))
         
@@ -1249,21 +1258,43 @@ def handle_status_check_company(reply_token, company_id):
         status_message = f"📊 利用状況\n\n"
         status_message += f"🏢 企業名: {company_name}\n\n"
         
+        # 月額基本サブスクリプション情報
+        if monthly_subscription:
+            subscription_status, monthly_base_price, current_period_end = monthly_subscription
+            status_message += f"💳 月額基本料金: {monthly_base_price:,}円/月\n"
+            status_message += f"📅 ステータス: {'アクティブ' if subscription_status == 'active' else '非アクティブ'}\n"
+            
+            if current_period_end:
+                period_end = current_period_end.strftime('%Y年%m月%d日')
+                status_message += f"📅 次回更新日: {period_end}\n"
+            
+            status_message += "\n"
+        else:
+            status_message += "❌ 月額基本サブスクリプションが見つかりません\n\n"
+        
+        # コンテンツ追加情報
         if active_contents:
             status_message += "📋 利用コンテンツ:\n"
-            total_price = 0
+            total_additional_price = 0
             
             for content in active_contents:
-                content_type, total_price_content, created_at = content
-                total_price += total_price_content if total_price_content else 0
+                content_type, additional_price, created_at = content
+                total_additional_price += additional_price if additional_price else 0
                 created_date = created_at.strftime('%Y年%m月%d日') if created_at else '不明'
-                status_message += f"• {content_type}（{created_date}追加）\n"
+                price_text = f"（+{additional_price:,}円/月）" if additional_price > 0 else "（基本料金に含まれる）"
+                status_message += f"• {content_type}{price_text}（{created_date}追加）\n"
             
-            status_message += f"\n合計料金：{total_price:,}円/月"
+            # 合計料金計算
+            total_monthly_price = (monthly_base_price if monthly_subscription else 0) + total_additional_price
+            status_message += f"\n💰 合計料金: {total_monthly_price:,}円/月"
+            status_message += f"\n  └ 基本料金: {monthly_base_price if monthly_subscription else 0:,}円"
+            status_message += f"\n  └ 追加料金: {total_additional_price:,}円"
         else:
-            status_message += "📋 利用コンテンツ: まだ利用していません\n"
+            status_message += "📋 利用コンテンツ: まだ追加していません\n"
+            if monthly_subscription:
+                status_message += f"\n💰 合計料金: {monthly_base_price:,}円/月（基本料金のみ）"
         
-        status_message += "\n💡 何かお手伝いできることはありますか？\n"
+        status_message += "\n\n💡 何かお手伝いできることはありますか？\n"
         status_message += "📱 「メニュー」と入力すると、メインメニューに戻れます。\n"
         status_message += "❓ 使い方がわからない場合は「ヘルプ」と入力してください。"
         
@@ -1526,94 +1557,111 @@ def handle_cancel_selection_company(reply_token, company_id, stripe_subscription
             conn.close()
 
 def handle_subscription_cancel_company(reply_token, company_id, stripe_subscription_id):
-    """企業ユーザー専用：サブスクリプション全体の解約処理"""
+    """企業ユーザー専用：月額基本サブスクリプション解約処理（月額基本料金システム対応）"""
     try:
-        # サブスクリプション状態をチェック
-        subscription_status = check_subscription_status(stripe_subscription_id)
-        is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
+        print(f'[DEBUG] 月額基本サブスクリプション解約処理開始: company_id={company_id}, stripe_subscription_id={stripe_subscription_id}')
         
-        if is_trial_period:
-            # トライアル期間中の場合は、期間終了時に解約
-            try:
+        # データベースタイプを取得
+        db_type = get_db_type()
+        placeholder = '%s' if db_type == 'postgresql' else '?'
+        
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 月額基本サブスクリプションの確認
+        c.execute(f'''
+            SELECT subscription_status, monthly_base_price
+            FROM company_monthly_subscriptions 
+            WHERE company_id = {placeholder}
+        ''', (company_id,))
+        
+        monthly_subscription = c.fetchone()
+        if not monthly_subscription:
+            send_line_message(reply_token, [{"type": "text", "text": "❌ 月額基本サブスクリプションが見つかりません。"}])
+            conn.close()
+            return
+        
+        subscription_status, monthly_base_price = monthly_subscription
+        
+        if subscription_status != 'active':
+            send_line_message(reply_token, [{"type": "text", "text": "❌ 月額基本サブスクリプションが既に非アクティブです。"}])
+            conn.close()
+            return
+        
+        # Stripeサブスクリプションの解約処理
+        try:
+            if stripe_subscription_id:
+                # Stripeサブスクリプションを期間終了時に解約
                 stripe.Subscription.modify(
                     stripe_subscription_id,
                     cancel_at_period_end=True
                 )
-                cancel_message = {
-                    "type": "template",
-                    "altText": "サブスクリプション解約予定",
-                    "template": {
-                        "type": "buttons",
-                        "title": "サブスクリプション解約予定",
-                        "text": "サブスクリプションが期間終了時に解約予定になりました。\n\nトライアル期間終了までご利用いただけます。",
-                        "actions": [
-                            {
-                                "type": "message",
-                                "label": "メニューに戻る",
-                                "text": "メニュー"
-                            }
-                        ]
+                print(f'[DEBUG] Stripeサブスクリプション解約設定完了: {stripe_subscription_id}')
+            else:
+                print(f'[DEBUG] StripeサブスクリプションIDが存在しません')
+        except Exception as e:
+            print(f'[DEBUG] Stripe解約エラー: {e}')
+            # Stripeエラーが発生しても、データベースは更新する
+        
+        # データベースの更新
+        try:
+            # 月額基本サブスクリプションを非アクティブ化
+            c.execute(f'''
+                UPDATE company_monthly_subscriptions 
+                SET subscription_status = 'canceled', updated_at = CURRENT_TIMESTAMP
+                WHERE company_id = {placeholder}
+            ''', (company_id,))
+            
+            # 全コンテンツ追加を非アクティブ化（月額解約により全コンテンツが無効になる）
+            c.execute(f'''
+                UPDATE company_content_additions 
+                SET status = 'inactive'
+                WHERE company_id = {placeholder}
+            ''', (company_id,))
+            
+            # LINEアカウントも非アクティブ化
+            c.execute(f'''
+                UPDATE company_line_accounts 
+                SET status = 'inactive'
+                WHERE company_id = {placeholder}
+            ''', (company_id,))
+            
+            conn.commit()
+            print(f'[DEBUG] データベース更新完了: company_id={company_id}')
+            
+        except Exception as e:
+            print(f'[DEBUG] データベース更新エラー: {e}')
+            conn.rollback()
+            raise e
+        
+        conn.close()
+        
+        # 解約完了メッセージを送信
+        cancel_message = {
+            "type": "template",
+            "altText": "月額基本サブスクリプション解約完了",
+            "template": {
+                "type": "buttons",
+                "title": "月額基本サブスクリプション解約完了",
+                "text": f"月額基本サブスクリプション（{monthly_base_price:,}円/月）を解約しました。\n\n📋 解約内容:\n• 月額基本料金の解約\n• 全コンテンツの利用停止\n\nご利用ありがとうございました。",
+                "actions": [
+                    {
+                        "type": "message",
+                        "label": "メニューに戻る",
+                        "text": "メニュー"
                     }
-                }
-                send_line_message(reply_token, [cancel_message])
-            except Exception as e:
-                print(f'[DEBUG] Stripe解約エラー: {e}')
-                error_message = {
-                    "type": "text",
-                    "text": "❌ 解約処理中にエラーが発生しました。しばらく時間をおいて再度お試しください。"
-                }
-                send_line_message(reply_token, [error_message])
-        else:
-            # 通常期間の場合は、即座に解約
-            try:
-                stripe.Subscription.delete(stripe_subscription_id)
-                
-                # データベースも更新
-                conn = get_db_connection()
-                c = conn.cursor()
-                c.execute('''
-                    UPDATE company_subscriptions 
-                    SET subscription_status = 'canceled'
-                    WHERE company_id = %s
-                ''', (company_id,))
-                c.execute('''
-                    UPDATE company_line_accounts 
-                    SET status = 'inactive'
-                    WHERE company_id = %s
-                ''', (company_id,))
-                conn.commit()
-                conn.close()
-                
-                cancel_message = {
-                    "type": "template",
-                    "altText": "サブスクリプション解約完了",
-                    "template": {
-                        "type": "buttons",
-                        "title": "サブスクリプション解約完了",
-                        "text": "サブスクリプションを解約しました。\n\nご利用ありがとうございました。",
-                        "actions": [
-                            {
-                                "type": "message",
-                                "label": "メニューに戻る",
-                                "text": "メニュー"
-                            }
-                        ]
-                    }
-                }
-                send_line_message(reply_token, [cancel_message])
-            except Exception as e:
-                print(f'[DEBUG] Stripe解約エラー: {e}')
-                error_message = {
-                    "type": "text",
-                    "text": "❌ 解約処理中にエラーが発生しました。しばらく時間をおいて再度お試しください。"
-                }
-                send_line_message(reply_token, [error_message])
-    
+                ]
+            }
+        }
+        
+        send_line_message(reply_token, [cancel_message])
+        print(f'[DEBUG] 月額基本サブスクリプション解約処理完了')
+        
     except Exception as e:
-        print(f'[ERROR] 企業サブスクリプション解約処理エラー: {e}')
+        print(f'[ERROR] 月額基本サブスクリプション解約処理エラー: {e}')
         import traceback
         traceback.print_exc()
-        send_line_message(reply_token, [{"type": "text", "text": "❌ エラーが発生しました。しばらく時間をおいて再度お試しください。"}])
+        send_line_message(reply_token, [{"type": "text", "text": "❌ 解約処理に失敗しました。しばらく時間をおいて再度お試しください。"}])
 
 def get_welcome_message():
     return "ようこそ！LINE連携が完了しました。"
@@ -1622,7 +1670,7 @@ def get_not_registered_message():
     return "ご登録情報が見つかりません。LPからご登録ください。"
 
 def handle_content_confirmation_company(company_id, content_type):
-    """企業ユーザー専用：コンテンツ追加確認処理"""
+    """企業ユーザー専用：コンテンツ追加確認処理（月額基本料金システム対応）"""
     try:
         print(f'[DEBUG] 企業コンテンツ確認処理開始: company_id={company_id}, content_type={content_type}')
         
@@ -1633,32 +1681,55 @@ def handle_content_confirmation_company(company_id, content_type):
         conn = get_db_connection()
         c = conn.cursor()
         
-        # 既存のコンテンツをチェック
+        # 月額基本サブスクリプションの確認
         c.execute(f'''
-            SELECT id, content_type, subscription_status 
-            FROM company_subscriptions 
+            SELECT subscription_status 
+            FROM company_monthly_subscriptions 
+            WHERE company_id = {placeholder}
+        ''', (company_id,))
+        
+        monthly_subscription = c.fetchone()
+        if not monthly_subscription:
+            return {
+                'success': False, 
+                'error': '❌ 月額基本サブスクリプションが見つかりません。\n\n💳 まず月額基本料金の決済を完了してください。'
+            }
+        
+        subscription_status = monthly_subscription[0]
+        if subscription_status != 'active':
+            return {
+                'success': False, 
+                'error': '❌ 月額基本サブスクリプションが非アクティブです。\n\n💳 月額基本料金の決済を完了してからコンテンツを追加してください。'
+            }
+        
+        print(f'[DEBUG] 月額基本サブスクリプション確認: status={subscription_status}')
+        
+        # 既存のコンテンツ追加をチェック
+        c.execute(f'''
+            SELECT id, content_type, status, additional_price
+            FROM company_content_additions 
             WHERE company_id = {placeholder} AND content_type = {placeholder}
         ''', (company_id, content_type))
         
         existing_content = c.fetchone()
         if existing_content:
-            subscription_id, existing_content_type, status = existing_content
-            print(f'[DEBUG] 既存コンテンツ発見: subscription_id={subscription_id}, content_type={existing_content_type}, status={status}')
+            addition_id, existing_content_type, status, additional_price = existing_content
+            print(f'[DEBUG] 既存コンテンツ追加発見: addition_id={addition_id}, content_type={existing_content_type}, status={status}, additional_price={additional_price}')
             
             if status == 'active':
                 return {
                     'success': False, 
                     'error': f'✅ {content_type}は既に追加済みです。\n\n📱 他のコンテンツを追加する場合は、再度「追加」を選択してください。\n\n💡 現在の利用状況を確認する場合は「状態」を選択してください。'
                 }
-            elif status == 'canceled':
-                # キャンセル済みの場合は再アクティブ化
+            elif status == 'inactive':
+                # 非アクティブの場合は再アクティブ化
                 c.execute(f'''
-                    UPDATE company_subscriptions 
-                    SET subscription_status = 'active', updated_at = CURRENT_TIMESTAMP
+                    UPDATE company_content_additions 
+                    SET status = 'active', created_at = CURRENT_TIMESTAMP
                     WHERE id = {placeholder}
-                ''', (subscription_id,))
+                ''', (addition_id,))
                 conn.commit()
-                print(f'[DEBUG] キャンセル済みコンテンツを再アクティブ化: subscription_id={subscription_id}')
+                print(f'[DEBUG] 非アクティブコンテンツを再アクティブ化: addition_id={addition_id}')
                 
                 return {
                     'success': True,
@@ -1667,183 +1738,73 @@ def handle_content_confirmation_company(company_id, content_type):
                     'description': f'{content_type}を再アクティブ化しました',
                     'url': 'https://lp-production-9e2c.up.railway.app',
                     'usage': 'LINEアカウントからご利用いただけます',
-                    'is_free': False
+                    'additional_price': additional_price
                 }
         
-        # コンテンツ情報を取得
+        # コンテンツ情報を定義
         content_info = {
             'AI予定秘書': {
-                'description': 'AIが予定管理をサポート',
-                'url': 'https://ai-schedule.example.com',
-                'usage': '予定を入力すると、AIが最適なスケジュールを提案します'
+                'description': '日程調整のストレスから解放される、スケジュール管理の相棒',
+                'usage': 'Googleカレンダーと連携し、LINEで予定の追加・確認・空き時間の提案まで。調整のやりとりに追われる時間を、もっとクリエイティブに使えるように。',
+                'url': 'https://lp-production-9e2c.up.railway.app/schedule',
+                'line_url': 'https://line.me/R/ti/p/@ai_schedule_secretary',
+                'additional_price': 0  # 基本料金に含まれる
             },
             'AI経理秘書': {
-                'description': 'AIが経理業務をサポート',
-                'url': 'https://ai-accounting.example.com',
-                'usage': '経理データを入力すると、AIが自動で仕訳を提案します'
+                'description': '打合せ後すぐ送れる、スマートな請求書作成アシスタント',
+                'usage': 'LINEで項目を送るだけで、見積書や請求書を即作成。営業から事務処理までを一気通貫でスムーズに。',
+                'url': 'https://lp-production-9e2c.up.railway.app/accounting',
+                'line_url': 'https://line.me/R/ti/p/@ai_accounting_secretary',
+                'additional_price': 1500
             },
             'AIタスクコンシェルジュ': {
-                'description': 'AIがタスク管理をサポート',
-                'url': 'https://ai-task.example.com',
-                'usage': 'タスクを入力すると、AIが優先順位を提案します'
+                'description': '今日やるべきことを、ベストなタイミングで',
+                'usage': '登録したタスクを空き時間に自動で配置し、理想的な1日をAIが提案。「やりたいのにできない」を、「自然にこなせる」毎日に。',
+                'url': 'https://lp-production-9e2c.up.railway.app/task',
+                'line_url': 'https://line.me/R/ti/p/@ai_task_concierge',
+                'additional_price': 1500
             }
         }
         
-        # 既存のコンテンツ数を取得
+        if content_type not in content_info:
+            return {
+                'success': False, 
+                'error': f'❌ 無効なコンテンツタイプ: {content_type}'
+            }
+        
+        content = content_info[content_type]
+        additional_price = content['additional_price']
+        
+        # 既存のアクティブコンテンツ数を取得
         c.execute(f'''
             SELECT COUNT(*) 
-            FROM company_subscriptions 
-            WHERE company_id = {placeholder} AND subscription_status = 'active'
+            FROM company_content_additions 
+            WHERE company_id = {placeholder} AND status = 'active'
         ''', (company_id,))
         
         existing_count = c.fetchone()[0]
-        print(f'[DEBUG] 既存コンテンツ数: {existing_count}')
+        print(f'[DEBUG] 既存アクティブコンテンツ数: {existing_count}')
         
-        # 料金計算
-        base_price = 3900  # 基本料金
-        additional_price_per_content = 1500  # 追加コンテンツ料金
-        
-        # 新しく追加するコンテンツの料金を計算
-        # 既に追加済みのコンテンツがある場合は、追加料金のみ
-        if existing_count == 0:
-            # 初回コンテンツ（無料）
-            total_price = 0
-            is_first_content = True
-        else:
-            # 追加コンテンツ（1,500円/個）
-            total_price = additional_price_per_content  # 新しく追加するコンテンツ1個分のみ
-            is_first_content = False
-        
-        # 企業のStripeサブスクリプションIDを取得
+        # 新しいコンテンツ追加を登録
         c.execute(f'''
-            SELECT stripe_subscription_id 
-            FROM company_subscriptions 
-            WHERE company_id = {placeholder} AND subscription_status = 'active' 
-            LIMIT 1
-        ''', (company_id,))
-        
-        stripe_result = c.fetchone()
-        if not stripe_result:
-            return {'success': False, 'error': 'Stripeサブスクリプションが見つかりません'}
-        
-        stripe_subscription_id = stripe_result[0]
-        print(f'[DEBUG] StripeサブスクリプションID: {stripe_subscription_id}')
-        
-        # サブスクリプション状態をチェック
-        subscription_status = check_subscription_status(stripe_subscription_id)
-        is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
-        
-        is_free = is_trial_period or is_first_content  # トライアル期間中または初回コンテンツは無料
-        
-        # Stripe UsageRecord作成（有料の場合のみ）
-        usage_record = None
-        if not is_free:
-            try:
-                # Stripeサブスクリプションを取得
-                subscription = stripe.Subscription.retrieve(stripe_subscription_id)
-                USAGE_PRICE_ID = os.getenv('STRIPE_USAGE_PRICE_ID')
-                print(f'[DEBUG] Stripeサブスクリプション取得: {stripe_subscription_id}, USAGE_PRICE_ID={USAGE_PRICE_ID}')
-                
-                # 従量課金アイテムを検索
-                usage_item = None
-                for item in subscription['items']['data']:
-                    print(f"アイテム確認: price_id={item['price']['id']}, usage_price_id={USAGE_PRICE_ID}")
-                    if item['price']['id'] == USAGE_PRICE_ID:
-                        usage_item = item
-                        print(f"従量課金アイテム発見: {item}")
-                        break
-                
-                if not usage_item:
-                    print(f"従量課金アイテムが見つかりません: usage_price_id={USAGE_PRICE_ID}")
-                    print(f"利用可能なアイテム: {[item['price']['id'] for item in subscription['items']['data']]}")
-                    
-                    # 従量課金アイテムを自動追加
-                    try:
-                        print(f"従量課金アイテムを自動追加中...")
-                        usage_item = stripe.SubscriptionItem.create(
-                            subscription=stripe_subscription_id,
-                            price=USAGE_PRICE_ID
-                        )
-                        print(f"従量課金アイテム追加成功: {usage_item.id}")
-                    except Exception as add_error:
-                        print(f"従量課金アイテム追加エラー: {add_error}")
-                        return {'success': False, 'error': f'従量課金アイテムの追加に失敗しました: {str(add_error)}'}
-                
-                subscription_item_id = usage_item['id']
-                print(f"従量課金アイテムID: {subscription_item_id}")
-                
-                # Usage Record作成
-                try:
-                    # 月額サブスクリプションの請求期間を取得
-                    subscription = stripe.Subscription.retrieve(stripe_subscription_id)
-                    current_period_start = subscription.current_period_start
-                    
-                    usage_record = stripe.UsageRecord.create(
-                        subscription_item=subscription_item_id,
-                        quantity=1,
-                        timestamp=current_period_start,  # 月額サブスクリプションの請求期間開始時に合わせる
-                        action='increment',
-                    )
-                    print(f"Usage Record作成成功: {usage_record.id}")
-                except Exception as usage_error:
-                    print(f"Usage Record作成エラー: {usage_error}")
-                    return {'success': False, 'error': f'使用量記録の作成に失敗しました: {str(usage_error)}'}
-            
-            except Exception as e:
-                print(f'[DEBUG] Stripe処理エラー: {e}')
-                return {'success': False, 'error': f'Stripe処理に失敗しました: {str(e)}'}
-        
-        # 新しいサブスクリプションを作成
-        if db_type == 'postgresql':
-            # PostgreSQL用の日付計算
-            c.execute(f'''
-                INSERT INTO company_subscriptions 
-                (company_id, content_type, subscription_status, base_price, additional_price, total_price, current_period_end) 
-                VALUES ({placeholder}, {placeholder}, 'active', {placeholder}, {placeholder}, {placeholder}, NOW() + INTERVAL '1 month')
-            ''', (company_id, content_type, base_price, additional_price_per_content, total_price))
-        else:
-            # SQLite用の日付計算
-            c.execute(f'''
-                INSERT INTO company_subscriptions 
-                (company_id, content_type, subscription_status, base_price, additional_price, total_price, current_period_end) 
-                VALUES ({placeholder}, {placeholder}, 'active', {placeholder}, {placeholder}, {placeholder}, DATE_ADD(NOW(), INTERVAL 1 MONTH))
-            ''', (company_id, content_type, base_price, additional_price_per_content, total_price))
+            INSERT INTO company_content_additions 
+            (company_id, content_type, additional_price, status)
+            VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder})
+        ''', (company_id, content_type, additional_price, 'active'))
         
         conn.commit()
+        print(f'[DEBUG] コンテンツ追加登録完了: company_id={company_id}, content_type={content_type}, additional_price={additional_price}')
+        
         conn.close()
-        
-        # コンテンツ情報を取得
-        content_info = {
-            'AI予定秘書': {
-                'description': 'AIが予定管理をサポート',
-                'url': 'https://ai-schedule.example.com',
-                'usage': '予定を入力すると、AIが最適なスケジュールを提案します'
-            },
-            'AI経理秘書': {
-                'description': 'AIが経理業務をサポート',
-                'url': 'https://ai-accounting.example.com',
-                'usage': '経理データを入力すると、AIが自動で仕訳を提案します'
-            },
-            'AIタスクコンシェルジュ': {
-                'description': 'AIがタスク管理をサポート',
-                'url': 'https://ai-task.example.com',
-                'usage': 'タスクを入力すると、AIが優先順位を提案します'
-            }
-        }
-        
-        # 選択されたコンテンツの情報を取得
-        selected_content = content_info.get(content_type, {})
         
         return {
             'success': True,
             'company_id': company_id,
             'content_type': content_type,
-            'total_price': total_price,
-            'description': selected_content.get('description', f'{content_type}の説明'),
-            'url': selected_content.get('url', 'https://lp-production-9e2c.up.railway.app'),
-            'usage': selected_content.get('usage', 'LINEアカウントからご利用いただけます'),
-            'is_free': is_free,
-            'usage_record_id': usage_record.id if usage_record else None
+            'description': content['description'],
+            'usage': content['usage'],
+            'url': content['url'],
+            'additional_price': additional_price
         }
         
     except Exception as e:
@@ -1851,11 +1812,6 @@ def handle_content_confirmation_company(company_id, content_type):
         import traceback
         traceback.print_exc()
         return {'success': False, 'error': str(e)}
-    finally:
-        if c:
-            c.close()
-        if conn:
-            conn.close()
 
 def get_help_message_company():
     """企業ユーザー専用：ヘルプメッセージ"""
@@ -1969,4 +1925,5 @@ def send_line_message_push(user_id, messages):
             
     except Exception as e:
         print(f'[DEBUG] LINE送信エラー: {e}')
+        return False
         return False

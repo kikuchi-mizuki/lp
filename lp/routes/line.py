@@ -693,7 +693,7 @@ def handle_text_message(event):
     handle_command(event, user_id, text, company_id, stripe_subscription_id)
 
 def get_company_info(user_id):
-    """企業情報を取得"""
+    """企業情報を取得（月額基本料金システム対応）"""
     print(f'[DEBUG] get_company_info開始: user_id={user_id}')
     conn = get_db_connection()
     c = conn.cursor()
@@ -709,11 +709,23 @@ def get_company_info(user_id):
     
     company_id = company[0]
     
-    # stripe_subscription_idを取得
-    c.execute('SELECT stripe_subscription_id FROM company_subscriptions WHERE company_id = %s AND subscription_status = %s LIMIT 1', (company_id, 'active'))
-    subscription = c.fetchone()
-    stripe_subscription_id = subscription[0] if subscription else None
-    print(f'[DEBUG] stripe_subscription_id取得結果: {stripe_subscription_id}')
+    # 月額基本サブスクリプションからstripe_subscription_idを取得
+    c.execute('SELECT stripe_subscription_id, subscription_status FROM company_monthly_subscriptions WHERE company_id = %s', (company_id,))
+    monthly_subscription = c.fetchone()
+    
+    if not monthly_subscription:
+        print(f'[DEBUG] 月額基本サブスクリプションが見つかりません: company_id={company_id}')
+        conn.close()
+        return None
+    
+    stripe_subscription_id, subscription_status = monthly_subscription
+    print(f'[DEBUG] 月額基本サブスクリプション: stripe_subscription_id={stripe_subscription_id}, status={subscription_status}')
+    
+    # 月額サブスクリプションがアクティブでない場合はNoneを返す
+    if subscription_status != 'active':
+        print(f'[DEBUG] 月額サブスクリプションが非アクティブ: status={subscription_status}')
+        conn.close()
+        return None
     
     conn.close()
     return (company_id, stripe_subscription_id)
