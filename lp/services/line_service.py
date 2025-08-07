@@ -1759,9 +1759,9 @@ def handle_content_confirmation_company(company_id, content_type):
         line_channel_id = f"company_{company_id}_{content_type}_{int(time.time())}"
         c.execute(f'''
             INSERT INTO company_line_accounts 
-            (company_id, content_type, line_channel_id, line_channel_access_token, line_channel_secret, status) 
-            VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, 'active')
-        ''', (company_id, content_type, line_channel_id, 'default_token', 'default_secret'))
+            (company_id, content_type, line_channel_id, line_channel_access_token, status) 
+            VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, 'active')
+        ''', (company_id, content_type, line_channel_id, 'default_token'))
         
         conn.commit()
         conn.close()
