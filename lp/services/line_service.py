@@ -1320,59 +1320,34 @@ def handle_cancel_request_company(reply_token, company_id, stripe_subscription_i
         conn = get_db_connection()
         c = conn.cursor()
         
-        # 企業のアクティブなコンテンツを取得
+        # アクティブなコンテンツを取得
         c.execute(f'''
-            SELECT content_type, created_at 
+            SELECT id, content_type, created_at 
             FROM company_subscriptions 
             WHERE company_id = {placeholder} AND subscription_status = 'active'
             ORDER BY created_at DESC
         ''', (company_id,))
         
         active_contents = c.fetchall()
-        conn.close()
-        
         print(f'[DEBUG] 企業解約対象コンテンツ取得: company_id={company_id}, count={len(active_contents)}')
-        for content in active_contents:
-            print(f'[DEBUG] コンテンツ: {content}')
         
         if not active_contents:
-            # 解約対象のコンテンツがない場合
-            no_content_message = {
-                "type": "template",
-                "altText": "解約対象なし",
-                "template": {
-                    "type": "buttons",
-                    "title": "解約対象なし",
-                    "text": "現在、解約可能なコンテンツはありません。\n\nコンテンツを追加してから解約してください。",
-                    "actions": [
-                        {
-                            "type": "message",
-                            "label": "コンテンツ追加",
-                            "text": "追加"
-                        },
-                        {
-                            "type": "message",
-                            "label": "戻る",
-                            "text": "メニュー"
-                        }
-                    ]
-                }
-            }
-            send_line_message(reply_token, [no_content_message])
+            send_line_message(reply_token, [{"type": "text", "text": "解約可能なコンテンツが見つかりませんでした。"}])
             return
         
-        # 解約対象コンテンツの選択メニューを作成
+        # コンテンツ選択メッセージを作成
         actions = []
-        for i, content in enumerate(active_contents, 1):
-            content_type, created_at = content
-            created_date = created_at.strftime('%Y年%m月%d日') if created_at else '不明'
+        for i, (subscription_id, content_type, created_at) in enumerate(active_contents, 1):
+            # ai_scheduleをAI予定秘書に変換
+            display_name = 'AI予定秘書' if content_type == 'ai_schedule' else content_type
+            print(f'[DEBUG] コンテンツ: ({content_type}, {created_at})')
+            
             actions.append({
                 "type": "message",
-                "label": f"{i}. {content_type}",
-                "text": f"{i}"
+                "label": f"{i}. {display_name}",
+                "text": str(i)
             })
         
-        # 戻るボタンを追加
         actions.append({
             "type": "message",
             "label": "戻る",
@@ -1391,6 +1366,7 @@ def handle_cancel_request_company(reply_token, company_id, stripe_subscription_i
         }
         
         send_line_message(reply_token, [message])
+        print(f'[DEBUG] コンテンツ解約コマンド処理完了')
         
     except Exception as e:
         print(f'[DEBUG] コンテンツ解約メニューエラー: {e}')
@@ -1483,7 +1459,7 @@ def handle_cancel_selection_company(reply_token, company_id, stripe_subscription
                     # サブスクリプションを停止
                     c.execute(f'''
                         UPDATE company_subscriptions 
-                        SET subscription_status = 'canceled', updated_at = CURRENT_TIMESTAMP
+                        SET subscription_status = 'canceled'
                         WHERE id = {placeholder}
                     ''', (subscription_id,))
                     print(f'[DEBUG] company_subscriptions更新成功: subscription_id={subscription_id}')
@@ -1491,7 +1467,7 @@ def handle_cancel_selection_company(reply_token, company_id, stripe_subscription
                     # LINEアカウントも停止
                     c.execute(f'''
                         UPDATE company_line_accounts 
-                        SET status = 'inactive', updated_at = CURRENT_TIMESTAMP
+                        SET status = 'inactive'
                         WHERE company_id = {placeholder} AND content_type = {placeholder}
                     ''', (company_id, content_type))
                     print(f'[DEBUG] company_line_accounts更新成功: company_id={company_id}, content_type={content_type}')
@@ -1590,12 +1566,12 @@ def handle_subscription_cancel_company(reply_token, company_id, stripe_subscript
                 c = conn.cursor()
                 c.execute('''
                     UPDATE company_subscriptions 
-                    SET subscription_status = 'canceled', updated_at = CURRENT_TIMESTAMP
+                    SET subscription_status = 'canceled'
                     WHERE company_id = %s
                 ''', (company_id,))
                 c.execute('''
                     UPDATE company_line_accounts 
-                    SET status = 'inactive', updated_at = CURRENT_TIMESTAMP
+                    SET status = 'inactive'
                     WHERE company_id = %s
                 ''', (company_id,))
                 conn.commit()
