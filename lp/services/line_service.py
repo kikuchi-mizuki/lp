@@ -1629,6 +1629,18 @@ def handle_content_confirmation_company(company_id, content_type):
         conn = get_db_connection()
         c = conn.cursor()
         
+        # 企業情報を取得
+        c.execute(f'SELECT stripe_subscription_id FROM companies WHERE id = {placeholder}', (company_id,))
+        company_result = c.fetchone()
+        if not company_result:
+            return {'success': False, 'error': '企業情報が見つかりません'}
+        
+        stripe_subscription_id = company_result[0]
+        
+        # サブスクリプション状態をチェック
+        subscription_status = check_subscription_status(stripe_subscription_id)
+        print(f'[DEBUG] サブスクリプション状態: {subscription_status}')
+        
         # 既存のサブスクリプション数を確認
         c.execute(f'SELECT COUNT(*) FROM company_subscriptions WHERE company_id = {placeholder} AND subscription_status = {placeholder}', (company_id, 'active'))
         existing_count = c.fetchone()[0]
@@ -1669,6 +1681,51 @@ def handle_content_confirmation_company(company_id, content_type):
             'usage': 'LINEアカウントからご利用いただけます'
         })
         
+        # サブスクリプション状態に基づく処理
+        is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
+        is_free = is_trial_period
+        
+        # 有料の場合のみStripe処理
+        usage_record = None
+        if not is_free:
+            print(f"コンテンツ追加処理開始: subscription_id={stripe_subscription_id}")
+            
+            # Stripeからsubscription_item_id取得
+            subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+            print(f"サブスクリプション詳細: {subscription}")
+            
+            # 環境変数からUSAGE_PRICE_IDを取得
+            USAGE_PRICE_ID = os.getenv('STRIPE_USAGE_PRICE_ID')
+            
+            usage_item = None
+            for item in subscription['items']['data']:
+                print(f"アイテム確認: price_id={item['price']['id']}, usage_price_id={USAGE_PRICE_ID}")
+                if item['price']['id'] == USAGE_PRICE_ID:
+                    usage_item = item
+                    print(f"従量課金アイテム発見: {item}")
+                    break
+            
+            if not usage_item:
+                print(f"従量課金アイテムが見つかりません: usage_price_id={USAGE_PRICE_ID}")
+                print(f"利用可能なアイテム: {[item['price']['id'] for item in subscription['items']['data']]}")
+                return {'success': False, 'error': '従量課金アイテムが見つかりません'}
+            
+            subscription_item_id = usage_item['id']
+            print(f"従量課金アイテムID: {subscription_item_id}")
+            
+            # Usage Record作成
+            try:
+                usage_record = stripe.UsageRecord.create(
+                    subscription_item=subscription_item_id,
+                    quantity=1,
+                    timestamp=int(time.time()),
+                    action='increment',
+                )
+                print(f"Usage Record作成成功: {usage_record.id}")
+            except Exception as usage_error:
+                print(f"Usage Record作成エラー: {usage_error}")
+                return {'success': False, 'error': f'使用量記録の作成に失敗しました: {str(usage_error)}'}
+        
         # 新しいサブスクリプションを作成
         if db_type == 'postgresql':
             # PostgreSQL用の日付計算
@@ -1704,7 +1761,9 @@ def handle_content_confirmation_company(company_id, content_type):
             'line_channel_id': line_channel_id,
             'description': content_info['description'],
             'url': content_info['url'],
-            'usage': content_info['usage']
+            'usage': content_info['usage'],
+            'is_free': is_free,
+            'usage_record_id': usage_record.id if usage_record else None
         }
         
     except Exception as e:
@@ -1716,7 +1775,7 @@ def handle_content_confirmation_company(company_id, content_type):
         if c:
             c.close()
         if conn:
-            conn.close() 
+            conn.close()
 
 def get_help_message_company():
     """企業ユーザー専用：ヘルプメッセージ"""
