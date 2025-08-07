@@ -1193,25 +1193,22 @@ def handle_add_content_company(reply_token, company_id, stripe_subscription_id):
         send_line_message(reply_token, [{"type": "text", "text": "コンテンツ追加処理でエラーが発生しました。"}])
 
 def handle_status_check_company(reply_token, company_id):
-    """企業ユーザー専用：利用状況確認（月額基本料金システム対応・請求期間表示）"""
+    """企業ユーザー専用：利用状況確認（company_line_accountsベース）"""
     try:
-        # データベースタイプを取得
-        db_type = get_db_type()
-        placeholder = '%s' if db_type == 'postgresql' else '?'
+        print(f'[DEBUG] 企業利用状況確認開始: company_id={company_id}')
         
         conn = get_db_connection()
         c = conn.cursor()
+        db_type = get_db_type()
+        placeholder = '%s' if db_type == 'postgresql' else '?'
         
-        # 企業情報を取得
+        # 企業名を取得
         c.execute(f'SELECT company_name FROM companies WHERE id = {placeholder}', (company_id,))
-        company = c.fetchone()
-        
-        if not company:
-            send_line_message(reply_token, [{"type": "text", "text": "企業情報が見つかりません。"}])
-            conn.close()
+        company_result = c.fetchone()
+        if not company_result:
+            send_line_message(reply_token, [{"type": "text", "text": "❌ 企業情報が見つかりません"}])
             return
-        
-        company_name = company[0]
+        company_name = company_result[0]
         
         # 月額基本サブスクリプション情報を取得
         c.execute(f'''
@@ -1222,15 +1219,15 @@ def handle_status_check_company(reply_token, company_id):
         
         monthly_subscription = c.fetchone()
         
-        # アクティブなコンテンツ追加を取得（請求期間も含む）
+        # 実際のLINEアカウント利用状況を取得
         c.execute(f'''
-            SELECT content_type, additional_price, created_at, billing_end_date
-            FROM company_content_additions 
-            WHERE company_id = {placeholder} AND status = 'active'
+            SELECT content_type, status, created_at
+            FROM company_line_accounts 
+            WHERE company_id = {placeholder}
             ORDER BY created_at DESC
         ''', (company_id,))
         
-        active_contents = c.fetchall()
+        line_accounts = c.fetchall()
         conn.close()
         
         # メッセージを構築
@@ -1251,45 +1248,54 @@ def handle_status_check_company(reply_token, company_id):
         else:
             status_message += "❌ 月額基本サブスクリプションが見つかりません\n\n"
         
-        # コンテンツ追加情報
-        if active_contents:
+        # 実際のLINEアカウント利用状況
+        if line_accounts:
             status_message += "📋 利用コンテンツ:\n"
-            total_additional_price = 0
+            active_count = 0
             
-            for content in active_contents:
-                content_type, additional_price, created_at, billing_end_date = content
-                total_additional_price += additional_price if additional_price else 0
+            for account in line_accounts:
+                content_type, status, created_at = account
+                status_text = "アクティブ" if status == "active" else "非アクティブ"
                 created_date = created_at.strftime('%Y年%m月%d日') if created_at else '不明'
+                
+                # 料金情報を取得（content_typeに基づいて）
+                additional_price = 0
+                if content_type == "AIタスクコンシェルジュ":
+                    additional_price = 1500
+                elif content_type == "AI経理秘書":
+                    additional_price = 1500
+                elif content_type == "AI予定秘書":
+                    additional_price = 0
+                
                 price_text = f"（+{additional_price:,}円/月）" if additional_price > 0 else "（基本料金に含まれる）"
+                status_message += f"• {content_type} - {status_text}{price_text}（{created_date}追加）\n"
                 
-                # 請求期間の表示
-                billing_text = ""
-                if billing_end_date:
-                    billing_date = billing_end_date.strftime('%Y年%m月%d日')
-                    billing_text = f"（請求期限: {billing_date}）"
-                
-                status_message += f"• {content_type}{price_text}{billing_text}（{created_date}追加）\n"
-            
-            # 合計料金計算
-            total_monthly_price = (monthly_base_price if monthly_subscription else 0) + total_additional_price
-            status_message += f"\n💰 合計料金: {total_monthly_price:,}円/月"
-            status_message += f"\n  └ 基本料金: {monthly_base_price if monthly_subscription else 0:,}円"
-            status_message += f"\n  └ 追加料金: {total_additional_price:,}円"
-            
-            # 請求期間の統一性を確認
-            if monthly_subscription and current_period_end:
-                all_same_billing = all(
-                    content[3] and content[3].date() == current_period_end.date() 
-                    for content in active_contents if content[3]
-                )
-                if all_same_billing:
-                    status_message += f"\n✅ すべてのコンテンツの請求期間が統一されています"
-                else:
-                    status_message += f"\n⚠️ 一部のコンテンツの請求期間が異なります"
+                if status == "active":
+                    active_count += 1
         else:
             status_message += "📋 利用コンテンツ: まだ追加していません\n"
-            if monthly_subscription:
-                status_message += f"\n💰 合計料金: {monthly_base_price:,}円/月（基本料金のみ）"
+        
+        # 合計料金計算
+        if monthly_subscription:
+            monthly_base_price = monthly_subscription[1]
+            total_additional_price = 0
+            
+            # アクティブなコンテンツの追加料金を計算
+            for account in line_accounts:
+                if account[1] == "active":  # statusがactive
+                    content_type = account[0]
+                    if content_type == "AIタスクコンシェルジュ":
+                        total_additional_price += 1500
+                    elif content_type == "AI経理秘書":
+                        total_additional_price += 1500
+                    # AI予定秘書は基本料金に含まれるので追加料金なし
+            
+            total_monthly_price = monthly_base_price + total_additional_price
+            status_message += f"\n💰 合計料金: {total_monthly_price:,}円/月"
+            status_message += f"\n  └ 基本料金: {monthly_base_price:,}円"
+            status_message += f"\n  └ 追加料金: {total_additional_price:,}円"
+        else:
+            status_message += f"\n💰 合計料金: 0円/月（サブスクリプションなし）"
         
         status_message += "\n\n💡 何かお手伝いできることはありますか？\n"
         status_message += "📱 「メニュー」と入力すると、メインメニューに戻れます。\n"
