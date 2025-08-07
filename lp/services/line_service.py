@@ -1278,6 +1278,7 @@ def handle_status_check_company(reply_token, company_id):
 def handle_cancel_menu_company(reply_token, company_id, stripe_subscription_id):
     """企業ユーザー専用：解約メニュー表示"""
     try:
+        print(f'[DEBUG] handle_cancel_menu_company開始: company_id={company_id}, stripe_subscription_id={stripe_subscription_id}')
         message = {
             "type": "template",
             "altText": "解約メニュー",
@@ -1305,7 +1306,9 @@ def handle_cancel_menu_company(reply_token, company_id, stripe_subscription_id):
             }
         }
         
+        print(f'[DEBUG] 解約メニューメッセージ送信開始: reply_token={reply_token[:20]}...')
         send_line_message(reply_token, [message])
+        print(f'[DEBUG] 解約メニューメッセージ送信完了')
         
     except Exception as e:
         print(f'[DEBUG] 解約メニューエラー: {e}')

@@ -738,10 +738,13 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
             print(f'[ERROR] 状態コマンド処理エラー: {e}')
     elif text == '解約':
         try:
+            print(f'[DEBUG] 解約コマンド受信: user_id={user_id}')
             handle_cancel_menu_company(event['replyToken'], company_id, stripe_subscription_id)
             print(f'[DEBUG] 解約コマンド処理完了')
         except Exception as e:
             print(f'[ERROR] 解約コマンド処理エラー: {e}')
+            import traceback
+            traceback.print_exc()
     elif text == 'サブスクリプション解約':
         try:
             handle_subscription_cancel_company(event['replyToken'], company_id, stripe_subscription_id)
