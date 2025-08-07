@@ -1144,6 +1144,7 @@ def smart_number_extraction(text):
 def handle_add_content_company(reply_token, company_id, stripe_subscription_id):
     """企業ユーザー専用：コンテンツ追加メニュー表示"""
     try:
+        print(f'[DEBUG] handle_add_content_company開始: company_id={company_id}, stripe_subscription_id={stripe_subscription_id}')
         # サブスクリプション状態をチェック
         subscription_status = check_subscription_status(stripe_subscription_id)
         is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
@@ -1202,7 +1203,9 @@ def handle_add_content_company(reply_token, company_id, stripe_subscription_id):
             }
         }
         
+        print(f'[DEBUG] メッセージ送信開始: reply_token={reply_token[:20]}...')
         send_line_message(reply_token, [message])
+        print(f'[DEBUG] メッセージ送信完了')
         
     except Exception as e:
         print(f'[DEBUG] 企業コンテンツ追加エラー: {e}')
