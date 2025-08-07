@@ -625,9 +625,15 @@ def handle_text_message(event):
                 print(f'[DEBUG] 企業データ発見: company_id={company_id}, company_name={company_name}')
                 
                 # 企業データにLINEユーザーIDを設定
+                print(f'[DEBUG] 紐付け更新開始: user_id={user_id}, company_id={company_id}')
                 c.execute('UPDATE companies SET line_user_id = %s WHERE id = %s', (user_id, company_id))
                 conn.commit()
-                print(f'[DEBUG] 企業データとLINEユーザーIDを紐付け: user_id={user_id}, company_id={company_id}')
+                print(f'[DEBUG] 企業データとLINEユーザーIDを紐付け完了: user_id={user_id}, company_id={company_id}')
+                
+                # 紐付け確認
+                c.execute('SELECT line_user_id FROM companies WHERE id = %s', (company_id,))
+                verify_result = c.fetchone()
+                print(f'[DEBUG] 紐付け確認: {verify_result}')
                 
                 # 企業向けの案内メッセージを送信
                 try:
@@ -658,9 +664,13 @@ def handle_text_message(event):
             return
     
     # 企業情報を取得
+    print(f'[DEBUG] 企業情報取得開始: user_id={user_id}')
     company_info = get_company_info(user_id)
+    print(f'[DEBUG] 企業情報取得結果: {company_info}')
+    
     if not company_info:
         # 企業が見つからない場合、メールアドレス連携を促す
+        print(f'[DEBUG] 企業情報が見つかりません: user_id={user_id}')
         send_line_message(event['replyToken'], [{"type": "text", "text": "決済済みの方は、登録時のメールアドレスを送信してください。\n\n例: example@example.com\n\n※メールアドレスを送信すると、自動的に企業データと紐付けされます。"}])
         return
     
@@ -678,12 +688,14 @@ def handle_text_message(event):
 
 def get_company_info(user_id):
     """企業情報を取得"""
+    print(f'[DEBUG] get_company_info開始: user_id={user_id}')
     conn = get_db_connection()
     c = conn.cursor()
     
     # companiesテーブルから企業情報を取得
     c.execute('SELECT id, company_name FROM companies WHERE line_user_id = %s', (user_id,))
     company = c.fetchone()
+    print(f'[DEBUG] 企業データ検索結果: {company}')
     
     if not company:
         conn.close()
