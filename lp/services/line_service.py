@@ -2076,8 +2076,8 @@ def handle_content_confirmation_company(company_id, content_type):
         conn.commit()
         print(f'[DEBUG] LINEアカウント登録完了: company_id={company_id}, content_type={content_type}')
         
-        # Stripeの請求項目を更新（追加料金が必要なコンテンツの場合）
-        if additional_price > 0 and stripe_subscription_id:
+        # Stripeの請求項目を更新（常に実行して追加料金アイテムを管理）
+        if stripe_subscription_id:
             try:
                 import stripe
                 stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
