@@ -1410,7 +1410,7 @@ def handle_cancel_request_company(reply_token, company_id, stripe_subscription_i
         send_line_message(reply_token, [{"type": "text", "text": "コンテンツ解約メニューでエラーが発生しました。"}])
 
 def handle_cancel_selection_company(reply_token, company_id, stripe_subscription_id, selection_text):
-    """企業ユーザー専用：解約選択処理（新しいシステム対応）"""
+    """企業ユーザー専用：解約選択処理（確認ステップ追加）"""
     try:
         print(f'[DEBUG] 企業解約選択処理開始: company_id={company_id}, selection_text={selection_text}')
         
@@ -1445,6 +1445,119 @@ def handle_cancel_selection_company(reply_token, company_id, stripe_subscription
             print(f'[DEBUG] 無効な入力: {invalid_reasons}')
         if duplicates:
             print(f'[DEBUG] 重複除去: {duplicates}')
+        
+        # 選択されたコンテンツを特定
+        selected_contents = []
+        for i, (account_id, content_type, created_at) in enumerate(active_accounts, 1):
+            if i in selected_indices:
+                # ai_scheduleをAI予定秘書に変換
+                display_name = 'AI予定秘書' if content_type == 'ai_schedule' else content_type
+                selected_contents.append({
+                    'account_id': account_id,
+                    'content_type': content_type,
+                    'display_name': display_name,
+                    'additional_price': 1500 if content_type in ["AIタスクコンシェルジュ", "AI経理秘書"] else 0
+                })
+        
+        if not selected_contents:
+            send_line_message(reply_token, [{"type": "text", "text": "解約対象のコンテンツが見つかりませんでした。"}])
+            return
+        
+        # 解約確認メッセージを作成
+        content_list = '\n'.join([f'• {content["display_name"]}' for content in selected_contents])
+        total_additional_price = sum(content['additional_price'] for content in selected_contents)
+        
+        if total_additional_price > 0:
+            price_info = f"\n💰 削除される追加料金: {total_additional_price:,}円/月"
+        else:
+            price_info = "\n💰 追加料金なし（基本料金に含まれる）"
+        
+        # 請求期間情報を取得
+        billing_period_info = ""
+        if stripe_subscription_id:
+            try:
+                from services.billing_period_sync_service import BillingPeriodSyncService
+                billing_sync_service = BillingPeriodSyncService()
+                period_info = billing_sync_service.get_subscription_billing_period(stripe_subscription_id)
+                
+                if period_info:
+                    from datetime import datetime
+                    period_end = period_info['period_end']
+                    billing_period_info = f"\n📅 次回請求日: {period_end.strftime('%Y年%m月%d日')}"
+                    
+            except Exception as e:
+                print(f'[DEBUG] 請求期間情報取得エラー: {e}')
+        
+        confirmation_text = f"以下のコンテンツを解約しますか？\n\n{content_list}{price_info}{billing_period_info}\n\n⚠️ 解約後は次回請求から追加料金が反映されます。"
+        
+        # 確認ボタンを作成
+        actions = [
+            {
+                "type": "message",
+                "label": "解約する",
+                "text": f"解約確認_{','.join(str(i) for i in selected_indices)}"
+            },
+            {
+                "type": "message",
+                "label": "キャンセル",
+                "text": "メニュー"
+            }
+        ]
+        
+        message = {
+            "type": "template",
+            "altText": "解約確認",
+            "template": {
+                "type": "buttons",
+                "title": "解約確認",
+                "text": confirmation_text,
+                "actions": actions
+            }
+        }
+        
+        send_line_message(reply_token, [message])
+        print(f'[DEBUG] 解約確認メッセージ送信完了')
+        
+    except Exception as e:
+        print(f'[ERROR] 企業解約選択処理エラー: {e}')
+        import traceback
+        traceback.print_exc()
+        send_line_message(reply_token, [{"type": "text", "text": "❌ 解約処理に失敗しました。しばらく時間をおいて再度お試しください。"}])
+    finally:
+        if conn:
+            conn.close()
+
+def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscription_id, confirmation_text):
+    """企業ユーザー専用：解約確認処理（実際の解約実行）"""
+    try:
+        print(f'[DEBUG] 企業解約確認処理開始: company_id={company_id}, confirmation_text={confirmation_text}')
+        
+        # 確認テキストから選択インデックスを抽出
+        if not confirmation_text.startswith('解約確認_'):
+            send_line_message(reply_token, [{"type": "text", "text": "❌ 無効な確認リクエストです。"}])
+            return
+        
+        selected_indices_str = confirmation_text.replace('解約確認_', '')
+        selected_indices = [int(idx) for idx in selected_indices_str.split(',')]
+        
+        print(f'[DEBUG] 解約対象インデックス: {selected_indices}')
+        
+        # データベースタイプを取得
+        db_type = get_db_type()
+        placeholder = '%s' if db_type == 'postgresql' else '?'
+        
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 企業のアクティブなLINEアカウントを取得
+        c.execute(f'''
+            SELECT id, content_type, created_at 
+            FROM company_line_accounts 
+            WHERE company_id = {placeholder} AND status = 'active'
+            ORDER BY created_at DESC
+        ''', (company_id,))
+        
+        active_accounts = c.fetchall()
         
         cancelled = []
         
@@ -1525,7 +1638,9 @@ def handle_cancel_selection_company(reply_token, company_id, stripe_subscription
                     conn.commit()
                     print(f'[DEBUG] データベーストランザクションコミット成功')
                     
-                    cancelled.append(content_type)
+                    # ai_scheduleをAI予定秘書に変換
+                    display_name = 'AI予定秘書' if content_type == 'ai_schedule' else content_type
+                    cancelled.append(display_name)
                     print(f'[DEBUG] 企業コンテンツ解約処理完了: content_type={content_type}, account_id={account_id}')
                     
                 except Exception as e:
@@ -1582,14 +1697,14 @@ def handle_cancel_selection_company(reply_token, company_id, stripe_subscription
             
             # 解約完了メッセージを送信
             cancelled_text = '\n'.join([f'• {content}' for content in cancelled])
-            success_message = f'以下のコンテンツの解約を受け付けました：\n\n{cancelled_text}\n\n次回請求から追加料金が反映されます。{billing_period_info}'
+            success_message = f'✅ 以下のコンテンツの解約が完了しました：\n\n{cancelled_text}\n\n次回請求から追加料金が反映されます。{billing_period_info}'
             send_line_message(reply_token, [{"type": "text", "text": success_message}])
         else:
             # 解約対象がない場合
             send_line_message(reply_token, [{"type": "text", "text": "解約対象のコンテンツが見つかりませんでした。"}])
     
     except Exception as e:
-        print(f'[ERROR] 企業解約選択処理エラー: {e}')
+        print(f'[ERROR] 企業解約確認処理エラー: {e}')
         import traceback
         traceback.print_exc()
         send_line_message(reply_token, [{"type": "text", "text": "❌ 解約処理に失敗しました。しばらく時間をおいて再度お試しください。"}])

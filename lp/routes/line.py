@@ -903,21 +903,36 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
         if text in ['1', '2', '3']:
             print(f'[DEBUG] 解約対象コンテンツ選択: text={text}')
             
-            # 選択されたコンテンツを解約
+            # 選択されたコンテンツの確認画面を表示
             try:
                 # 選択されたコンテンツのインデックスを取得
                 selected_index = int(text)
                 print(f'[DEBUG] 解約対象インデックス: {selected_index}')
                 
-                # 解約処理を実行
+                # 解約確認画面を表示
                 print(f'[DEBUG] handle_cancel_selection_company呼び出し開始')
-                result = handle_cancel_selection_company(event['replyToken'], company_id, stripe_subscription_id, f"{selected_index}")
-                print(f'[DEBUG] handle_cancel_selection_company呼び出し完了: result={result}')
+                handle_cancel_selection_company(event['replyToken'], company_id, stripe_subscription_id, f"{selected_index}")
+                print(f'[DEBUG] handle_cancel_selection_company呼び出し完了')
                 
-                if result:
-                    print(f'[DEBUG] 解約処理完了: {result}')
-                else:
-                    print(f'[DEBUG] 解約処理失敗')
+                # 状態を確認待ちに変更
+                set_user_state(user_id, 'cancel_confirm')
+                print(f'[DEBUG] ユーザー状態を確認待ちに変更: user_id={user_id}')
+                return
+                
+            except Exception as e:
+                print(f'[ERROR] 解約確認処理エラー: {e}')
+                import traceback
+                traceback.print_exc()
+                send_line_message(event['replyToken'], [{"type": "text", "text": "解約確認処理中にエラーが発生しました。もう一度お試しください。"}])
+                return
+        # 解約確認処理
+        elif text.startswith('解約確認_'):
+            print(f'[DEBUG] 解約確認処理開始: text={text}')
+            
+            try:
+                # 解約確認処理を実行
+                from services.line_service import handle_cancel_confirmation_company
+                handle_cancel_confirmation_company(event['replyToken'], company_id, stripe_subscription_id, text)
                 
                 # 状態をリセット
                 set_user_state(user_id, 'welcome_sent')
@@ -925,7 +940,7 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
                 return
                 
             except Exception as e:
-                print(f'[ERROR] 解約処理エラー: {e}')
+                print(f'[ERROR] 解約確認処理エラー: {e}')
                 import traceback
                 traceback.print_exc()
                 send_line_message(event['replyToken'], [{"type": "text", "text": "解約処理中にエラーが発生しました。もう一度お試しください。"}])
