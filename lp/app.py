@@ -98,16 +98,9 @@ except Exception as e:
 
 # 基本的なルート
 @app.route('/')
-def health_check_root():
-    """Railwayヘルスチェック用のルートパス - 最もシンプルな応答"""
-    try:
-        # データベース接続の簡単な確認
-        conn = get_db_connection()
-        conn.close()
-        return "OK", 200, {'Content-Type': 'text/plain'}
-    except Exception as e:
-        # データベースエラーでもアプリケーションは起動していることを示す
-        return "OK", 200, {'Content-Type': 'text/plain'}
+def root_redirect_to_main():
+    """LPをルートで表示（/mainに統一）"""
+    return redirect('/main')
 
 @app.route('/main')
 def index():

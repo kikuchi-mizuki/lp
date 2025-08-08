@@ -10,8 +10,7 @@ import os
 app = Flask(__name__)
 
 @app.route('/')
-def health_check():
-    """ヘルスチェック"""
+def root_to_main():
     return "OK", 200
 
 @app.route('/ping')
