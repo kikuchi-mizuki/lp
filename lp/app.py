@@ -11,6 +11,7 @@ from flask import Flask, render_template, request, redirect, url_for, jsonify
 import stripe
 from dotenv import load_dotenv
 from utils.db import get_db_connection
+from services.spreadsheet_content_service import spreadsheet_content_service
 
 load_dotenv()
 
@@ -308,6 +309,13 @@ def debug_railway():
     """Railway環境デバッグ"""
     from app_debug import debug_railway
     result = debug_railway()
+    return jsonify(result)
+
+# スプレッドシート連携のデバッグ
+@app.route('/debug/spreadsheet')
+def debug_spreadsheet():
+    """スプレッドシートからの取得状況を確認（環境変数未設定時はフォールバックを返す）"""
+    result = spreadsheet_content_service.get_available_contents(force_refresh=True)
     return jsonify(result)
 
 @app.route('/debug/company/pricing/<int:company_id>')
