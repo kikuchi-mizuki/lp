@@ -210,7 +210,7 @@ def is_paid_user_company_centric(line_user_id):
         
         # 新しい請求システム：月額基本サブスクリプションの決済状況をチェック
         c.execute('''
-            SELECT subscription_status, current_period_end, monthly_base_price
+            SELECT subscription_status, current_period_end, monthly_base_price, stripe_subscription_id
             FROM company_monthly_subscriptions 
             WHERE company_id = %s
         ''', (company_id,))
@@ -248,6 +248,34 @@ def is_paid_user_company_centric(line_user_id):
                 'is_paid': True,
                 'subscription_status': 'trialing',
                 'message': f'トライアル期間中です。残り{trial_days_remaining}日間ご利用いただけます。',
+                'redirect_url': None,
+                'trial_days_remaining': trial_days_remaining
+            }
+        # company_monthly_subscriptions が trialing の場合も有効扱い
+        elif payment_result and payment_result[0] == 'trialing':
+            print(f"[DEBUG] company_monthly_subscriptions が 'trialing' を示しています: company_id={company_id}")
+            trial_days_remaining = 0
+            try:
+                # companies.trial_end が無い場合はStripeから取得（可能なら）
+                stripe_subscription_id = payment_result[3]
+                if stripe_subscription_id:
+                    import stripe, os
+                    stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+                    sub = stripe.Subscription.retrieve(stripe_subscription_id)
+                    from datetime import datetime, timezone, timedelta
+                    jst = timezone(timedelta(hours=9))
+                    if getattr(sub, 'trial_end', None):
+                        trial_end_utc = datetime.fromtimestamp(sub.trial_end, tz=timezone.utc)
+                        trial_end_jst = trial_end_utc.astimezone(jst)
+                        now = datetime.now(jst)
+                        if now < trial_end_jst:
+                            trial_days_remaining = max(0, (trial_end_jst - now).days)
+            except Exception as e:
+                print(f"[WARN] Stripeからtrial_end取得に失敗: {e}")
+            return {
+                'is_paid': True,
+                'subscription_status': 'trialing',
+                'message': 'トライアル期間中です。',
                 'redirect_url': None,
                 'trial_days_remaining': trial_days_remaining
             }
