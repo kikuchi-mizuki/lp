@@ -925,8 +925,26 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
                 traceback.print_exc()
                 send_line_message(event['replyToken'], [{"type": "text", "text": "解約確認処理中にエラーが発生しました。もう一度お試しください。"}])
                 return
+                
+        # 「メニュー」コマンドの場合は状態をリセットしてメニューを表示
+        elif text == 'メニュー':
+            print(f'[DEBUG] メニューコマンド処理: user_id={user_id}')
+            set_user_state(user_id, 'welcome_sent')
+            from utils.message_templates import get_menu_message_company
+            send_line_message(event['replyToken'], [get_menu_message_company()])
+            return
+        else:
+            print(f'[DEBUG] 無効な入力: user_id={user_id}, text={text}')
+            # 無効な入力の場合、メインメニューを表示
+            set_user_state(user_id, 'welcome_sent')
+            from utils.message_templates import get_menu_message_company
+            send_line_message(event['replyToken'], [get_menu_message_company()])
+            return
+    elif state == 'cancel_confirm':
+        print(f'[DEBUG] 解約確認状態での処理: user_id={user_id}, state={state}, text={text}')
+        
         # 解約確認処理
-        elif text.startswith('解約確認_'):
+        if text.startswith('解約確認_'):
             print(f'[DEBUG] 解約確認処理開始: text={text}')
             
             try:
@@ -954,7 +972,7 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
             send_line_message(event['replyToken'], [get_menu_message_company()])
             return
         else:
-            print(f'[DEBUG] 無効な入力: user_id={user_id}, text={text}')
+            print(f'[DEBUG] 無効な入力（解約確認状態）: user_id={user_id}, text={text}')
             # 無効な入力の場合、メインメニューを表示
             set_user_state(user_id, 'welcome_sent')
             from utils.message_templates import get_menu_message_company
