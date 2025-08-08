@@ -1495,6 +1495,22 @@ def handle_cancel_selection_company(reply_token, company_id, stripe_subscription
                         print(f'[DEBUG] Stripe請求項目更新エラー: {e}')
                         # Stripeエラーが発生しても処理を続行
                 
+                # 請求期間同期サービスを呼び出して使用量レコードを月額サブスクリプション期間に合わせる
+                if stripe_subscription_id:
+                    try:
+                        from services.billing_period_sync_service import BillingPeriodSyncService
+                        billing_sync_service = BillingPeriodSyncService()
+                        sync_success = billing_sync_service.sync_usage_records_to_subscription_period(stripe_subscription_id)
+                        
+                        if sync_success:
+                            print(f'[DEBUG] 解約時の請求期間同期完了: subscription_id={stripe_subscription_id}')
+                        else:
+                            print(f'[WARN] 解約時の請求期間同期に失敗: subscription_id={stripe_subscription_id}')
+                            
+                    except Exception as e:
+                        print(f'[DEBUG] 解約時の請求期間同期エラー: {e}')
+                        # 同期エラーが発生しても処理を続行
+                
                 # データベース更新処理
                 try:
                     # LINEアカウントを非アクティブ化
@@ -1530,10 +1546,43 @@ def handle_cancel_selection_company(reply_token, company_id, stripe_subscription
         print(f'[DEBUG] 解約対象コンテンツ数: {len(cancelled)}')
         print(f'[DEBUG] 解約対象: {cancelled}')
         
+        # 解約処理完了後、全体の請求期間同期を実行
+        if cancelled and stripe_subscription_id:
+            try:
+                from services.billing_period_sync_service import BillingPeriodSyncService
+                billing_sync_service = BillingPeriodSyncService()
+                sync_success = billing_sync_service.sync_usage_records_to_subscription_period(stripe_subscription_id)
+                
+                if sync_success:
+                    print(f'[DEBUG] 解約処理後の請求期間同期完了: subscription_id={stripe_subscription_id}')
+                else:
+                    print(f'[WARN] 解約処理後の請求期間同期に失敗: subscription_id={stripe_subscription_id}')
+                    
+            except Exception as e:
+                print(f'[DEBUG] 解約処理後の請求期間同期エラー: {e}')
+                # 同期エラーが発生しても処理を続行
+        
         if cancelled:
+            # 請求期間情報を取得
+            billing_period_info = ""
+            if stripe_subscription_id:
+                try:
+                    from services.billing_period_sync_service import BillingPeriodSyncService
+                    billing_sync_service = BillingPeriodSyncService()
+                    period_info = billing_sync_service.get_subscription_billing_period(stripe_subscription_id)
+                    
+                    if period_info:
+                        from datetime import datetime
+                        period_end = period_info['period_end']
+                        billing_period_info = f"\n📅 次回請求日: {period_end.strftime('%Y年%m月%d日')}"
+                        
+                except Exception as e:
+                    print(f'[DEBUG] 請求期間情報取得エラー: {e}')
+                    # エラーが発生しても処理を続行
+            
             # 解約完了メッセージを送信
             cancelled_text = '\n'.join([f'• {content}' for content in cancelled])
-            success_message = f'以下のコンテンツの解約を受け付けました：\n\n{cancelled_text}\n\n次回請求から追加料金が反映されます。'
+            success_message = f'以下のコンテンツの解約を受け付けました：\n\n{cancelled_text}\n\n次回請求から追加料金が反映されます。{billing_period_info}'
             send_line_message(reply_token, [{"type": "text", "text": success_message}])
         else:
             # 解約対象がない場合
