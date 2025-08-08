@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies for PostgreSQL and Pillow
+# Install system dependencies in a single layer to reduce image size
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     gcc \
@@ -10,14 +10,17 @@ RUN apt-get update && \
     libjpeg-dev \
     libpng-dev \
     libfreetype6-dev \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /tmp/* /var/tmp/*
 
 # Copy requirements first for better caching
 COPY requirements.txt .
 
-# Install Python dependencies
+# Install Python dependencies with optimizations
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir --compile -r requirements.txt && \
+    pip cache purge
 
 # Copy the entire application
 COPY . .
