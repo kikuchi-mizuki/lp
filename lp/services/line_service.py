@@ -1368,6 +1368,7 @@ def handle_cancel_request_company(reply_token, company_id, stripe_subscription_i
         
         if not active_contents:
             send_line_message(reply_token, [{"type": "text", "text": "解約可能なコンテンツが見つかりませんでした。"}])
+            conn.close()
             return
         
         # コンテンツ選択メッセージを作成
@@ -1408,6 +1409,9 @@ def handle_cancel_request_company(reply_token, company_id, stripe_subscription_i
         import traceback
         traceback.print_exc()
         send_line_message(reply_token, [{"type": "text", "text": "コンテンツ解約メニューでエラーが発生しました。"}])
+    finally:
+        if conn:
+            conn.close()
 
 def handle_cancel_selection_company(reply_token, company_id, stripe_subscription_id, selection_text):
     """企業ユーザー専用：解約選択処理（確認ステップ追加）"""
