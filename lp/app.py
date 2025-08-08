@@ -1019,7 +1019,7 @@ def health_check():
             'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         }), 500
 
-@app.route('/')
+@app.route('/health-simple')
 def simple_health_check():
     """Railwayヘルスチェック用のシンプルなエンドポイント"""
     return "OK", 200
