@@ -911,6 +911,7 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
                 
                 # 解約確認画面を表示
                 print(f'[DEBUG] handle_cancel_selection_company呼び出し開始')
+                print(f'[DEBUG] パラメータ: reply_token={event["replyToken"][:20]}..., company_id={company_id}, stripe_subscription_id={stripe_subscription_id}, selection_text="{selected_index}"')
                 handle_cancel_selection_company(event['replyToken'], company_id, stripe_subscription_id, f"{selected_index}")
                 print(f'[DEBUG] handle_cancel_selection_company呼び出し完了')
                 

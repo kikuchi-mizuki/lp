@@ -1415,17 +1415,25 @@ def handle_cancel_request_company(reply_token, company_id, stripe_subscription_i
 
 def handle_cancel_selection_company(reply_token, company_id, stripe_subscription_id, selection_text):
     """企業ユーザー専用：解約選択処理（確認ステップ追加）"""
+    conn = None
     try:
+        print(f'[DEBUG] === handle_cancel_selection_company 開始 ===')
         print(f'[DEBUG] 企業解約選択処理開始: company_id={company_id}, selection_text={selection_text}')
+        print(f'[DEBUG] reply_token={reply_token[:20] if reply_token else "None"}..., stripe_subscription_id={stripe_subscription_id}')
         
         # データベースタイプを取得
+        print(f'[DEBUG] データベースタイプ取得開始')
         db_type = get_db_type()
         placeholder = '%s' if db_type == 'postgresql' else '?'
+        print(f'[DEBUG] データベースタイプ: {db_type}, placeholder: {placeholder}')
         
+        print(f'[DEBUG] データベース接続開始')
         conn = get_db_connection()
         c = conn.cursor()
+        print(f'[DEBUG] データベース接続成功')
         
         # 企業のアクティブなLINEアカウントを取得
+        print(f'[DEBUG] SQLクエリ実行開始: company_id={company_id}')
         c.execute(f'''
             SELECT id, content_type, created_at 
             FROM company_line_accounts 
@@ -1433,6 +1441,7 @@ def handle_cancel_selection_company(reply_token, company_id, stripe_subscription
             ORDER BY created_at DESC
         ''', (company_id,))
         
+        print(f'[DEBUG] SQLクエリ実行完了、結果取得開始')
         active_accounts = c.fetchall()
         print(f'[DEBUG] アクティブアカウント取得結果: {active_accounts}')
         
