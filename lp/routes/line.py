@@ -667,18 +667,22 @@ def handle_text_message(event):
                 verify_result = c.fetchone()
                 print(f'[DEBUG] 紐付け確認: {verify_result}')
                 
-                # 企業向けの案内メッセージを送信
+                # 企業向けの案内メッセージを送信（push失敗時はreplyでフォールバック）
                 try:
                     from services.line_service import send_company_welcome_message
                     print(f'[DEBUG] 企業向け案内メッセージ送信開始: user_id={user_id}, company_name={company_name}')
-                    send_company_welcome_message(user_id, company_name, email)
-                    print(f'[DEBUG] 企業向け案内メッセージ送信完了: user_id={user_id}')
+                    pushed = send_company_welcome_message(user_id, company_name, email)
+                    if pushed:
+                        print(f'[DEBUG] 企業向け案内メッセージ送信完了(push): user_id={user_id}')
+                    else:
+                        print(f'[WARN] push送信に失敗。replyでフォールバック: user_id={user_id}')
+                        send_line_message(event['replyToken'], [{"type": "text", "text": f"✅ 企業データとの紐付けが完了しました！\n\n企業名: {company_name}\nメールアドレス: {email}\n\n『メニュー』と入力して始めてください。"}])
                 except Exception as e:
                     print(f'[DEBUG] 企業向け案内メッセージ送信エラー: {e}')
                     import traceback
                     traceback.print_exc()
-                    # エラーが発生しても成功メッセージを送信
-                    send_line_message(event['replyToken'], [{"type": "text", "text": f"✅ 企業データとの紐付けが完了しました！\n\n企業名: {company_name}\nメールアドレス: {email}\n\nこれでAIコレクションズをご利用いただけます。"}])
+                    # 例外時もreplyでフォールバック
+                    send_line_message(event['replyToken'], [{"type": "text", "text": f"✅ 企業データとの紐付けが完了しました！\n\n企業名: {company_name}\nメールアドレス: {email}\n\n『メニュー』と入力して始めてください。"}])
                     
             else:
                 print(f'[DEBUG] 企業データが見つかりません: email={normalized_email}')
