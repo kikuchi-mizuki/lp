@@ -34,5 +34,5 @@ EXPOSE 3000
 # 環境変数を設定
 ENV PYTHONPATH=/app
 
-# Flaskの最小アプリを起動
-CMD ["python", "app_simple.py"]
+# Flaskの最小アプリをGunicornで起動（WSGI経路の確認）
+CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-3000} --workers 1 --timeout 120 app_simple:app"]
