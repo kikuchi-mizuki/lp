@@ -68,17 +68,35 @@ class SpreadsheetContentService:
             
             contents = {}
             for row in data_rows:
-                if len(row) >= 6:  # 最低限必要な列数
-                    content_id = row[0].strip()
-                    if content_id and row[5].lower() == 'active':  # ステータスがactive
+                # 期待される列: [id, name, description, url, price, (optional) status, (optional) created_at, (optional) features]
+                if len(row) >= 5:
+                    content_id = (row[0] or '').strip()
+                    if not content_id:
+                        continue
+
+                    name = (row[1] or '').strip()
+                    description = (row[2] or '').strip()
+                    url = (row[3] or '').strip()
+                    price_raw = (row[4] or '').strip()
+                    try:
+                        price = int(price_raw)
+                    except Exception:
+                        price = 0
+
+                    status = (row[5] or 'active').strip().lower() if len(row) > 5 else 'active'
+                    created_at = row[6] if len(row) > 6 and row[6] else datetime.now().strftime('%Y-%m-%d')
+                    features = self._parse_features(row[7]) if len(row) > 7 else []
+
+                    # ステータスがinactiveのものは除外
+                    if status and status.lower() not in ['inactive', 'disabled', 'off']:
                         contents[content_id] = {
-                            'name': row[1].strip(),
-                            'description': row[2].strip(),
-                            'url': row[3].strip(),
-                            'price': int(row[4]) if row[4].isdigit() else 0,
-                            'status': row[5].strip(),
-                            'created_at': row[6] if len(row) > 6 else datetime.now().strftime('%Y-%m-%d'),
-                            'features': self._parse_features(row[7]) if len(row) > 7 else []
+                            'name': name,
+                            'description': description,
+                            'url': url,
+                            'price': price,
+                            'status': status,
+                            'created_at': created_at,
+                            'features': features,
                         }
             
             return contents
