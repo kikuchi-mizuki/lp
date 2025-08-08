@@ -35,5 +35,6 @@ EXPOSE 3000
 ENV PORT=3000
 ENV PYTHONPATH=/app
 
-# アプリケーションを起動（暫定：Gunicornではなくpythonで最小起動）
-CMD ["python", "app_simple.py"]
+# ネットワーク切り分け用に、まずは純粋なHTTPサーバで$PORTをリッスンさせる
+# これで応答があればFlask/Gunicorn側の問題、応答がなければポート/実行設定の問題
+CMD ["sh", "-c", "python -m http.server ${PORT:-3000}"]
