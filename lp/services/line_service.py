@@ -1477,22 +1477,14 @@ def handle_cancel_selection_company(reply_token, company_id, stripe_subscription
                 })
         
         if not selected_contents:
-            debug_message = f"""❌ デバッグ情報:
-解約対象のコンテンツが見つかりませんでした。
-
-🔍 詳細情報:
-• 企業ID: {company_id}
-• 選択テキスト: '{selection_text}'
-• アクティブアカウント数: {len(active_accounts)}
-• 抽出された数字: {numbers}
-• 有効な選択: {selected_indices}
-• 無効な理由: {invalid_reasons}
-
-📊 アクティブアカウント一覧:
-{chr(10).join([f"• {i+1}. {content_type} (ID: {account_id})" for i, (account_id, content_type, _) in enumerate(active_accounts)])}
-
-💡 「メニュー」と入力してメインメニューに戻ってください。"""
-            send_line_message(reply_token, [{"type": "text", "text": debug_message}])
+            print(f'[DEBUG] selected_contents が空です')
+            print(f'[DEBUG] 企業ID: {company_id}, 選択: {selection_text}')
+            print(f'[DEBUG] アクティブアカウント: {len(active_accounts)}件')
+            print(f'[DEBUG] 抽出数字: {numbers}, 有効選択: {selected_indices}')
+            
+            # 簡潔なエラーメッセージ
+            error_message = f"❌ 解約対象が見つかりません\n\n企業ID: {company_id}\n選択: {selection_text}\nアクティブ: {len(active_accounts)}件\n\n「メニュー」でメイン画面に戻れます。"
+            send_line_message(reply_token, [{"type": "text", "text": error_message}])
             return
         
         # 解約確認メッセージを作成
@@ -1520,14 +1512,15 @@ def handle_cancel_selection_company(reply_token, company_id, stripe_subscription
             except Exception as e:
                 print(f'[DEBUG] 請求期間情報取得エラー: {e}')
         
-        confirmation_text = f"以下のコンテンツを解約しますか？\n\n{content_list}{price_info}{billing_period_info}\n\n⚠️ 解約後は次回請求から追加料金が反映されます。"
+        # 簡潔な確認メッセージ
+        confirmation_text = f"解約対象:\n{content_list}{price_info}\n\n解約しますか？"
         
-        # 確認ボタンを作成
+        # 確認ボタンを作成（簡潔なテキスト）
         actions = [
             {
                 "type": "message",
                 "label": "解約する",
-                "text": f"解約確認_{','.join(str(i) for i in selected_indices)}"
+                "text": f"解約確認_{selected_indices[0]}" if selected_indices else "解約確認_1"
             },
             {
                 "type": "message",
@@ -1547,8 +1540,9 @@ def handle_cancel_selection_company(reply_token, company_id, stripe_subscription
             }
         }
         
-        send_line_message(reply_token, [message])
-        print(f'[DEBUG] 解約確認メッセージ送信完了')
+        print(f'[DEBUG] LINE API呼び出し開始: message={message}')
+        result = send_line_message(reply_token, [message])
+        print(f'[DEBUG] 解約確認メッセージ送信完了: result={result}')
         
     except Exception as e:
         print(f'[ERROR] 企業解約選択処理エラー: {e}')
