@@ -3,26 +3,19 @@
 usersテーブルを作成するスクリプト
 """
 
+import os
 import psycopg2
 
 def create_users_table():
     """usersテーブルを作成"""
     
-    # Railway接続情報
-    host = "gondola.proxy.rlwy.net"
-    port = 16797
-    database = "railway"
-    user = "postgres"
-    password = "WZgnjZezoefHmxbwRjUbiPhajtwubmUs"
+    # 接続情報は環境変数から取得
+    database_url = os.getenv('RAILWAY_DATABASE_URL') or os.getenv('DATABASE_URL')
+    if not database_url:
+        raise RuntimeError('DATABASE_URL/RAILWAY_DATABASE_URL is not set')
     
     try:
-        conn = psycopg2.connect(
-            host=host,
-            port=port,
-            database=database,
-            user=user,
-            password=password
-        )
+        conn = psycopg2.connect(database_url)
         c = conn.cursor()
         
         print(f'[SUCCESS] Railwayデータベース接続成功!')

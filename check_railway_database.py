@@ -12,27 +12,14 @@ load_dotenv()
 def check_railway_database():
     """Railway本番環境のデータベース状態を確認"""
     
-    # Railway本番環境のデータベース接続情報（正しい接続情報）
-    host = "gondola.proxy.rlwy.net"
-    port = 16797
-    database = "railway"
-    user = "postgres"
-    password = "WZgnjZezoefHmxbwRjUbiPhajtwubmUs"
-    
-    print(f'[DEBUG] Railway接続情報:')
-    print(f'  ホスト: {host}')
-    print(f'  ポート: {port}')
-    print(f'  データベース: {database}')
-    print(f'  ユーザー: {user}')
+    # 接続情報は環境変数から取得
+    database_url = os.getenv('RAILWAY_DATABASE_URL') or os.getenv('DATABASE_URL')
+    if not database_url:
+        raise RuntimeError('DATABASE_URL/RAILWAY_DATABASE_URL is not set')
+    print(f'[DEBUG] Railway接続URL検出: {"set" if database_url else "unset"}')
     
     try:
-        conn = psycopg2.connect(
-            host=host,
-            port=port,
-            database=database,
-            user=user,
-            password=password
-        )
+        conn = psycopg2.connect(database_url)
         c = conn.cursor()
         
         print(f'[DEBUG] Railwayデータベース接続成功')

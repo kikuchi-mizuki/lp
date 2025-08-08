@@ -8,16 +8,13 @@ DATABASE_URL = os.getenv('DATABASE_URL', 'database.db')
 
 def get_db_connection():
     """データベース接続を取得（改善版）"""
-    database_url = os.getenv('RAILWAY_DATABASE_URL') or os.getenv('DATABASE_URL')
-    
-    print(f'[DEBUG] 環境変数確認: RAILWAY_DATABASE_URL={os.getenv("RAILWAY_DATABASE_URL")}, DATABASE_URL={os.getenv("DATABASE_URL")}')
-    print(f'[DEBUG] 使用するdatabase_url: {database_url}')
-    
-    # Railwayの外部接続URLを優先使用
-    if not database_url or (database_url and ('postgres.railway.internal' in database_url or 'postgres.railway.app' in database_url)):
-        database_url = "postgresql://postgres:WZgnjZezoefHmxbwRjUbiPhajtwubmUs@gondola.proxy.rlwy.net:16797/railway"
-        print(f'[DEBUG] 外部接続URLを使用: {database_url}')
-    
+    # 機密情報をログに出さないよう、存在フラグのみ出力
+    railway_url_env = os.getenv('RAILWAY_DATABASE_URL')
+    database_url_env = os.getenv('DATABASE_URL')
+    print(f"[DEBUG] DB URL presence: RAILWAY_DATABASE_URL={'set' if railway_url_env else 'unset'}, DATABASE_URL={'set' if database_url_env else 'unset'}")
+
+    database_url = railway_url_env or database_url_env
+
     if database_url and database_url.startswith('postgresql://'):
         # PostgreSQL接続
         try:
@@ -32,7 +29,7 @@ def get_db_connection():
                     user="postgres",
                     password="password"
                 )
-            except:
+            except Exception:
                 # 最終フォールバック: SQLite
                 return sqlite3.connect('database.db')
     elif database_url and database_url.startswith('sqlite://'):
@@ -51,7 +48,7 @@ def get_db_connection():
                 user="postgres",
                 password="password"
             )
-        except:
+        except Exception:
             # PostgreSQL接続に失敗した場合はSQLiteを使用
             return sqlite3.connect('database.db')
 

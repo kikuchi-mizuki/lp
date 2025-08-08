@@ -18,9 +18,9 @@ def debug_database_state():
     
     try:
         # Railway本番環境のデータベース接続情報
-        database_url = os.getenv("DATABASE_URL")
+        database_url = os.getenv("RAILWAY_DATABASE_URL") or os.getenv("DATABASE_URL")
         if not database_url:
-            database_url = "postgresql://postgres:WZgnjZezoefHmxbwRjUbiPhajtwubmUs@gondola.proxy.rlwy.net:16797/railway"
+            raise RuntimeError("DATABASE_URL/RAILWAY_DATABASE_URL is not set")
         
         print(f'[DEBUG] Railway接続URL: {database_url}')
         
@@ -162,9 +162,9 @@ def fix_payment_periods():
     
     try:
         # Railway本番環境のデータベース接続情報
-        database_url = os.getenv("DATABASE_URL")
+        database_url = os.getenv("RAILWAY_DATABASE_URL") or os.getenv("DATABASE_URL")
         if not database_url:
-            database_url = "postgresql://postgres:WZgnjZezoefHmxbwRjUbiPhajtwubmUs@gondola.proxy.rlwy.net:16797/railway"
+            raise RuntimeError("DATABASE_URL/RAILWAY_DATABASE_URL is not set")
         
         print(f'[DEBUG] Railway接続URL: {database_url}')
         
@@ -230,9 +230,9 @@ def debug_payment_check():
     
     try:
         # Railway本番環境のデータベース接続情報
-        database_url = os.getenv("DATABASE_URL")
+        database_url = os.getenv("RAILWAY_DATABASE_URL") or os.getenv("DATABASE_URL")
         if not database_url:
-            database_url = "postgresql://postgres:WZgnjZezoefHmxbwRjUbiPhajtwubmUs@gondola.proxy.rlwy.net:16797/railway"
+            raise RuntimeError("DATABASE_URL/RAILWAY_DATABASE_URL is not set")
         
         print(f'[DEBUG] Railway接続URL: {database_url}')
         

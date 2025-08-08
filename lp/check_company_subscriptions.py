@@ -16,9 +16,9 @@ def check_company_subscriptions():
         load_dotenv()
         
         # データベース接続
-        database_url = os.getenv("DATABASE_URL")
+        database_url = os.getenv("RAILWAY_DATABASE_URL") or os.getenv("DATABASE_URL")
         if not database_url:
-            database_url = "postgresql://postgres:WZgnjZezoefHmxbwRjUbiPhajtwubmUs@gondola.proxy.rlwy.net:16797/railway"
+            raise RuntimeError("DATABASE_URL/RAILWAY_DATABASE_URL is not set")
         
         print(f"[DEBUG] 接続URL: {database_url[:50]}...")
         

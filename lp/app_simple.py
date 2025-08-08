@@ -33,20 +33,11 @@ TRIAL_PERIOD_DAYS = 14  # 2週間無料
 def get_db_connection():
     """データベース接続を取得"""
     try:
-        # Railway PostgreSQL接続情報
-        host = "gondola.proxy.rlwy.net"
-        port = 16797
-        database = "railway"
-        user = "postgres"
-        password = "WZgnjZezoefHmxbwRjUbiPhajtwubmUs"
-        
-        conn = psycopg2.connect(
-            host=host,
-            port=port,
-            database=database,
-            user=user,
-            password=password
-        )
+        import os
+        database_url = os.getenv('RAILWAY_DATABASE_URL') or os.getenv('DATABASE_URL')
+        if not database_url:
+            raise RuntimeError('DATABASE_URL/RAILWAY_DATABASE_URL is not set')
+        conn = psycopg2.connect(database_url)
         return conn
     except Exception as e:
         print(f"データベース接続エラー: {e}")

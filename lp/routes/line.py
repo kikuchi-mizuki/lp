@@ -139,7 +139,11 @@ def debug_diagnose_user(user_id):
                     'Authorization': f'Bearer {LINE_CHANNEL_ACCESS_TOKEN}',
                     'Content-Type': 'application/json'
                 }
-                response = requests.get(f'https://api.line.me/v2/bot/profile/{user[2]}', headers=headers)
+                response = requests.get(
+                    f'https://api.line.me/v2/bot/profile/{user[2]}',
+                    headers=headers,
+                    timeout=10
+                )
                 
                 if response.status_code == 200:
                     line_profile = response.json()
@@ -234,7 +238,12 @@ def debug_send_welcome(user_id):
             'messages': [test_message]
         }
         
-        response = requests.post('https://api.line.me/v2/bot/message/push', headers=headers, json=data)
+        response = requests.post(
+            'https://api.line.me/v2/bot/message/push',
+            headers=headers,
+            json=data,
+            timeout=10
+        )
         
         if response.status_code == 200:
             return jsonify({
@@ -493,15 +502,29 @@ def debug_test_webhook():
 def line_webhook():
     logger = logging.getLogger(__name__)
     print(f'[DEBUG] LINE Webhook受信開始')
-    
+
     try:
+        # 署名検証
+        signature = request.headers.get('X-Line-Signature', '')
         body = request.data.decode('utf-8')
+        line_channel_secret = os.getenv('LINE_CHANNEL_SECRET')
+        if line_channel_secret:
+            try:
+                hash_bytes = hmac.new(line_channel_secret.encode('utf-8'), body.encode('utf-8'), hashlib.sha256).digest()
+                expected_signature = base64.b64encode(hash_bytes).decode('utf-8')
+                if not hmac.compare_digest(signature, expected_signature):
+                    print('[ERROR] LINE Webhook署名検証失敗')
+                    return jsonify({'error': 'invalid signature'}), 400
+            except Exception as sig_e:
+                print(f'[ERROR] 署名検証エラー: {sig_e}')
+                return jsonify({'error': 'signature verification error'}), 400
+
         events = json.loads(body).get('events', [])
         print(f'[DEBUG] イベント数: {len(events)}')
-        
+
         for event in events:
             print(f'[DEBUG] イベント処理開始: {event.get("type")}')
-            
+
             # イベントタイプに応じて処理を分岐
             if event.get('type') == 'follow':
                 handle_follow_event(event)
@@ -511,13 +534,13 @@ def line_webhook():
                 handle_text_message(event)
             elif event.get('type') == 'postback':
                 handle_postback_event(event)
-    
+
     except Exception as e:
         print(f'[ERROR] LINE Webhook処理エラー: {e}')
         traceback.print_exc()
     finally:
         logger.info(f'[DEBUG] LINE Webhook処理完了')
-    
+
     return jsonify({'status': 'ok'})
 
 def handle_follow_event(event):

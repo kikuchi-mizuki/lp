@@ -11,8 +11,11 @@ def create_company_tables_with_public_url():
     """DATABASE_PUBLIC_URLを使用して企業管理テーブルを作成"""
     print("=== Railway DATABASE_PUBLIC_URL使用・企業管理テーブル作成 ===")
     
-    # Railwayの外部接続URL
-    database_url = "postgresql://postgres:WZgnjZezoefHmxbwRjUbiPhajtwubmUs@gondola.proxy.rlwy.net:16797/railway"
+    # Railwayの外部接続URL（環境変数から取得）
+    import os
+    database_url = os.getenv('RAILWAY_DATABASE_URL') or os.getenv('DATABASE_URL')
+    if not database_url:
+        raise RuntimeError('DATABASE_URL/RAILWAY_DATABASE_URL is not set')
     
     try:
         # PostgreSQLに接続

@@ -160,10 +160,9 @@ def is_paid_user_company_centric(line_user_id):
         load_dotenv()
         
         # Railway本番環境のデータベース接続情報
-        database_url = os.getenv("DATABASE_URL")
+        database_url = os.getenv("RAILWAY_DATABASE_URL") or os.getenv("DATABASE_URL")
         if not database_url:
-            # フォールバック用の接続情報
-            database_url = "postgresql://postgres:WZgnjZezoefHmxbwRjUbiPhajtwubmUs@gondola.proxy.rlwy.net:16797/railway"
+            raise RuntimeError("DATABASE_URL/RAILWAY_DATABASE_URL is not set")
         
         print(f'[DEBUG] PostgreSQL接続開始: {database_url[:50]}...')
         
@@ -380,7 +379,9 @@ def find_company_by_email(email):
         load_dotenv()
         
         # PostgreSQL接続情報
-        database_url = "postgresql://postgres:WZgnjZezoefHmxbwRjUbiPhajtwubmUs@gondola.proxy.rlwy.net:16797/railway"
+        database_url = os.getenv("RAILWAY_DATABASE_URL") or os.getenv("DATABASE_URL")
+        if not database_url:
+            raise RuntimeError("DATABASE_URL/RAILWAY_DATABASE_URL is not set")
         conn = psycopg2.connect(database_url)
         c = conn.cursor()
         
@@ -441,7 +442,9 @@ def update_line_user_id_for_company(company_id, new_line_user_id):
         load_dotenv()
         
         # PostgreSQL接続情報
-        database_url = "postgresql://postgres:WZgnjZezoefHmxbwRjUbiPhajtwubmUs@gondola.proxy.rlwy.net:16797/railway"
+        database_url = os.getenv("RAILWAY_DATABASE_URL") or os.getenv("DATABASE_URL")
+        if not database_url:
+            raise RuntimeError("DATABASE_URL/RAILWAY_DATABASE_URL is not set")
         conn = psycopg2.connect(database_url)
         c = conn.cursor()
         
@@ -490,9 +493,9 @@ def update_line_user_id_for_email(email, new_line_user_id):
         from dotenv import load_dotenv
         load_dotenv()
         
-        database_url = os.getenv("DATABASE_URL")
+        database_url = os.getenv("RAILWAY_DATABASE_URL") or os.getenv("DATABASE_URL")
         if not database_url:
-            database_url = "postgresql://postgres:WZgnjZezoefHmxbwRjUbiPhajtwubmUs@gondola.proxy.rlwy.net:16797/railway"
+            raise RuntimeError("DATABASE_URL/RAILWAY_DATABASE_URL is not set")
         
         conn = psycopg2.connect(database_url)
         c = conn.cursor()
@@ -542,9 +545,9 @@ def is_paid_user_by_email(email):
         load_dotenv()
         
         # Railway本番環境のデータベース接続情報
-        database_url = os.getenv("DATABASE_URL")
+        database_url = os.getenv("RAILWAY_DATABASE_URL") or os.getenv("DATABASE_URL")
         if not database_url:
-            database_url = "postgresql://postgres:WZgnjZezoefHmxbwRjUbiPhajtwubmUs@gondola.proxy.rlwy.net:16797/railway"
+            raise RuntimeError("DATABASE_URL/RAILWAY_DATABASE_URL is not set")
         
         print(f'[DEBUG] PostgreSQL接続開始: {database_url[:50]}...')
         
