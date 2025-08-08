@@ -1,10 +1,17 @@
 import os
 import json
-import psutil
 import logging
 from datetime import datetime, timedelta
 from utils.db import get_db_connection
 from services.dashboard_service import dashboard_service
+
+# psutilの条件付きインポート
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    PSUTIL_AVAILABLE = False
+    print("Warning: psutil is not available. System monitoring features will be limited.")
 
 class MonitoringService:
     """システム監視サービス"""
@@ -137,6 +144,12 @@ class MonitoringService:
     
     def check_system_resources(self):
         """システムリソースチェック"""
+        if not PSUTIL_AVAILABLE:
+            return {
+                'status': 'warning',
+                'message': 'psutil not available - system monitoring limited'
+            }
+        
         try:
             # CPU使用率
             cpu_percent = psutil.cpu_percent(interval=1)
@@ -181,6 +194,12 @@ class MonitoringService:
     
     def check_application_services(self):
         """アプリケーションサービスチェック"""
+        if not PSUTIL_AVAILABLE:
+            return {
+                'status': 'warning',
+                'message': 'psutil not available - process monitoring limited'
+            }
+        
         try:
             services_status = {}
             

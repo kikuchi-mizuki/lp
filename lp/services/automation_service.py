@@ -420,6 +420,9 @@ class AutomationService:
             
             return cpu_percent < 90 and memory.percent < 90 and disk.percent < 90
             
+        except ImportError:
+            self.logger.warning("psutil not available - skipping system resource check")
+            return True
         except Exception as e:
             self.logger.error(f"システムリソースチェックエラー: {e}")
             return False
