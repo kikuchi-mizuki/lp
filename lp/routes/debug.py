@@ -1,8 +1,10 @@
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 import os
 import psycopg2
 from dotenv import load_dotenv
 from datetime import datetime, timedelta, timezone
+from utils.db import get_db_connection
+import stripe
 
 debug_bp = Blueprint('debug', __name__)
 
@@ -478,3 +480,201 @@ def simulate_line_webhook():
         traceback.print_exc()
     
     return jsonify(result) 
+
+@debug_bp.route('/debug/companies')
+def debug_companies():
+    """企業とコンテンツの状況を確認"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 企業情報とコンテンツ数を取得
+        c.execute('''
+            SELECT 
+                c.id,
+                c.company_name,
+                c.stripe_subscription_id,
+                COUNT(cla.id) as total_contents,
+                COUNT(CASE WHEN cla.status = 'active' THEN 1 END) as active_contents,
+                GREATEST(0, COUNT(CASE WHEN cla.status = 'active' THEN 1 END) - 1) as billing_target
+            FROM companies c
+            LEFT JOIN company_line_accounts cla ON c.id = cla.company_id
+            WHERE c.stripe_subscription_id IS NOT NULL
+            GROUP BY c.id, c.company_name, c.stripe_subscription_id
+            ORDER BY c.id DESC
+            LIMIT 10
+        ''')
+        
+        companies = []
+        for row in c.fetchall():
+            companies.append({
+                'company_id': row[0],
+                'company_name': row[1],
+                'stripe_subscription_id': row[2],
+                'total_contents': row[3],
+                'active_contents': row[4],
+                'billing_target': row[5],
+                'expected_additional_charge': row[5] * 1500
+            })
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'companies': companies,
+            'summary': {
+                'total_companies': len(companies),
+                'billing_analysis': 'billing_target shows expected additional billing quantity'
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@debug_bp.route('/debug/contents/<int:company_id>')
+def debug_company_contents(company_id):
+    """特定企業のコンテンツ詳細を確認"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 企業情報を取得
+        c.execute('SELECT company_name, stripe_subscription_id FROM companies WHERE id = %s', (company_id,))
+        company_info = c.fetchone()
+        
+        if not company_info:
+            return jsonify({'success': False, 'error': 'Company not found'}), 404
+        
+        # コンテンツ詳細を取得
+        c.execute('''
+            SELECT content_type, status, created_at, line_channel_id
+            FROM company_line_accounts 
+            WHERE company_id = %s
+            ORDER BY created_at
+        ''', (company_id,))
+        
+        contents = []
+        for i, row in enumerate(c.fetchall(), 1):
+            contents.append({
+                'position': i,
+                'content_type': row[0],
+                'status': row[1],
+                'created_at': str(row[2]),
+                'line_channel_id': row[3],
+                'is_free': i == 1 and row[1] == 'active',
+                'billing_price': 0 if (i == 1 and row[1] == 'active') else (1500 if row[1] == 'active' else 0)
+            })
+        
+        conn.close()
+        
+        active_contents = [c for c in contents if c['status'] == 'active']
+        total_billing = sum(c['billing_price'] for c in contents)
+        
+        return jsonify({
+            'success': True,
+            'company': {
+                'id': company_id,
+                'name': company_info[0],
+                'stripe_subscription_id': company_info[1]
+            },
+            'contents': contents,
+            'summary': {
+                'total_contents': len(contents),
+                'active_contents': len(active_contents),
+                'billing_quantity': max(0, len(active_contents) - 1),
+                'expected_monthly_additional_charge': total_billing
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@debug_bp.route('/debug/stripe-check/<int:company_id>')
+def debug_stripe_check(company_id):
+    """Stripe請求項目の状況を確認"""
+    try:
+        stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+        
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 企業情報を取得
+        c.execute('SELECT company_name, stripe_subscription_id FROM companies WHERE id = %s', (company_id,))
+        company_info = c.fetchone()
+        
+        if not company_info:
+            return jsonify({'success': False, 'error': 'Company not found'}), 404
+        
+        stripe_subscription_id = company_info[1]
+        if not stripe_subscription_id:
+            return jsonify({'success': False, 'error': 'No Stripe subscription'}), 404
+        
+        # アクティブコンテンツ数を取得
+        c.execute('SELECT COUNT(*) FROM company_line_accounts WHERE company_id = %s AND status = %s', (company_id, 'active'))
+        active_count = c.fetchone()[0]
+        expected_billing = max(0, active_count - 1)
+        
+        # Stripeサブスクリプションを取得
+        subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+        
+        items = []
+        additional_item_found = False
+        
+        for item in subscription.items.data:
+            price_nickname = item.price.nickname or ""
+            
+            # 追加料金アイテムかチェック
+            is_additional = (
+                ("追加" in price_nickname) or 
+                ("additional" in price_nickname.lower()) or
+                ("metered" in price_nickname.lower()) or
+                (item.price.id == 'price_1Rog1nIxg6C5hAVdnqB5MJiT')
+            )
+            
+            if is_additional:
+                additional_item_found = True
+            
+            items.append({
+                'id': item.id,
+                'price_id': item.price.id,
+                'nickname': price_nickname,
+                'quantity': item.quantity,
+                'unit_amount': item.price.unit_amount,
+                'is_additional_item': is_additional,
+                'quantity_status': 'correct' if (is_additional and item.quantity == expected_billing) else ('incorrect' if is_additional else 'n/a')
+            })
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'company': {
+                'id': company_id,
+                'name': company_info[0]
+            },
+            'stripe_subscription_id': stripe_subscription_id,
+            'database_info': {
+                'active_contents': active_count,
+                'expected_billing_quantity': expected_billing
+            },
+            'stripe_items': items,
+            'analysis': {
+                'additional_item_found': additional_item_found,
+                'billing_correct': additional_item_found and any(
+                    item['is_additional_item'] and item['quantity'] == expected_billing 
+                    for item in items
+                )
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500 
