@@ -1256,14 +1256,8 @@ def handle_status_check_company(reply_token, company_id):
                 content_type, status, created_at = account
                 created_date = created_at.strftime('%Y年%m月%d日') if created_at else '不明'
                 
-                # 料金情報を取得（content_typeに基づいて）
-                additional_price = 0
-                if content_type == "AIタスクコンシェルジュ":
-                    additional_price = 1500
-                elif content_type == "AI経理秘書":
-                    additional_price = 1500
-                elif content_type == "AI予定秘書":
-                    additional_price = 0
+                # 料金情報を取得（全コンテンツが追加料金対象）
+                additional_price = 1500
                 
                 price_text = f"（+{additional_price:,}円/月）" if additional_price > 0 else "（基本料金に含まれる）"
                 status_message += f"• {content_type}{price_text}（{created_date}追加）\n"
@@ -1275,15 +1269,10 @@ def handle_status_check_company(reply_token, company_id):
             monthly_base_price = monthly_subscription[1]
             total_additional_price = 0
             
-            # アクティブなコンテンツの追加料金を計算
+            # アクティブなコンテンツの追加料金を計算（全コンテンツが対象）
             for account in line_accounts:
                 if account[1] == "active":  # statusがactive
-                    content_type = account[0]
-                    if content_type == "AIタスクコンシェルジュ":
-                        total_additional_price += 1500
-                    elif content_type == "AI経理秘書":
-                        total_additional_price += 1500
-                    # AI予定秘書は基本料金に含まれるので追加料金なし
+                    total_additional_price += 1500  # 全コンテンツが1,500円
             
             total_monthly_price = monthly_base_price + total_additional_price
             status_message += f"\n💰 合計料金: {total_monthly_price:,}円/月"
@@ -1592,10 +1581,8 @@ def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscript
             if i in selected_indices:
                 print(f'[DEBUG] 解約処理開始: content_type={content_type}, account_id={account_id}')
                 
-                # 追加料金が必要なコンテンツかチェック
-                additional_price = 0
-                if content_type in ["AIタスクコンシェルジュ", "AI経理秘書"]:
-                    additional_price = 1500
+                # 追加料金が必要なコンテンツかチェック（全コンテンツが対象）
+                additional_price = 1500
                 
                 # Stripeの請求項目を更新（追加料金が必要なコンテンツの場合）
                 if additional_price > 0 and stripe_subscription_id:
@@ -1931,9 +1918,7 @@ def handle_content_confirmation_company(company_id, content_type):
                 print(f'[DEBUG] 非アクティブLINEアカウントを再アクティブ化: account_id={account_id}')
                 
                 # Stripeの請求項目を更新（追加料金が必要なコンテンツの場合）
-                additional_price = 0
-                if content_type in ["AIタスクコンシェルジュ", "AI経理秘書"]:
-                    additional_price = 1500
+                additional_price = 1500  # 全コンテンツが追加料金対象
                 
                 if additional_price > 0 and stripe_subscription_id:
                     try:
@@ -1986,7 +1971,7 @@ def handle_content_confirmation_company(company_id, content_type):
                 'usage': 'Googleカレンダーと連携し、LINEで予定の追加・確認・空き時間の提案まで。調整のやりとりに追われる時間を、もっとクリエイティブに使えるように。',
                 'url': 'https://lp-production-9e2c.up.railway.app/schedule',
                 'line_url': 'https://line.me/R/ti/p/@ai_schedule_secretary',
-                'additional_price': 0  # 基本料金に含まれる
+                'additional_price': 1500  # 追加料金対象に変更
             },
             'AI経理秘書': {
                 'description': '打合せ後すぐ送れる、スマートな請求書作成アシスタント',
@@ -2043,12 +2028,11 @@ def handle_content_confirmation_company(company_id, content_type):
                 import stripe
                 stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
                 
-                # 現在のアクティブコンテンツ数を取得（追加料金が必要なもののみ）
+                # 現在のアクティブコンテンツ数を取得（全コンテンツが追加料金対象）
                 c.execute(f'''
                     SELECT COUNT(*) 
                     FROM company_line_accounts 
-                    WHERE company_id = {placeholder} AND status = 'active' 
-                    AND content_type IN ('AIタスクコンシェルジュ', 'AI経理秘書')
+                    WHERE company_id = {placeholder} AND status = 'active'
                 ''', (company_id,))
                 
                 additional_content_count = c.fetchone()[0]
