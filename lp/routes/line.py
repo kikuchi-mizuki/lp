@@ -560,7 +560,23 @@ def handle_follow_event(event):
         else:
             print(f'[DEBUG] 未紐付け企業データが見つかりません: user_id={user_id}')
             # メールアドレス連携を促すメッセージを送信
-            send_line_message(event['replyToken'], [{"type": "text", "text": "決済済みの方は、登録時のメールアドレスを送信してください。\n\n例: example@example.com\n\n※メールアドレスを送信すると、自動的に企業データと紐付けされます。"}])
+            welcome_message = {
+                "type": "template",
+                "altText": "メールアドレス連携のお願い",
+                "template": {
+                    "type": "buttons",
+                    "title": "メールアドレス連携のお願い",
+                    "text": "AIコレクションズをご利用いただくには、決済時のメールアドレスとの連携が必要です。\n\n以下のメールアドレスを送信してください：\n\n例: example@example.com",
+                    "actions": [
+                        {
+                            "type": "message",
+                            "label": "メールアドレスを送信",
+                            "text": "メールアドレスを送信します"
+                        }
+                    ]
+                }
+            }
+            send_line_message(event['replyToken'], [welcome_message])
         
         conn.close()
         
@@ -568,7 +584,23 @@ def handle_follow_event(event):
         print(f'[DEBUG] フォローイベント処理エラー: {e}')
         import traceback
         traceback.print_exc()
-        send_line_message(event['replyToken'], [{"type": "text", "text": "決済済みの方は、登録時のメールアドレスを送信してください。\n\n例: example@example.com\n\n※メールアドレスを送信すると、自動的に企業データと紐付けされます。"}])
+        welcome_message = {
+            "type": "template",
+            "altText": "メールアドレス連携のお願い",
+            "template": {
+                "type": "buttons",
+                "title": "メールアドレス連携のお願い",
+                "text": "AIコレクションズをご利用いただくには、決済時のメールアドレスとの連携が必要です。\n\n以下のメールアドレスを送信してください：\n\n例: example@example.com",
+                "actions": [
+                    {
+                        "type": "message",
+                        "label": "メールアドレスを送信",
+                        "text": "メールアドレスを送信します"
+                    }
+                ]
+            }
+        }
+        send_line_message(event['replyToken'], [welcome_message])
 
 def handle_unfollow_event(event):
     """友達削除イベントの処理"""

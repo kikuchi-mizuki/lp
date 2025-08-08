@@ -62,14 +62,26 @@
 
             <div class="alert alert-info mb-4">
                 <h5 class="mb-3"><i class="fas fa-flag"></i> 次のステップ</h5>
-                <div class="d-flex justify-content-center">
-                    <a href="https://lin.ee/BeVUdD3" target="_blank" class="btn btn-primary btn-lg">
-                        <i class="fab fa-line me-2"></i>
-                        公式LINEを追加する
-                    </a>
-                </div>
-                <div class="text-center mt-3">
-                    <small class="text-muted">LINE追加後、「企業登録完了」とメッセージを送信してください</small>
+                <div class="d-flex flex-column align-items-center">
+                    <div class="text-center mb-3">
+                        <p class="mb-2">1. 公式LINEを追加</p>
+                        <a href="https://lin.ee/BeVUdD3" target="_blank" class="btn btn-primary btn-lg">
+                            <i class="fab fa-line me-2"></i>
+                            公式LINEを追加する
+                        </a>
+                    </div>
+                    <div class="text-center mb-3">
+                        <p class="mb-2">2. メールアドレスを送信</p>
+                        <div class="bg-white p-3 rounded">
+                            <p class="mb-1"><strong>送信するメールアドレス:</strong></p>
+                            <p class="mb-0 text-primary">{{ company_data.email }}</p>
+                        </div>
+                        <small class="text-muted d-block mt-2">※このメールアドレスをLINEで送信してください</small>
+                    </div>
+                    <div class="text-center">
+                        <p class="mb-2">3. サービスを利用開始</p>
+                        <p class="text-muted small mb-0">メールアドレスの確認が完了すると、<br>すぐにサービスをご利用いただけます</p>
+                    </div>
                 </div>
             </div>
 
