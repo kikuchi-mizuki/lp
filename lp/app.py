@@ -352,7 +352,7 @@ def company_registration():
     if existing_company:
         return jsonify({'error': 'このメールアドレスは既に登録されています'}), 400
     
-    # Stripeチェックアウトセッションを作成
+    # Stripeチェックアウトセッションを作成（2週間無料トライアル）
     try:
         checkout_session = stripe.checkout.Session.create(
             payment_method_types=['card'],
@@ -361,6 +361,9 @@ def company_registration():
                 'quantity': 1,
             }],
             mode='subscription',
+            subscription_data={
+                'trial_period_days': 14,  # 2週間無料トライアル
+            },
             success_url=url_for('company_registration_success', _external=True) + '?session_id={CHECKOUT_SESSION_ID}',
             cancel_url=url_for('company_registration_cancel', _external=True),
             metadata={

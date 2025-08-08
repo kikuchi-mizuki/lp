@@ -89,6 +89,12 @@ def stripe_webhook():
                         subscription = stripe.Subscription.retrieve(subscription_id)
                         current_period_end = datetime.fromtimestamp(subscription.current_period_end)
                         
+                        # トライアル期間の確認
+                        trial_end = None
+                        if subscription.trial_end:
+                            trial_end = datetime.fromtimestamp(subscription.trial_end)
+                            print(f'[DEBUG] トライアル期間終了: {trial_end}')
+                        
                         c.execute('''
                             INSERT INTO company_subscriptions 
                             (company_id, content_type, subscription_status, stripe_subscription_id, current_period_end, created_at)
@@ -101,6 +107,16 @@ def stripe_webhook():
                             current_period_end
                         ))
                         print(f'[DEBUG] company_subscriptionsテーブルにサブスクリプション情報を保存: company_id={company_id}, subscription_id={subscription_id}')
+                        
+                        # companiesテーブルにトライアル期間情報を更新
+                        if trial_end:
+                            c.execute('''
+                                UPDATE companies 
+                                SET trial_end = %s 
+                                WHERE id = %s
+                            ''', (trial_end, company_id))
+                            print(f'[DEBUG] トライアル期間情報を更新: company_id={company_id}, trial_end={trial_end}')
+                        
                     except Exception as e:
                         print(f'[ERROR] company_subscriptionsテーブル保存エラー: {e}')
                         import traceback
@@ -173,6 +189,12 @@ def stripe_webhook():
                     subscription = stripe.Subscription.retrieve(subscription_id)
                     current_period_end = datetime.fromtimestamp(subscription.current_period_end)
                     
+                    # トライアル期間の確認
+                    trial_end = None
+                    if subscription.trial_end:
+                        trial_end = datetime.fromtimestamp(subscription.trial_end)
+                        print(f'[DEBUG] トライアル期間終了: {trial_end}')
+                    
                     c.execute('''
                         INSERT INTO company_subscriptions 
                         (company_id, content_type, subscription_status, stripe_subscription_id, current_period_end, created_at)
@@ -185,6 +207,16 @@ def stripe_webhook():
                         current_period_end
                     ))
                     print(f'[DEBUG] company_subscriptionsテーブルにサブスクリプション情報を保存: company_id={company_id}, subscription_id={subscription_id}')
+                    
+                    # companiesテーブルにトライアル期間情報を更新
+                    if trial_end:
+                        c.execute('''
+                            UPDATE companies 
+                            SET trial_end = %s 
+                            WHERE id = %s
+                        ''', (trial_end, company_id))
+                        print(f'[DEBUG] トライアル期間情報を更新: company_id={company_id}, trial_end={trial_end}')
+                    
                 except Exception as e:
                     print(f'[ERROR] company_subscriptionsテーブル保存エラー: {e}')
                     import traceback

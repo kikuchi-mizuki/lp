@@ -148,7 +148,8 @@ def is_paid_user_company_centric(line_user_id):
             'is_paid': bool,
             'subscription_status': str,
             'message': str,
-            'redirect_url': str
+            'redirect_url': str,
+            'trial_days_remaining': int
         }
     """
     print(f'[DEBUG] is_paid_user_company_centric開始: line_user_id={line_user_id}')
@@ -189,11 +190,23 @@ def is_paid_user_company_centric(line_user_id):
                 'is_paid': False,
                 'subscription_status': 'not_registered',
                 'message': 'AIコレクションズの公式LINEにご登録ください。',
-                'redirect_url': 'https://line.me/R/ti/p/@ai_collections'
+                'redirect_url': 'https://line.me/R/ti/p/@ai_collections',
+                'trial_days_remaining': 0
             }
         
         company_id, company_name, email, status = result
         print(f'[DEBUG] 企業情報取得: company_id={company_id}, company_name={company_name}, email={email}, status={status}')
+        
+        # トライアル期間の確認
+        c.execute('''
+            SELECT trial_end
+            FROM companies 
+            WHERE id = %s
+        ''', (company_id,))
+        
+        trial_result = c.fetchone()
+        trial_end = trial_result[0] if trial_result else None
+        print(f'[DEBUG] トライアル期間確認: company_id={company_id}, trial_end={trial_end}')
         
         # 新しい請求システム：月額基本サブスクリプションの決済状況をチェック
         c.execute('''
@@ -208,8 +221,37 @@ def is_paid_user_company_centric(line_user_id):
         conn.close()
         print(f'[DEBUG] データベース接続終了')
         
+        # トライアル期間の判定
+        trial_days_remaining = 0
+        is_trial_active = False
+        
+        if trial_end:
+            from datetime import datetime, timezone, timedelta
+            jst = timezone(timedelta(hours=9))
+            current_time = datetime.now(jst)
+            
+            # タイムゾーン情報を統一（trial_endをawareに変換）
+            if trial_end.tzinfo is None:
+                trial_end = trial_end.replace(tzinfo=jst)
+            
+            if current_time < trial_end:
+                is_trial_active = True
+                trial_days_remaining = (trial_end - current_time).days
+                print(f'[DEBUG] トライアル期間中: company_id={company_id}, days_remaining={trial_days_remaining}')
+            else:
+                print(f'[DEBUG] トライアル期間終了: company_id={company_id}, trial_end={trial_end}')
+        
         # 決済状況の判定
-        if payment_result and payment_result[0] == 'active':
+        if is_trial_active:
+            print(f'[DEBUG] トライアル期間中: company_id={company_id}, days_remaining={trial_days_remaining}')
+            return {
+                'is_paid': True,
+                'subscription_status': 'trialing',
+                'message': f'トライアル期間中です。残り{trial_days_remaining}日間ご利用いただけます。',
+                'redirect_url': None,
+                'trial_days_remaining': trial_days_remaining
+            }
+        elif payment_result and payment_result[0] == 'active':
             current_period_end = payment_result[1]
             monthly_base_price = payment_result[2]
             print(f'[DEBUG] 有効な月額基本サブスクリプション: company_id={company_id}, status=active, period_end={current_period_end}, base_price={monthly_base_price}')
@@ -230,7 +272,8 @@ def is_paid_user_company_centric(line_user_id):
                         'is_paid': False,
                         'subscription_status': 'expired',
                         'message': '月額基本料金の支払い期限が切れています。',
-                        'redirect_url': 'https://line.me/R/ti/p/@ai_collections'
+                        'redirect_url': 'https://line.me/R/ti/p/@ai_collections',
+                        'trial_days_remaining': 0
                     }
             
             print(f'[DEBUG] 有効な決済確認: company_id={company_id}')
@@ -238,7 +281,8 @@ def is_paid_user_company_centric(line_user_id):
                 'is_paid': True,
                 'subscription_status': 'active',
                 'message': None,
-                'redirect_url': None
+                'redirect_url': None,
+                'trial_days_remaining': 0
             }
         else:
             print(f'[DEBUG] 無効な決済: company_id={company_id}, payment_result={payment_result}')
@@ -246,7 +290,8 @@ def is_paid_user_company_centric(line_user_id):
                 'is_paid': False,
                 'subscription_status': 'not_paid',
                 'message': '決済済みユーザーのみご利用いただけます。',
-                'redirect_url': 'https://line.me/R/ti/p/@ai_collections'
+                'redirect_url': 'https://line.me/R/ti/p/@ai_collections',
+                'trial_days_remaining': 0
             }
             
     except Exception as e:
@@ -257,7 +302,8 @@ def is_paid_user_company_centric(line_user_id):
             'is_paid': False,
             'subscription_status': 'error',
             'message': 'システムエラーが発生しました。',
-            'redirect_url': 'https://line.me/R/ti/p/@ai_collections'
+            'redirect_url': 'https://line.me/R/ti/p/@ai_collections',
+            'trial_days_remaining': 0
         }
 
 def get_restricted_message():
