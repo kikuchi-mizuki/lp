@@ -907,25 +907,40 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
     elif state == 'add_select':
         print(f'[DEBUG] コンテンツ選択処理: user_id={user_id}, state={state}, text={text}')
         
-        # コンテンツ選択（まず確認ダイアログを表示）
-        if text in ['1', '2', '3']:
-            print(f'[DEBUG] コンテンツ選択: text={text}')
-            content_mapping = {
-                '1': 'AI予定秘書',
-                '2': 'AI経理秘書',
-                '3': 'AIタスクコンシェルジュ'
-            }
-            content_type = content_mapping.get(text)
-            if content_type:
+        # 「メニュー」コマンドの場合は状態をリセットしてメニューを表示
+        if text == 'メニュー':
+            set_user_state(user_id, 'welcome_sent')
+            from utils.message_templates import get_menu_message_company
+            send_line_message(event['replyToken'], [get_menu_message_company()])
+            return
+
+        # 数字入力を受け付け、スプレッドシートの順序で解釈
+        try:
+            selection_index = int(text)
+        except ValueError:
+            selection_index = None
+
+        if selection_index is not None and selection_index >= 1:
+            from services.spreadsheet_content_service import spreadsheet_content_service
+            contents_result = spreadsheet_content_service.get_available_contents()
+            contents_dict = contents_result.get('contents', {})
+            contents_list = [content_info for _, content_info in contents_dict.items()]
+            if 1 <= selection_index <= len(contents_list):
+                selected = contents_list[selection_index - 1]
+                content_name = selected.get('name', f'コンテンツ{selection_index}')
+                description = selected.get('description', 'このコンテンツを追加しますか？')
+                price = selected.get('price')
+                price_text = f"料金：{price:,}円/月（2個目以降）\n※1個目は無料" if isinstance(price, int) else ""
+
                 confirmation_message = {
                     "type": "template",
                     "altText": "コンテンツ追加の確認",
                     "template": {
                         "type": "buttons",
-                        "title": f"{content_type}を追加",
-                        "text": "このコンテンツを追加しますか？",
+                        "title": f"{content_name}を追加",
+                        "text": f"{description}\n\n{price_text}\n\nこのコンテンツを追加しますか？".strip(),
                         "actions": [
-                            {"type": "postback", "label": "はい", "data": f"company_confirm_add_{text}"},
+                            {"type": "postback", "label": "はい", "data": f"company_confirm_add_{selection_index}"},
                             {"type": "postback", "label": "いいえ", "data": "company_cancel_add"}
                         ]
                     }
@@ -933,18 +948,12 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
                 send_line_message(event['replyToken'], [confirmation_message])
                 # 状態は一旦維持し、postbackで確定
                 return
-        # 「メニュー」コマンドの場合は状態をリセットしてメニューを表示
-        elif text == 'メニュー':
-            set_user_state(user_id, 'welcome_sent')
-            from utils.message_templates import get_menu_message_company
-            send_line_message(event['replyToken'], [get_menu_message_company()])
-            return
-        else:
-            # 無効な入力の場合、メインメニューを表示
-            set_user_state(user_id, 'welcome_sent')
-            from utils.message_templates import get_menu_message_company
-            send_line_message(event['replyToken'], [get_menu_message_company()])
-            return
+
+        # 無効な入力の場合、メインメニューを表示
+        set_user_state(user_id, 'welcome_sent')
+        from utils.message_templates import get_menu_message_company
+        send_line_message(event['replyToken'], [get_menu_message_company()])
+        return
     elif state == 'cancel_select':
         print(f'[DEBUG] 解約選択処理開始: user_id={user_id}, state={state}, text={text}')
         
@@ -1080,14 +1089,28 @@ https://lp-production-9e2c.up.railway.app
 友達が登録すると、あなたにも特典があります！"""
         send_line_message(event['replyToken'], [{"type": "text", "text": share_message}]) 
     elif postback_data.startswith('company_confirm_add_'):
-        num = postback_data.replace('company_confirm_add_', '')
-        content_mapping = {'1': 'AI予定秘書', '2': 'AI経理秘書', '3': 'AIタスクコンシェルジュ'}
-        content_type = content_mapping.get(num)
-        if not content_type:
+        num_str = postback_data.replace('company_confirm_add_', '')
+        try:
+            index = int(num_str)
+        except ValueError:
+            index = None
+        if not index or index < 1:
+            send_line_message(event['replyToken'], [{"type": "text", "text": "無効な選択です。"}])
+            return
+        # スプレッドシートの順序でコンテンツ名を取得
+        from services.spreadsheet_content_service import spreadsheet_content_service
+        contents_result = spreadsheet_content_service.get_available_contents()
+        contents_dict = contents_result.get('contents', {})
+        contents_list = [content_info for _, content_info in contents_dict.items()]
+        if index > len(contents_list):
+            send_line_message(event['replyToken'], [{"type": "text", "text": "無効な選択です。"}])
+            return
+        content_name = contents_list[index - 1].get('name')
+        if not content_name:
             send_line_message(event['replyToken'], [{"type": "text", "text": "無効な選択です。"}])
             return
         try:
-            result = handle_content_confirmation_company(company_id, content_type)
+            result = handle_content_confirmation_company(company_id, content_name)
             if result['success']:
                 success_message = f"🎉 {content_type}を追加しました！\n\n✨ {result.get('description', '新しいコンテンツが利用可能になりました')}\n\n🔗 アクセスURL：\n{result.get('url', 'https://lp-production-9e2c.up.railway.app')}\n\n💡 使い方：\n{result.get('usage', 'LINEアカウントからご利用いただけます')}"
                 send_line_message(event['replyToken'], [{"type": "text", "text": success_message}])

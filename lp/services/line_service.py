@@ -1124,12 +1124,12 @@ def handle_add_content_company(reply_token, company_id, stripe_subscription_id):
         subscription_status = check_subscription_status(stripe_subscription_id)
         is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
         
-        # 利用可能なコンテンツを定義
-        available_contents = [
-            {'name': 'AI予定秘書', 'description': 'スケジュール管理をAIがサポート'},
-            {'name': 'AI経理秘書', 'description': '経理作業をAIが効率化'},
-            {'name': 'AIタスクコンシェルジュ', 'description': 'タスク管理をAIが最適化'}
-        ]
+        # 利用可能なコンテンツをスプレッドシートから取得（フォールバック内蔵）
+        from services.spreadsheet_content_service import spreadsheet_content_service
+        contents_result = spreadsheet_content_service.get_available_contents()
+        contents_dict = contents_result.get('contents', {})
+        # 表示順はシートの行順に従う（dictは挿入順を維持）
+        available_contents = [content_info for _, content_info in contents_dict.items()]
         
         # 既に追加されているコンテンツを確認
         conn = get_db_connection()
@@ -1151,7 +1151,7 @@ def handle_add_content_company(reply_token, company_id, stripe_subscription_id):
         
         print(f'[DEBUG] 企業コンテンツ追加: company_id={company_id}, total_subscription_count={total_subscription_count}, total_line_account_count={total_line_account_count}')
         
-        # コンテンツ選択メニューを作成
+        # コンテンツ選択メニューを作成（番号選択方式）
         actions = []
         for i, content in enumerate(available_contents, 1):
             actions.append({
