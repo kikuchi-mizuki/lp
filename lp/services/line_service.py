@@ -1668,7 +1668,8 @@ def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscript
                                 break
                         
                         if not updated:
-                            print(f'[WARN] 追加料金アイテムが見つかりませんでした。')
+                            print(f'[WARN] 追加料金アイテムが見つかりませんでした（解約処理）。')
+                            print(f'[INFO] 解約処理では新規作成は行いません。')
                                 
                     except Exception as e:
                         print(f'[DEBUG] Stripe請求項目更新エラー: {e}')
@@ -1969,16 +1970,32 @@ def handle_content_confirmation_company(company_id, content_type):
                         # Stripeサブスクリプションを取得
                         subscription = stripe.Subscription.retrieve(stripe_subscription_id)
                         
-                        # 追加料金の請求項目を更新
+                        # 追加料金の請求項目を更新（複数の条件で検索）
+                        updated = False
                         for item in subscription.items.data:
-                            if "追加" in (item.price.nickname or ""):
+                            price_nickname = item.price.nickname or ""
+                            price_id = item.price.id
+                            
+                            # 複数の条件で追加料金アイテムを特定
+                            if (("追加" in price_nickname) or 
+                                ("additional" in price_nickname.lower()) or
+                                ("metered" in price_nickname.lower()) or
+                                (price_id == 'price_1Rog1nIxg6C5hAVdnqB5MJiT')):
+                                
                                 print(f'[DEBUG] Stripe請求項目を更新: {item.id}, 数量={additional_content_count}')
                                 stripe.SubscriptionItem.modify(
                                     item.id,
                                     quantity=additional_content_count
                                 )
                                 print(f'[DEBUG] Stripe請求項目更新完了')
+                                updated = True
                                 break
+                        
+                        if not updated:
+                            print(f'[WARN] 再アクティブ化: 追加料金アイテムが見つかりませんでした。')
+                            print(f'[INFO] 利用可能なアイテム:')
+                            for item in subscription.items.data:
+                                print(f'  - ID: {item.id}, Price: {item.price.id}, Nickname: {item.price.nickname}')
                                 
                     except Exception as e:
                         print(f'[DEBUG] Stripe請求項目更新エラー: {e}')
@@ -2110,10 +2127,38 @@ def handle_content_confirmation_company(company_id, content_type):
                         break
                 
                 if not updated:
-                    print(f'[WARN] 追加料金アイテムが見つかりませんでした。手動で確認が必要です。')
+                    print(f'[WARN] 追加料金アイテムが見つかりませんでした。新しい追加料金アイテムを作成します。')
                     print(f'[DEBUG] 利用可能なアイテム:')
                     for item in subscription.items.data:
                         print(f'  - ID: {item.id}, Price: {item.price.id}, Nickname: {item.price.nickname}')
+                    
+                    # 追加料金用の価格アイテムを作成
+                    try:
+                        # 追加料金用の価格を作成（月額1,500円）
+                        additional_price_obj = stripe.Price.create(
+                            unit_amount=150000,  # 1,500円（セント単位）
+                            currency='jpy',
+                            recurring={'interval': 'month'},
+                            product_data={
+                                'name': 'コンテンツ追加料金',
+                            },
+                            nickname='追加コンテンツ料金'
+                        )
+                        print(f'[DEBUG] 追加料金用価格を作成: {additional_price_obj.id}')
+                        
+                        # サブスクリプションに追加料金アイテムを追加
+                        additional_item = stripe.SubscriptionItem.create(
+                            subscription=stripe_subscription_id,
+                            price=additional_price_obj.id,
+                            quantity=additional_content_count
+                        )
+                        print(f'[DEBUG] 追加料金アイテムを作成: {additional_item.id}, 数量={additional_content_count}')
+                        updated = True
+                        
+                    except Exception as create_error:
+                        print(f'[ERROR] 追加料金アイテム作成エラー: {create_error}')
+                        import traceback
+                        traceback.print_exc()
                         
             except Exception as e:
                 print(f'[ERROR] Stripe請求項目更新エラー: {e}')
