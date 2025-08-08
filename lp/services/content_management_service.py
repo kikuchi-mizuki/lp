@@ -19,19 +19,19 @@ class ContentManagementService:
             'ai_accounting': {
                 'name': 'AI経理秘書',
                 'description': '自動経理処理・帳簿作成・税務申告サポート',
-                'price': 2980,
+                'price': 1500,
                 'features': ['自動仕訳', '帳簿作成', '税務申告', '経営分析']
             },
             'ai_schedule': {
                 'name': 'AI予定秘書',
                 'description': 'スケジュール管理・会議調整・リマインダー機能',
-                'price': 1980,
+                'price': 1500,
                 'features': ['スケジュール管理', '会議調整', 'リマインダー', 'タスク管理']
             },
             'ai_task': {
                 'name': 'AIタスクコンシェルジュ',
                 'description': 'タスク管理・プロジェクト管理・進捗追跡',
-                'price': 2480,
+                'price': 1500,
                 'features': ['タスク管理', 'プロジェクト管理', '進捗追跡', 'チーム連携']
             }
         }

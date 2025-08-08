@@ -240,9 +240,9 @@ def handle_add_content(reply_token, user_id_db, stripe_subscription_id):
         else:
             # フォールバック用のデフォルトコンテンツ
             available_contents = [
-                {'id': 'ai_schedule', 'name': 'AI予定秘書', 'description': 'スケジュール管理をAIがサポート', 'price': 1980},
-                {'id': 'ai_accounting', 'name': 'AI経理秘書', 'description': '経理作業をAIが効率化', 'price': 2980},
-                {'id': 'ai_task', 'name': 'AIタスクコンシェルジュ', 'description': 'タスク管理をAIが最適化', 'price': 2480}
+                {'id': 'ai_schedule', 'name': 'AI予定秘書', 'description': 'スケジュール管理をAIがサポート', 'price': 1500},
+                {'id': 'ai_accounting', 'name': 'AI経理秘書', 'description': '経理作業をAIが効率化', 'price': 1500},
+                {'id': 'ai_task', 'name': 'AIタスクコンシェルジュ', 'description': 'タスク管理をAIが最適化', 'price': 1500}
             ]
         
         # 既に追加されているコンテンツを確認

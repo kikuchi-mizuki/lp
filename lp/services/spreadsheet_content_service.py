@@ -135,7 +135,7 @@ class SpreadsheetContentService:
                 'name': 'AI経理秘書',
                 'description': '経理作業をAIが効率化',
                 'url': 'https://lp-production-9e2c.up.railway.app/accounting',
-                'price': 2980,
+                'price': 1500,
                 'status': 'active',
                 'created_at': '2024-01-01',
                 'features': ['自動仕訳', '帳簿作成', '税務申告', '経営分析']
@@ -144,7 +144,7 @@ class SpreadsheetContentService:
                 'name': 'AI予定秘書',
                 'description': 'スケジュール管理をAIがサポート',
                 'url': 'https://lp-production-9e2c.up.railway.app/schedule',
-                'price': 1980,
+                'price': 1500,
                 'status': 'active',
                 'created_at': '2024-01-01',
                 'features': ['スケジュール管理', '会議調整', 'リマインダー', 'タスク管理']
@@ -153,7 +153,7 @@ class SpreadsheetContentService:
                 'name': 'AIタスクコンシェルジュ',
                 'description': 'タスク管理をAIが最適化',
                 'url': 'https://lp-production-9e2c.up.railway.app/task',
-                'price': 2480,
+                'price': 1500,
                 'status': 'active',
                 'created_at': '2024-01-01',
                 'features': ['タスク管理', 'プロジェクト管理', '進捗追跡', 'チーム連携']
