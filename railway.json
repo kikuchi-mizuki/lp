@@ -14,6 +14,10 @@
     {
       "name": "ai-collections-main",
       "source": "./lp",
+      "build": {
+        "builder": "DOCKERFILE",
+        "dockerfilePath": "./lp/Dockerfile"
+      },
       "domains": [
         {
           "name": "ai-collections.herokuapp.com"
