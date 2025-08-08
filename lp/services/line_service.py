@@ -1696,9 +1696,6 @@ def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscript
                 display_name = 'AI予定秘書' if content_type == 'ai_schedule' else content_type
                 cancelled.append(display_name)
                 print(f'[DEBUG] 企業コンテンツ解約処理完了: content_type={content_type}, account_id={account_id}')
-                    
-                    # エラーが発生した場合は処理をスキップ
-                    continue
         
         print(f'[DEBUG] 解約対象コンテンツ数: {len(cancelled)}')
         print(f'[DEBUG] 解約対象: {cancelled}')
