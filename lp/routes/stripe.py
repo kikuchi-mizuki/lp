@@ -83,6 +83,29 @@ def stripe_webhook():
                         VALUES (%s, %s, %s, 'active', CURRENT_TIMESTAMP)
                     ''', (company_id, customer_id, subscription_id))
                     
+                    # company_subscriptionsテーブルにサブスクリプション情報を保存
+                    try:
+                        # Stripeからサブスクリプション情報を取得
+                        subscription = stripe.Subscription.retrieve(subscription_id)
+                        current_period_end = datetime.fromtimestamp(subscription.current_period_end)
+                        
+                        c.execute('''
+                            INSERT INTO company_subscriptions 
+                            (company_id, content_type, subscription_status, stripe_subscription_id, current_period_end, created_at)
+                            VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                        ''', (
+                            company_id,
+                            '月額基本料金',  # 初期は月額基本料金のみ
+                            subscription.status,
+                            subscription_id,
+                            current_period_end
+                        ))
+                        print(f'[DEBUG] company_subscriptionsテーブルにサブスクリプション情報を保存: company_id={company_id}, subscription_id={subscription_id}')
+                    except Exception as e:
+                        print(f'[ERROR] company_subscriptionsテーブル保存エラー: {e}')
+                        import traceback
+                        traceback.print_exc()
+                    
                     print(f'企業データ作成完了: company_id={company_id}, company_name={company_name}')
                 
                 conn.commit()
@@ -144,32 +167,37 @@ def stripe_webhook():
                     VALUES (%s, %s, %s, 'active', CURRENT_TIMESTAMP)
                 ''', (company_id, customer_id, subscription_id))
                 
+                # company_subscriptionsテーブルにサブスクリプション情報を保存
+                try:
+                    # Stripeからサブスクリプション情報を取得
+                    subscription = stripe.Subscription.retrieve(subscription_id)
+                    current_period_end = datetime.fromtimestamp(subscription.current_period_end)
+                    
+                    c.execute('''
+                        INSERT INTO company_subscriptions 
+                        (company_id, content_type, subscription_status, stripe_subscription_id, current_period_end, created_at)
+                        VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                    ''', (
+                        company_id,
+                        '月額基本料金',  # 初期は月額基本料金のみ
+                        subscription.status,
+                        subscription_id,
+                        current_period_end
+                    ))
+                    print(f'[DEBUG] company_subscriptionsテーブルにサブスクリプション情報を保存: company_id={company_id}, subscription_id={subscription_id}')
+                except Exception as e:
+                    print(f'[ERROR] company_subscriptionsテーブル保存エラー: {e}')
+                    import traceback
+                    traceback.print_exc()
+                
                 conn.commit()
                 print(f'新規ユーザー登録完了: email={email}, customer_id={customer_id}, subscription_id={subscription_id}')
                 print(f'企業データ作成完了: company_id={company_id}, company_name={company_name}')
                 print(f'[IMPORTANT] 企業データ準備完了 - LINE連携待ち: email={email}, company_id={company_id}')
             
-            # 従量課金アイテムを追加
-            try:
-                USAGE_PRICE_ID = os.getenv('STRIPE_USAGE_PRICE_ID')
-                subscription = stripe.Subscription.retrieve(subscription_id)
-                # 従量課金（metered）Price IDのみ追加
-                usage_item_exists = False
-                for item in subscription['items']['data']:
-                    if item['price']['id'] == USAGE_PRICE_ID:
-                        print(f'従量課金アイテムは既に追加済み: subscription_id={subscription_id}, usage_price_id={USAGE_PRICE_ID}')
-                        usage_item_exists = True
-                        break
-                
-                if not usage_item_exists:
-                    result = stripe.SubscriptionItem.create(
-                        subscription=subscription_id,
-                        price=USAGE_PRICE_ID
-                    )
-                    print(f'従量課金アイテム追加完了: subscription_id={subscription_id}, usage_price_id={USAGE_PRICE_ID}, result={result}')
-            except Exception as e:
-                print(f'従量課金アイテム追加エラー: {e}')
-                print(traceback.format_exc())
+            # 従量課金アイテムの自動追加を削除 - ユーザーが手動で追加するまで待機
+            print(f'[DEBUG] サブスクリプション情報保存完了: subscription_id={subscription_id}')
+            print(f'[INFO] 従量課金アイテムは手動追加まで待機中')
             
             conn.close()
         elif event_type == 'invoice.payment_succeeded':
@@ -215,19 +243,37 @@ def stripe_webhook():
                         VALUES (%s, %s, %s, 'active', CURRENT_TIMESTAMP)
                     ''', (company_id, customer_id, subscription_id))
                     
+                    # company_subscriptionsテーブルにサブスクリプション情報を保存
+                    try:
+                        # Stripeからサブスクリプション情報を取得
+                        subscription = stripe.Subscription.retrieve(subscription_id)
+                        current_period_end = datetime.fromtimestamp(subscription.current_period_end)
+                        
+                        c.execute('''
+                            INSERT INTO company_subscriptions 
+                            (company_id, content_type, subscription_status, stripe_subscription_id, current_period_end, created_at)
+                            VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                        ''', (
+                            company_id,
+                            '月額基本料金',  # 初期は月額基本料金のみ
+                            subscription.status,
+                            subscription_id,
+                            current_period_end
+                        ))
+                        print(f'[DEBUG] company_subscriptionsテーブルにサブスクリプション情報を保存: company_id={company_id}, subscription_id={subscription_id}')
+                    except Exception as e:
+                        print(f'[ERROR] company_subscriptionsテーブル保存エラー: {e}')
+                        import traceback
+                        traceback.print_exc()
+                    
                     print(f'企業データ作成完了: company_id={company_id}, company_name={company_name}')
                 
                 conn.commit()
                 print(f'既存ユーザーの決済情報を更新: id={user_id}, subscription_id={subscription_id}')
                 
-                # 課金予定のコンテンツを実際に課金
-                try:
-                    from services.line_service import process_pending_charges
-                    charge_result = process_pending_charges(user_id, subscription_id)
-                    print(f'[DEBUG] 課金予定処理結果: {charge_result}')
-                except Exception as e:
-                    print(f'[DEBUG] 課金予定処理エラー: {e}')
-                    traceback.print_exc()
+                # 課金予定のコンテンツ処理を削除 - ユーザーが手動で追加するまで待機
+                print(f'[DEBUG] サブスクリプション情報保存完了: subscription_id={subscription_id}')
+                print(f'[INFO] コンテンツ追加は手動追加まで待機中')
                 
                 # LINE連携済みの場合、案内メッセージを送信
                 if line_user_id:
@@ -295,6 +341,35 @@ def stripe_webhook():
                 company_id = c.fetchone()[0]
                 print(f'[DEBUG] 企業データ作成: company_id={company_id}, company_name={company_name}')
                 
+                # company_paymentsテーブルにも決済データを作成
+                c.execute('''
+                    INSERT INTO company_payments (company_id, stripe_customer_id, stripe_subscription_id, subscription_status, created_at)
+                    VALUES (%s, %s, %s, 'active', CURRENT_TIMESTAMP)
+                ''', (company_id, customer_id, subscription_id))
+                
+                # company_subscriptionsテーブルにサブスクリプション情報を保存
+                try:
+                    # Stripeからサブスクリプション情報を取得
+                    subscription = stripe.Subscription.retrieve(subscription_id)
+                    current_period_end = datetime.fromtimestamp(subscription.current_period_end)
+                    
+                    c.execute('''
+                        INSERT INTO company_subscriptions 
+                        (company_id, content_type, subscription_status, stripe_subscription_id, current_period_end, created_at)
+                        VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                    ''', (
+                        company_id,
+                        '月額基本料金',  # 初期は月額基本料金のみ
+                        subscription.status,
+                        subscription_id,
+                        current_period_end
+                    ))
+                    print(f'[DEBUG] company_subscriptionsテーブルにサブスクリプション情報を保存: company_id={company_id}, subscription_id={subscription_id}')
+                except Exception as e:
+                    print(f'[ERROR] company_subscriptionsテーブル保存エラー: {e}')
+                    import traceback
+                    traceback.print_exc()
+                
                 # 月額料金決済時はコンテンツを自動追加しない
                 # ユーザーが手動でコンテンツを追加するまで待機
                 
@@ -302,18 +377,9 @@ def stripe_webhook():
                 print(f'新規ユーザー登録完了: email={email}, customer_id={customer_id}, subscription_id={subscription_id}')
                 print(f'企業データ作成完了: company_id={company_id}, company_name={company_name}')
             
-            # 従量課金アイテムを追加
-            try:
-                USAGE_PRICE_ID = os.getenv('STRIPE_USAGE_PRICE_ID')
-                result = stripe.SubscriptionItem.create(
-                    subscription=subscription_id,
-                    price=USAGE_PRICE_ID
-                )
-                print(f'従量課金アイテム追加完了: subscription_id={subscription_id}, usage_price_id={USAGE_PRICE_ID}, result={result}')
-            except Exception as e:
-                import traceback
-                print(f'従量課金アイテム追加エラー: {e}')
-                print(traceback.format_exc())
+            # 従量課金アイテムの自動追加を削除 - ユーザーが手動で追加するまで待機
+            print(f'[DEBUG] サブスクリプション情報保存完了: subscription_id={subscription_id}')
+            print(f'[INFO] 従量課金アイテムは手動追加まで待機中')
             
             conn.close()
         elif event_type == 'customer.subscription.created':
@@ -337,6 +403,29 @@ def stripe_webhook():
                 company_id, line_user_id = existing_company_by_email
                 # 既存企業の決済情報を更新
                 c.execute('UPDATE companies SET stripe_subscription_id = %s WHERE id = %s', (subscription_id, company_id))
+                
+                # company_subscriptionsテーブルにサブスクリプション情報を保存
+                try:
+                    # Stripeからサブスクリプション情報を取得
+                    subscription = stripe.Subscription.retrieve(subscription_id)
+                    current_period_end = datetime.fromtimestamp(subscription.current_period_end)
+                    
+                    c.execute('''
+                        INSERT INTO company_subscriptions 
+                        (company_id, content_type, subscription_status, stripe_subscription_id, current_period_end, created_at)
+                        VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                    ''', (
+                        company_id,
+                        '月額基本料金',  # 初期は月額基本料金のみ
+                        subscription.status,
+                        subscription_id,
+                        current_period_end
+                    ))
+                    print(f'[DEBUG] company_subscriptionsテーブルにサブスクリプション情報を保存: company_id={company_id}, subscription_id={subscription_id}')
+                except Exception as e:
+                    print(f'[ERROR] company_subscriptionsテーブル保存エラー: {e}')
+                    import traceback
+                    traceback.print_exc()
                 
                 # 企業データは既に存在するため、サブスクリプション情報を更新
                 print(f'[DEBUG] 既存企業データのサブスクリプション更新: company_id={company_id}')
@@ -400,11 +489,34 @@ def stripe_webhook():
                 company_id = c.fetchone()[0]
                 print(f'[DEBUG] 新規企業データ作成: company_id={company_id}, company_name={company_name}')
                 
-                # company_subscriptionsテーブルにサブスクリプション情報を保存
+                # company_paymentsテーブルにも決済データを作成
                 c.execute('''
                     INSERT INTO company_payments (company_id, stripe_customer_id, stripe_subscription_id, subscription_status, created_at)
                     VALUES (%s, %s, %s, 'active', CURRENT_TIMESTAMP)
                 ''', (company_id, customer_id, subscription_id))
+                
+                # company_subscriptionsテーブルにサブスクリプション情報を保存
+                try:
+                    # Stripeからサブスクリプション情報を取得
+                    subscription = stripe.Subscription.retrieve(subscription_id)
+                    current_period_end = datetime.fromtimestamp(subscription.current_period_end)
+                    
+                    c.execute('''
+                        INSERT INTO company_subscriptions 
+                        (company_id, content_type, subscription_status, stripe_subscription_id, current_period_end, created_at)
+                        VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                    ''', (
+                        company_id,
+                        '月額基本料金',  # 初期は月額基本料金のみ
+                        subscription.status,
+                        subscription_id,
+                        current_period_end
+                    ))
+                    print(f'[DEBUG] company_subscriptionsテーブルにサブスクリプション情報を保存: company_id={company_id}, subscription_id={subscription_id}')
+                except Exception as e:
+                    print(f'[ERROR] company_subscriptionsテーブル保存エラー: {e}')
+                    import traceback
+                    traceback.print_exc()
                 
                 conn.commit()
                 print(f'新規ユーザー登録完了: email={email}, customer_id={customer_id}, subscription_id={subscription_id}')
