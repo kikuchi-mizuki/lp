@@ -23,9 +23,9 @@ COPY app_minimal.py .
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 USER appuser
 
-# Set port
+# Set fixed port
 ENV PORT=3000
 EXPOSE 3000
 
-# Start command
-CMD gunicorn --bind 0.0.0.0:$PORT app_minimal:app
+# Start command with fixed port
+CMD gunicorn --bind 0.0.0.0:3000 app_minimal:app
