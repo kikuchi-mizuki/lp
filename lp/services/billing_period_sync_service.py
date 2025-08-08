@@ -32,9 +32,9 @@ class BillingPeriodSyncService:
                 
                 # 複数の条件で従量課金アイテムを特定
                 if (price_id == self.usage_price_id or
-                    "追加" in price_nickname or
-                    "additional" in price_nickname.lower() or
-                    "metered" in price_nickname.lower()):
+                    (price_nickname and "追加" in price_nickname) or
+                    (price_nickname and "additional" in price_nickname.lower()) or
+                    (price_nickname and "metered" in price_nickname.lower())):
                     usage_item = item
                     print(f"[DEBUG] 従量課金アイテム候補発見: {item['id']}, Price={price_id}")
                     break
