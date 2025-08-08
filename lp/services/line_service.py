@@ -1252,14 +1252,21 @@ def handle_status_check_company(reply_token, company_id):
         if line_accounts:
             status_message += "📋 利用コンテンツ:\n"
             
+            active_content_count = 0
             for account in line_accounts:
                 content_type, status, created_at = account
                 created_date = created_at.strftime('%Y年%m月%d日') if created_at else '不明'
                 
-                # 料金情報を取得（全コンテンツが追加料金対象）
-                additional_price = 1500
+                # アクティブなコンテンツの順番を管理
+                if status == "active":
+                    active_content_count += 1
+                    if active_content_count == 1:
+                        price_text = "（無料）"  # 1個目は無料
+                    else:
+                        price_text = "（+1,500円/月）"  # 2個目以降は有料
+                else:
+                    price_text = "（停止中）"
                 
-                price_text = f"（+{additional_price:,}円/月）" if additional_price > 0 else "（基本料金に含まれる）"
                 status_message += f"• {content_type}{price_text}（{created_date}追加）\n"
         else:
             status_message += "📋 利用コンテンツ: まだ追加していません\n"
@@ -1269,10 +1276,13 @@ def handle_status_check_company(reply_token, company_id):
             monthly_base_price = monthly_subscription[1]
             total_additional_price = 0
             
-            # アクティブなコンテンツの追加料金を計算（全コンテンツが対象）
+            # アクティブなコンテンツの追加料金を計算（1個目は無料、2個目以降は有料）
+            active_count = 0
             for account in line_accounts:
                 if account[1] == "active":  # statusがactive
-                    total_additional_price += 1500  # 全コンテンツが1,500円
+                    active_count += 1
+                    if active_count > 1:  # 2個目以降のみ課金
+                        total_additional_price += 1500
             
             total_monthly_price = monthly_base_price + total_additional_price
             status_message += f"\n💰 合計料金: {total_monthly_price:,}円/月"
@@ -1458,11 +1468,13 @@ def handle_cancel_selection_company(reply_token, company_id, stripe_subscription
             if i in selected_indices:
                 # ai_scheduleをAI予定秘書に変換
                 display_name = 'AI予定秘書' if content_type == 'ai_schedule' else content_type
+                # 1個目は無料、2個目以降は有料
+                additional_price = 0 if i == 1 else 1500
                 selected_contents.append({
                     'account_id': account_id,
                     'content_type': content_type,
                     'display_name': display_name,
-                    'additional_price': 1500 if content_type in ["AIタスクコンシェルジュ", "AI経理秘書"] else 0
+                    'additional_price': additional_price
                 })
         
         if not selected_contents:
@@ -1581,8 +1593,8 @@ def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscript
             if i in selected_indices:
                 print(f'[DEBUG] 解約処理開始: content_type={content_type}, account_id={account_id}')
                 
-                # 追加料金が必要なコンテンツかチェック（全コンテンツが対象）
-                additional_price = 1500
+                # 追加料金が必要なコンテンツかチェック（1個目は無料、2個目以降は有料）
+                additional_price = 0 if i == 1 else 1500
                 
                 # Stripeの請求項目を更新（追加料金が必要なコンテンツの場合）
                 if additional_price > 0 and stripe_subscription_id:
@@ -1590,18 +1602,18 @@ def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscript
                         import stripe
                         stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
                         
-                        # 現在のアクティブコンテンツ数を取得（追加料金が必要なもののみ）
+                        # 現在のアクティブコンテンツ数を取得（1個目は無料なので-1）
                         c.execute(f'''
                             SELECT COUNT(*) 
                             FROM company_line_accounts 
-                            WHERE company_id = {placeholder} AND status = 'active' 
-                            AND content_type IN ('AIタスクコンシェルジュ', 'AI経理秘書')
+                            WHERE company_id = {placeholder} AND status = 'active'
                         ''', (company_id,))
                         
-                        current_count = c.fetchone()[0]
+                        total_current_count = c.fetchone()[0]
+                        current_count = max(0, total_current_count - 1)  # 1個目は無料なので-1
                         # 解約後の数量を計算（現在の数量 - 1）
                         new_count = max(0, current_count - 1)
-                        print(f'[DEBUG] 追加料金コンテンツ数: 現在={current_count}, 解約後={new_count}')
+                        print(f'[DEBUG] コンテンツ数: 総数={total_current_count}, 現在課金対象={current_count}, 解約後={new_count}')
                         
                         # Stripeサブスクリプションを取得
                         subscription = stripe.Subscription.retrieve(stripe_subscription_id)
@@ -1917,24 +1929,28 @@ def handle_content_confirmation_company(company_id, content_type):
                 conn.commit()
                 print(f'[DEBUG] 非アクティブLINEアカウントを再アクティブ化: account_id={account_id}')
                 
-                # Stripeの請求項目を更新（追加料金が必要なコンテンツの場合）
-                additional_price = 1500  # 全コンテンツが追加料金対象
+                # 再アクティブ化後のアクティブコンテンツ数を取得（1個目は無料なので-1）
+                c.execute(f'''
+                    SELECT COUNT(*) 
+                    FROM company_line_accounts 
+                    WHERE company_id = {placeholder} AND status = 'active'
+                ''', (company_id,))
+                
+                total_content_count = c.fetchone()[0]
+                # 1個目は無料なので、課金対象は総数-1
+                if total_content_count > 0:
+                    additional_price = 1500  # 2個目以降のコンテンツは有料
+                    additional_content_count = max(0, total_content_count - 1)
+                else:
+                    additional_price = 0  # コンテンツが0個の場合
+                    additional_content_count = 0
+                    
+                print(f'[DEBUG] 再アクティブ化: 総数={total_content_count}, 課金対象={additional_content_count}, 料金={additional_price}')
                 
                 if additional_price > 0 and stripe_subscription_id:
                     try:
                         import stripe
                         stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
-                        
-                        # 現在のアクティブコンテンツ数を取得（追加料金が必要なもののみ）
-                        c.execute(f'''
-                            SELECT COUNT(*) 
-                            FROM company_line_accounts 
-                            WHERE company_id = {placeholder} AND status = 'active' 
-                            AND content_type IN ('AIタスクコンシェルジュ', 'AI経理秘書')
-                        ''', (company_id,))
-                        
-                        additional_content_count = c.fetchone()[0]
-                        print(f'[DEBUG] 追加料金コンテンツ数: {additional_content_count}')
                         
                         # Stripeサブスクリプションを取得
                         subscription = stripe.Subscription.retrieve(stripe_subscription_id)
@@ -1996,7 +2012,6 @@ def handle_content_confirmation_company(company_id, content_type):
             }
         
         content = content_info[content_type]
-        additional_price = content['additional_price']
         
         # 既存のアクティブコンテンツ数を取得
         c.execute(f'''
@@ -2007,6 +2022,14 @@ def handle_content_confirmation_company(company_id, content_type):
         
         existing_count = c.fetchone()[0]
         print(f'[DEBUG] 既存アクティブコンテンツ数: {existing_count}')
+        
+        # 1個目は無料、2個目以降は有料
+        if existing_count == 0:
+            additional_price = 0  # 初回コンテンツは無料
+            print(f'[DEBUG] 初回コンテンツのため無料: {content_type}')
+        else:
+            additional_price = content['additional_price']  # 2個目以降は有料
+            print(f'[DEBUG] 追加コンテンツのため有料: {content_type}, 料金={additional_price}円')
         
         # 請求期間を月額サブスクリプションに合わせる
         billing_end_date = stripe_period_end if stripe_period_end else current_period_end
@@ -2028,15 +2051,16 @@ def handle_content_confirmation_company(company_id, content_type):
                 import stripe
                 stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
                 
-                # 現在のアクティブコンテンツ数を取得（全コンテンツが追加料金対象）
+                # 現在のアクティブコンテンツ数を取得（1個目は無料なので-1）
                 c.execute(f'''
                     SELECT COUNT(*) 
                     FROM company_line_accounts 
                     WHERE company_id = {placeholder} AND status = 'active'
                 ''', (company_id,))
                 
-                additional_content_count = c.fetchone()[0]
-                print(f'[DEBUG] 追加料金コンテンツ数: {additional_content_count}')
+                total_content_count = c.fetchone()[0]
+                additional_content_count = max(0, total_content_count - 1)  # 1個目は無料なので-1
+                print(f'[DEBUG] 総コンテンツ数: {total_content_count}, 追加料金対象: {additional_content_count}')
                 
                 # Stripeサブスクリプションを取得
                 subscription = stripe.Subscription.retrieve(stripe_subscription_id)
