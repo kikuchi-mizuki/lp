@@ -21,18 +21,32 @@ class BillingPeriodSyncService:
             # Stripeサブスクリプションを取得
             subscription = stripe.Subscription.retrieve(stripe_subscription_id)
             
-            # 従量課金アイテムを取得
+            # 従量課金アイテムを取得（複数の条件で検索）
             usage_item = None
-            for item in subscription['items']['data']:
-                if item['price']['id'] == self.usage_price_id:
+            print(f"[DEBUG] サブスクリプションアイテム数: {len(subscription['items']['data'])}")
+            
+            for i, item in enumerate(subscription['items']['data']):
+                price_id = item['price']['id']
+                price_nickname = item['price'].get('nickname', '')
+                print(f"[DEBUG] アイテム{i}: ID={item['id']}, Price={price_id}, Nickname={price_nickname}")
+                
+                # 複数の条件で従量課金アイテムを特定
+                if (price_id == self.usage_price_id or
+                    "追加" in price_nickname or
+                    "additional" in price_nickname.lower() or
+                    "metered" in price_nickname.lower()):
                     usage_item = item
+                    print(f"[DEBUG] 従量課金アイテム候補発見: {item['id']}, Price={price_id}")
                     break
             
             if not usage_item:
                 print(f"[WARN] 従量課金アイテムが見つかりません: subscription_id={stripe_subscription_id}")
+                print(f"[DEBUG] 利用可能なアイテム:")
+                for item in subscription['items']['data']:
+                    print(f"  - ID: {item['id']}, Price: {item['price']['id']}, Nickname: {item['price'].get('nickname', '')}")
                 return False
             
-            print(f"[DEBUG] 従量課金アイテム発見: {usage_item['id']}")
+            print(f"[DEBUG] 従量課金アイテム確定: {usage_item['id']}")
             
             # 既存の使用量レコードを確認
             existing_usage = stripe.UsageRecord.list(
@@ -42,10 +56,29 @@ class BillingPeriodSyncService:
             
             print(f"[DEBUG] 既存の使用量レコード数: {len(existing_usage['data'])}")
             
+            # 現在のアクティブコンテンツ数を取得（データベースから）
+            try:
+                conn = get_db_connection()
+                c = conn.cursor()
+                c.execute('''
+                    SELECT COUNT(*) 
+                    FROM company_line_accounts 
+                    WHERE company_id = (SELECT company_id FROM company_monthly_subscriptions WHERE stripe_subscription_id = %s)
+                    AND status = 'active' 
+                    AND content_type IN ('AIタスクコンシェルジュ', 'AI経理秘書')
+                ''', (stripe_subscription_id,))
+                
+                active_content_count = c.fetchone()[0]
+                conn.close()
+                print(f"[DEBUG] アクティブコンテンツ数: {active_content_count}")
+            except Exception as e:
+                print(f"[WARN] データベースからコンテンツ数取得エラー: {e}")
+                active_content_count = 1  # フォールバック
+            
             # 月額サブスクリプションの期間に合わせて使用量レコードを作成
             stripe.UsageRecord.create(
                 subscription_item=usage_item['id'],
-                quantity=1,  # 追加コンテンツ1つ分
+                quantity=active_content_count,  # 実際のアクティブコンテンツ数
                 timestamp=int(subscription['current_period_start']),  # 月額期間開始時点
                 action='set'  # 既存レコードを上書き
             )

@@ -2030,20 +2030,47 @@ def handle_content_confirmation_company(company_id, content_type):
                 
                 # Stripeサブスクリプションを取得
                 subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+                print(f'[DEBUG] Stripeサブスクリプション取得: {subscription.id}')
                 
-                # 追加料金の請求項目を更新
+                # サブスクリプションアイテムを詳細にログ出力
+                print(f'[DEBUG] サブスクリプションアイテム数: {len(subscription.items.data)}')
+                for i, item in enumerate(subscription.items.data):
+                    print(f'[DEBUG] アイテム{i}: ID={item.id}, Price={item.price.id}, Nickname={item.price.nickname}, Quantity={item.quantity}')
+                
+                # 追加料金の請求項目を更新（複数の条件で検索）
+                updated = False
                 for item in subscription.items.data:
-                    if "追加" in (item.price.nickname or ""):
+                    price_nickname = item.price.nickname or ""
+                    price_id = item.price.id
+                    
+                    # 複数の条件で追加料金アイテムを特定
+                    if (("追加" in price_nickname) or 
+                        ("additional" in price_nickname.lower()) or
+                        ("metered" in price_nickname.lower()) or
+                        (price_id == 'price_1Rog1nIxg6C5hAVdnqB5MJiT')):  # 既知のPrice ID
+                        
+                        print(f'[DEBUG] 追加料金アイテム発見: {item.id}, Price={price_id}, Nickname={price_nickname}')
                         print(f'[DEBUG] Stripe請求項目を更新: {item.id}, 数量={additional_content_count}')
+                        
+                        # 数量を更新
                         stripe.SubscriptionItem.modify(
                             item.id,
                             quantity=additional_content_count
                         )
-                        print(f'[DEBUG] Stripe請求項目更新完了')
+                        print(f'[DEBUG] Stripe請求項目更新完了: {item.id}')
+                        updated = True
                         break
+                
+                if not updated:
+                    print(f'[WARN] 追加料金アイテムが見つかりませんでした。手動で確認が必要です。')
+                    print(f'[DEBUG] 利用可能なアイテム:')
+                    for item in subscription.items.data:
+                        print(f'  - ID: {item.id}, Price: {item.price.id}, Nickname: {item.price.nickname}')
                         
             except Exception as e:
-                print(f'[DEBUG] Stripe請求項目更新エラー: {e}')
+                print(f'[ERROR] Stripe請求項目更新エラー: {e}')
+                import traceback
+                traceback.print_exc()
                 # Stripeエラーが発生しても処理を続行
         
         # 請求期間同期サービスを呼び出して使用量レコードを月額サブスクリプション期間に合わせる
