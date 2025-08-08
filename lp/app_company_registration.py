@@ -64,9 +64,13 @@ def upsert_company_profile_with_subscription(company_name: str, email: str, stri
             ''', (company_name, email))
             company_id = c.fetchone()[0]
         
-        # サブスクリプション情報の保存
+        # 先に企業情報の変更を確定させる
+        conn.commit()
+
+        # サブスクリプション情報の保存（別コネクションで実行されるため、企業側を先にコミットする）
         save_company_subscription(company_id, stripe_subscription_id)
         
+        # 念のためコミット（既にコミット済みの場合は影響なし）
         conn.commit()
         conn.close()
         

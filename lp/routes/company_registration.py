@@ -9,7 +9,11 @@ from flask import Blueprint, request, jsonify, render_template, redirect, url_fo
 import os
 import json
 from services.company_registration_service import CompanyRegistrationService
-from services.automated_ai_schedule_clone import AutomatedAIScheduleClone
+# AutomatedAIScheduleClone は任意機能のため、モジュール未配置の場合でも起動を継続する
+try:
+    from services.automated_ai_schedule_clone import AutomatedAIScheduleClone
+except Exception:
+    AutomatedAIScheduleClone = None
 from utils.db import get_db_connection
 
 company_registration_bp = Blueprint('company_registration', __name__)
@@ -140,6 +144,12 @@ def register_company():
             # 完全自動化スクリプトを実行
             print(f"🚀 AI予定秘書の完全自動複製を開始: {company_name}")
             
+            if AutomatedAIScheduleClone is None:
+                return jsonify({
+                    'success': False,
+                    'error': '自動複製モジュールが未導入のため、この機能は現在無効化されています。'
+                }), 501
+
             cloner = AutomatedAIScheduleClone()
             result = cloner.create_ai_schedule_clone(
                 company_name, line_channel_id, line_access_token, line_channel_secret
