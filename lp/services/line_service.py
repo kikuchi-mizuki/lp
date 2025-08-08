@@ -1689,7 +1689,8 @@ def handle_content_confirmation_company(company_id, content_type):
             }
         
         subscription_status, stripe_subscription_id, current_period_end = monthly_subscription
-        if subscription_status != 'active':
+        # trialing も有効扱いにする
+        if subscription_status not in ('active', 'trialing'):
             return {
                 'success': False, 
                 'error': '❌ 月額基本サブスクリプションが非アクティブです。\n\n💳 月額基本料金の決済を完了してからコンテンツを追加してください。'
