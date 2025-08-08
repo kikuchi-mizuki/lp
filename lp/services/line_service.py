@@ -224,12 +224,26 @@ def handle_add_content(reply_token, user_id_db, stripe_subscription_id):
         subscription_status = check_subscription_status(stripe_subscription_id)
         is_trial_period = subscription_status.get('subscription', {}).get('status') == 'trialing'
         
-        # 利用可能なコンテンツを定義
-        available_contents = [
-            {'name': 'AI予定秘書', 'description': 'スケジュール管理をAIがサポート'},
-            {'name': 'AI経理秘書', 'description': '経理作業をAIが効率化'},
-            {'name': 'AIタスクコンシェルジュ', 'description': 'タスク管理をAIが最適化'}
-        ]
+        # スプレッドシートから利用可能なコンテンツを取得
+        from services.spreadsheet_content_service import spreadsheet_content_service
+        contents_result = spreadsheet_content_service.get_available_contents()
+        
+        if contents_result['success']:
+            available_contents = []
+            for content_id, content_info in contents_result['contents'].items():
+                available_contents.append({
+                    'id': content_id,
+                    'name': content_info['name'],
+                    'description': content_info['description'],
+                    'price': content_info['price']
+                })
+        else:
+            # フォールバック用のデフォルトコンテンツ
+            available_contents = [
+                {'id': 'ai_schedule', 'name': 'AI予定秘書', 'description': 'スケジュール管理をAIがサポート', 'price': 1980},
+                {'id': 'ai_accounting', 'name': 'AI経理秘書', 'description': '経理作業をAIが効率化', 'price': 2980},
+                {'id': 'ai_task', 'name': 'AIタスクコンシェルジュ', 'description': 'タスク管理をAIが最適化', 'price': 2480}
+            ]
         
         # 既に追加されているコンテンツを確認
         conn = get_db_connection()
@@ -264,7 +278,7 @@ def handle_add_content(reply_token, user_id_db, stripe_subscription_id):
             actions.append({
                 "type": "message",
                 "label": f"{i}. {content['name']}",
-                "text": f"{i}"
+                "text": f"{content['id']}"  # content_idを送信
             })
         
         # 戻るボタンを追加
@@ -293,46 +307,28 @@ def handle_add_content(reply_token, user_id_db, stripe_subscription_id):
         traceback.print_exc()
         send_line_message(reply_token, [{"type": "text", "text": "コンテンツ追加処理でエラーが発生しました。"}])
 
-def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, content_number):
+def handle_content_selection(reply_token, user_id_db, stripe_subscription_id, content_id):
     """コンテンツ選択処理"""
     try:
         # データベースタイプを取得
         db_type = get_db_type()
         placeholder = '%s' if db_type == 'postgresql' else '?'
         
-        # コンテンツ情報を定義
-        content_info = {
-            '1': {
-                'name': 'AI予定秘書',
-                'price': 1500,
-                "description": '日程調整のストレスから解放される、スケジュール管理の相棒',
-                'usage': 'Googleカレンダーと連携し、LINEで予定の追加・確認・空き時間の提案まで。調整のやりとりに追われる時間を、もっとクリエイティブに使えるように。',
-                'url': 'https://lp-production-9e2c.up.railway.app/schedule',
-                'line_url': 'https://line.me/R/ti/p/@ai_schedule_secretary'
-            },
-            '2': {
-                'name': 'AI経理秘書',
-                'price': 1500,
-                "description": '打合せ後すぐ送れる、スマートな請求書作成アシスタント',
-                'usage': 'LINEで項目を送るだけで、見積書や請求書を即作成。営業から事務処理までを一気通貫でスムーズに。',
-                'url': 'https://lp-production-9e2c.up.railway.app/accounting',
-                'line_url': 'https://line.me/R/ti/p/@ai_accounting_secretary'
-            },
-            '3': {
-                'name': 'AIタスクコンシェルジュ',
-                'price': 1500,
-                "description": '今日やるべきことを、ベストなタイミングで',
-                'usage': '登録したタスクを空き時間に自動で配置し、理想的な1日をAIが提案。「やりたいのにできない」を、「自然にこなせる」毎日に。',
-                'url': 'https://lp-production-9e2c.up.railway.app/task',
-                'line_url': 'https://line.me/R/ti/p/@ai_task_concierge'
-            }
-        }
+        # スプレッドシートからコンテンツ情報を取得
+        from services.spreadsheet_content_service import spreadsheet_content_service
+        content_info_result = spreadsheet_content_service.get_available_contents()
         
-        if content_number not in content_info:
-            send_line_message(reply_token, [{"type": "text", "text": "無効なコンテンツ番号です。"}])
+        if not content_info_result['success']:
+            send_line_message(reply_token, [{"type": "text", "text": "コンテンツ情報の取得に失敗しました。"}])
             return
         
-        content = content_info[content_number]
+        content_info = content_info_result['contents']
+        
+        if content_id not in content_info:
+            send_line_message(reply_token, [{"type": "text", "text": "無効なコンテンツIDです。"}])
+            return
+        
+        content = content_info[content_id]
         
         # 既に追加されているコンテンツを確認
         conn = get_db_connection()

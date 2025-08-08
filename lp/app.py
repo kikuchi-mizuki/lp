@@ -43,6 +43,7 @@ from routes.railway_setup import railway_setup_bp
 from routes.ai_schedule_webhook import ai_schedule_webhook_bp
 from routes.ai_schedule_webhook_simple import ai_schedule_webhook_simple_bp
 from routes.debug import debug_bp
+# from routes.content_admin import content_admin_bp  # 一時的に無効化
 from datetime import datetime
 
 load_dotenv()
@@ -317,6 +318,7 @@ app.register_blueprint(railway_setup_bp)
 app.register_blueprint(ai_schedule_webhook_bp)
 app.register_blueprint(ai_schedule_webhook_simple_bp)
 app.register_blueprint(debug_bp)
+# app.register_blueprint(content_admin_bp)  # 一時的に無効化
 
 # アプリケーション起動時のデータベース初期化
 import logging
