@@ -125,6 +125,22 @@ def stripe_webhook():
                             ''', (trial_end, company_id))
                             print(f'[DEBUG] トライアル期間情報を更新: company_id={company_id}, trial_end={trial_end}')
                         
+                        # 月額基本サブスクリプションテーブルをUPSERT
+                        try:
+                            c.execute('''
+                                INSERT INTO company_monthly_subscriptions 
+                                (company_id, stripe_subscription_id, subscription_status, monthly_base_price, current_period_end)
+                                VALUES (%s, %s, %s, %s, %s)
+                                ON CONFLICT (company_id) DO UPDATE SET
+                                    stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+                                    subscription_status = EXCLUDED.subscription_status,
+                                    current_period_end = EXCLUDED.current_period_end,
+                                    updated_at = CURRENT_TIMESTAMP
+                            ''', (company_id, subscription_id, subscription.status, 3900, current_period_end))
+                            print(f"[DEBUG] company_monthly_subscriptions をUPSERT: company_id={company_id}")
+                        except Exception as e:
+                            print(f"[WARN] company_monthly_subscriptions UPSERT失敗: {e}")
+                        
                     except Exception as e:
                         print(f'[ERROR] company_subscriptionsテーブル保存エラー: {e}')
                         import traceback
@@ -132,6 +148,28 @@ def stripe_webhook():
                     
                     print(f'企業データ作成完了: company_id={company_id}, company_name={company_name}')
                 
+                # 月額基本サブスクリプションテーブルをUPSERT（既存企業にも必ず実行）
+                try:
+                    subscription = stripe.Subscription.retrieve(subscription_id)
+                    from datetime import timezone, timedelta
+                    jst = timezone(timedelta(hours=9))
+                    current_period_end_utc = datetime.fromtimestamp(subscription.current_period_end, tz=timezone.utc)
+                    current_period_end = current_period_end_utc.astimezone(jst)
+
+                    c.execute('''
+                        INSERT INTO company_monthly_subscriptions 
+                        (company_id, stripe_subscription_id, subscription_status, monthly_base_price, current_period_end)
+                        VALUES (%s, %s, %s, %s, %s)
+                        ON CONFLICT (company_id) DO UPDATE SET
+                            stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+                            subscription_status = EXCLUDED.subscription_status,
+                            current_period_end = EXCLUDED.current_period_end,
+                            updated_at = CURRENT_TIMESTAMP
+                    ''', (company_id, subscription_id, subscription.status, 3900, current_period_end))
+                    print(f"[DEBUG] company_monthly_subscriptions をUPSERT(既存含む): company_id={company_id}")
+                except Exception as e:
+                    print(f"[WARN] company_monthly_subscriptions UPSERT失敗(既存含む): {e}")
+
                 conn.commit()
                 print(f'既存ユーザーの決済情報を更新: id={user_id}, subscription_id={subscription_id}')
                 
@@ -233,11 +271,48 @@ def stripe_webhook():
                         ''', (trial_end, company_id))
                         print(f'[DEBUG] トライアル期間情報を更新: company_id={company_id}, trial_end={trial_end}')
                     
+                    # 月額基本サブスクリプションテーブルをUPSERT
+                    try:
+                        c.execute('''
+                            INSERT INTO company_monthly_subscriptions 
+                            (company_id, stripe_subscription_id, subscription_status, monthly_base_price, current_period_end)
+                            VALUES (%s, %s, %s, %s, %s)
+                            ON CONFLICT (company_id) DO UPDATE SET
+                                stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+                                subscription_status = EXCLUDED.subscription_status,
+                                current_period_end = EXCLUDED.current_period_end,
+                                updated_at = CURRENT_TIMESTAMP
+                        ''', (company_id, subscription_id, subscription.status, 3900, current_period_end))
+                        print(f"[DEBUG] company_monthly_subscriptions をUPSERT: company_id={company_id}")
+                    except Exception as e:
+                        print(f"[WARN] company_monthly_subscriptions UPSERT失敗: {e}")
+                    
                 except Exception as e:
                     print(f'[ERROR] company_subscriptionsテーブル保存エラー: {e}')
                     import traceback
                     traceback.print_exc()
                 
+                # 月額基本サブスクリプションテーブルをUPSERT
+                try:
+                    from datetime import timezone, timedelta
+                    jst = timezone(timedelta(hours=9))
+                    current_period_end_utc = datetime.fromtimestamp(subscription.current_period_end, tz=timezone.utc)
+                    current_period_end = current_period_end_utc.astimezone(jst)
+
+                    c.execute('''
+                        INSERT INTO company_monthly_subscriptions 
+                        (company_id, stripe_subscription_id, subscription_status, monthly_base_price, current_period_end)
+                        VALUES (%s, %s, %s, %s, %s)
+                        ON CONFLICT (company_id) DO UPDATE SET
+                            stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+                            subscription_status = EXCLUDED.subscription_status,
+                            current_period_end = EXCLUDED.current_period_end,
+                            updated_at = CURRENT_TIMESTAMP
+                    ''', (company_id, subscription_id, subscription.status, 3900, current_period_end))
+                    print(f"[DEBUG] company_monthly_subscriptions をUPSERT: company_id={company_id}")
+                except Exception as e:
+                    print(f"[WARN] company_monthly_subscriptions UPSERT失敗: {e}")
+
                 conn.commit()
                 print(f'新規ユーザー登録完了: email={email}, customer_id={customer_id}, subscription_id={subscription_id}')
                 print(f'企業データ作成完了: company_id={company_id}, company_name={company_name}')
@@ -507,6 +582,27 @@ def stripe_webhook():
                 
                 print(f'[DEBUG] サブスクリプション情報保存完了: company_id={company_id}')
                 
+                # 月額基本サブスクリプションテーブルをUPSERT
+                try:
+                    from datetime import timezone, timedelta
+                    jst = timezone(timedelta(hours=9))
+                    current_period_end_utc = datetime.fromtimestamp(subscription.current_period_end, tz=timezone.utc)
+                    current_period_end_jst = current_period_end_utc.astimezone(jst)
+
+                    c.execute('''
+                        INSERT INTO company_monthly_subscriptions 
+                        (company_id, stripe_subscription_id, subscription_status, monthly_base_price, current_period_end)
+                        VALUES (%s, %s, %s, %s, %s)
+                        ON CONFLICT (company_id) DO UPDATE SET
+                            stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+                            subscription_status = EXCLUDED.subscription_status,
+                            current_period_end = EXCLUDED.current_period_end,
+                            updated_at = CURRENT_TIMESTAMP
+                    ''', (company_id, subscription_id, subscription.status, 3900, current_period_end_jst))
+                    print(f"[DEBUG] company_monthly_subscriptions をUPSERT: company_id={company_id}")
+                except Exception as e:
+                    print(f"[WARN] company_monthly_subscriptions UPSERT失敗: {e}")
+
                 conn.commit()
                 print(f'既存企業の決済情報を更新: company_id={company_id}, subscription_id={subscription_id}')
                 

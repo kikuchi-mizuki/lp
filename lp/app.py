@@ -85,6 +85,23 @@ def init_db():
                 )
             ''')
             
+            # 月額基本サブスクリプション管理テーブル（企業単位）
+            c.execute('''
+                CREATE TABLE IF NOT EXISTS company_monthly_subscriptions (
+                    id SERIAL PRIMARY KEY,
+                    company_id INTEGER NOT NULL,
+                    stripe_subscription_id VARCHAR(255),
+                    subscription_status VARCHAR(50) DEFAULT 'active',
+                    monthly_base_price INTEGER DEFAULT 3900,
+                    current_period_start TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    current_period_end TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (company_id) REFERENCES companies(id),
+                    UNIQUE(company_id)
+                )
+            ''')
+            
             # 企業LINEアカウントテーブル（最小限）
             c.execute('''
                 CREATE TABLE IF NOT EXISTS company_line_accounts (
@@ -127,6 +144,11 @@ def init_db():
             c.execute('''
                 CREATE INDEX IF NOT EXISTS idx_company_subscriptions_status 
                 ON company_subscriptions(subscription_status)
+            ''')
+            
+            c.execute('''
+                CREATE INDEX IF NOT EXISTS idx_company_monthly_subscriptions_company 
+                ON company_monthly_subscriptions(company_id)
             ''')
             
             # user_statesテーブルの作成（LINEボット用）
@@ -424,6 +446,32 @@ def company_registration_success():
         print("💳 サブスクリプション情報を保存中...")
         save_company_subscription(company_id, checkout_session.subscription)  # content_typeを指定しない
         print(f"✅ サブスクリプション保存完了: {checkout_session.subscription}")
+
+        # 月額基本サブスクリプションも必ず記録（Webhook未達時のフェイルセーフ）
+        try:
+            subscription = stripe.Subscription.retrieve(checkout_session.subscription)
+            from datetime import timezone, timedelta
+            jst = timezone(timedelta(hours=9))
+            current_period_end_utc = datetime.fromtimestamp(subscription.current_period_end, tz=timezone.utc)
+            current_period_end = current_period_end_utc.astimezone(jst)
+
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute('''
+                INSERT INTO company_monthly_subscriptions 
+                (company_id, stripe_subscription_id, subscription_status, monthly_base_price, current_period_end)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (company_id) DO UPDATE SET
+                    stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+                    subscription_status = EXCLUDED.subscription_status,
+                    current_period_end = EXCLUDED.current_period_end,
+                    updated_at = CURRENT_TIMESTAMP
+            ''', (company_id, checkout_session.subscription, subscription.status, 3900, current_period_end))
+            conn.commit()
+            conn.close()
+            print("✅ company_monthly_subscriptions を更新/作成しました (successページ)")
+        except Exception as e:
+            print(f"⚠️ company_monthly_subscriptions の更新に失敗しました (successページ): {e}")
         
         # 次回請求日を計算
         subscription = stripe.Subscription.retrieve(checkout_session.subscription)
