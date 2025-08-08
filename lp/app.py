@@ -338,7 +338,13 @@ except Exception as e:
 logger.info("✅ アプリケーション初期化完了")
 
 @app.route('/')
+def health_check_root():
+    """Railwayヘルスチェック用のルートパス"""
+    return "OK", 200
+
+@app.route('/index')
 def index():
+    """メインページ"""
     return render_template('index.html')
 
 # 企業ユーザー専用の決済フォーム処理
@@ -986,11 +992,42 @@ def debug_user(line_user_id):
 @app.route('/health')
 def health_check():
     """アプリケーションの起動確認用エンドポイント"""
-    return jsonify({
-        'status': 'ok',
-        'message': 'Application is running',
-        'timestamp': '2025-07-29 08:30:00'
-    })
+    try:
+        # 基本的なアプリケーション状態を確認
+        import datetime
+        current_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        # データベース接続の簡単な確認
+        try:
+            conn = get_db_connection()
+            conn.close()
+            db_status = 'connected'
+        except Exception as e:
+            db_status = f'error: {str(e)}'
+        
+        return jsonify({
+            'status': 'ok',
+            'message': 'Application is running',
+            'timestamp': current_time,
+            'database': db_status,
+            'version': '1.0.0'
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e),
+            'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        }), 500
+
+@app.route('/')
+def simple_health_check():
+    """Railwayヘルスチェック用のシンプルなエンドポイント"""
+    return "OK", 200
+
+@app.route('/ping')
+def ping():
+    """最もシンプルなヘルスチェックエンドポイント"""
+    return "pong", 200
 
 @app.route('/debug/db')
 def debug_database():

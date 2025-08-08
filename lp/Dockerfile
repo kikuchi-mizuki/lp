@@ -1,20 +1,19 @@
-FROM python:3.11-alpine
+FROM python:3.11-slim
 
 WORKDIR /app
 
 # Install system dependencies in a single layer to reduce image size
-RUN apk update && \
-    apk add --no-cache \
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
     gcc \
-    musl-dev \
-    postgresql-dev \
-    jpeg-dev \
-    zlib-dev \
-    libffi-dev \
-    cairo-dev \
-    pango-dev \
-    gdk-pixbuf-dev \
-    && rm -rf /var/cache/apk/*
+    libpq-dev \
+    libjpeg-dev \
+    libpng-dev \
+    libfreetype6-dev \
+    curl \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /tmp/* /var/tmp/*
 
 # Copy requirements first for better caching
 COPY requirements.txt .
@@ -28,7 +27,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 COPY . .
 
 # Create non-root user for security
-RUN adduser -D -u 1000 appuser && chown -R appuser:appuser /app
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 USER appuser
 
 # Set default port if not provided
@@ -36,5 +35,9 @@ ENV PORT=3000
 
 EXPOSE $PORT
 
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:${PORT:-3000}/ping || exit 1
+
 # Use environment variable for port with fallback
-CMD ["sh", "-c", "gunicorn app:app --bind 0.0.0.0:${PORT:-3000} --workers 1 --timeout 120 --preload"]
+CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-3000} --workers 1 --timeout 120 --preload wsgi:app"]
