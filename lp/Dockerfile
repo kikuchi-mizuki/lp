@@ -30,14 +30,13 @@ COPY . .
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 USER appuser
 
-# Set default port if not provided
+# Set fixed port
 ENV PORT=3000
-
 EXPOSE 3000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:3000/ping || exit 1
 
-# Use environment variable for port with fallback
-CMD gunicorn --bind 0.0.0.0:$PORT --workers 1 --timeout 120 --preload wsgi:app
+# Use fixed port
+CMD gunicorn --bind 0.0.0.0:3000 --workers 1 --timeout 120 --preload wsgi:app
