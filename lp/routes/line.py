@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify
+import datetime
 import os, json, hmac, hashlib, base64
 import traceback
 import requests
@@ -6,6 +7,7 @@ import stripe
 import unicodedata
 import logging
 from services.line_service import send_line_message
+from services.line_service import send_welcome_with_buttons
 from services.line_service import (
     handle_add_content_company, handle_status_check_company, handle_cancel_menu_company,
     handle_content_confirmation_company, handle_cancel_request_company, 
@@ -833,10 +835,9 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
     elif state == 'add_select':
         print(f'[DEBUG] コンテンツ選択処理: user_id={user_id}, state={state}, text={text}')
         
-        # コンテンツ選択
+        # コンテンツ選択（まず確認ダイアログを表示）
         if text in ['1', '2', '3']:
             print(f'[DEBUG] コンテンツ選択: text={text}')
-            # コンテンツ確認処理
             content_mapping = {
                 '1': 'AI予定秘書',
                 '2': 'AI経理秘書',
@@ -844,24 +845,22 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
             }
             content_type = content_mapping.get(text)
             if content_type:
-                try:
-                    result = handle_content_confirmation_company(company_id, content_type)
-                    print(f'[DEBUG] コンテンツ追加結果: {result}')
-                    if result['success']:
-                        # 成功メッセージを送信
-                        success_message = f"🎉 {content_type}を追加しました！\n\n✨ {result.get('description', '新しいコンテンツが利用可能になりました')}\n\n🔗 アクセスURL：\n{result.get('url', 'https://lp-production-9e2c.up.railway.app')}\n\n💡 使い方：\n{result.get('usage', 'LINEアカウントからご利用いただけます')}\n\n📱 何かお手伝いできることはありますか？\n• 「追加」：他のコンテンツを追加\n• 「状態」：利用状況を確認\n• 「メニュー」：メインメニューに戻る\n• 「ヘルプ」：使い方を確認"
-                        send_line_message(event['replyToken'], [{"type": "text", "text": success_message}])
-                    else:
-                        error_message = result.get('error', f"❌ {content_type}の追加に失敗しました。\n\nエラー: 不明なエラー\n\nもう一度お試しください。")
-                        send_line_message(event['replyToken'], [{"type": "text", "text": error_message}])
-                except Exception as e:
-                    print(f'[ERROR] コンテンツ追加処理エラー: {e}')
-                    import traceback
-                    traceback.print_exc()
-                    error_message = f"❌ {content_type}の追加中にエラーが発生しました。\n\nエラー: {str(e)}\n\nもう一度お試しください。"
-                    send_line_message(event['replyToken'], [{"type": "text", "text": error_message}])
-            set_user_state(user_id, 'welcome_sent')
-            return
+                confirmation_message = {
+                    "type": "template",
+                    "altText": "コンテンツ追加の確認",
+                    "template": {
+                        "type": "buttons",
+                        "title": f"{content_type}を追加",
+                        "text": "このコンテンツを追加しますか？",
+                        "actions": [
+                            {"type": "postback", "label": "はい", "data": f"company_confirm_add_{text}"},
+                            {"type": "postback", "label": "いいえ", "data": "company_cancel_add"}
+                        ]
+                    }
+                }
+                send_line_message(event['replyToken'], [confirmation_message])
+                # 状態は一旦維持し、postbackで確定
+                return
         # 「メニュー」コマンドの場合は状態をリセットしてメニューを表示
         elif text == 'メニュー':
             set_user_state(user_id, 'welcome_sent')
@@ -975,6 +974,27 @@ https://lp-production-9e2c.up.railway.app
 
 友達が登録すると、あなたにも特典があります！"""
         send_line_message(event['replyToken'], [{"type": "text", "text": share_message}]) 
+    elif postback_data.startswith('company_confirm_add_'):
+        num = postback_data.replace('company_confirm_add_', '')
+        content_mapping = {'1': 'AI予定秘書', '2': 'AI経理秘書', '3': 'AIタスクコンシェルジュ'}
+        content_type = content_mapping.get(num)
+        if not content_type:
+            send_line_message(event['replyToken'], [{"type": "text", "text": "無効な選択です。"}])
+            return
+        try:
+            result = handle_content_confirmation_company(company_id, content_type)
+            if result['success']:
+                success_message = f"🎉 {content_type}を追加しました！\n\n✨ {result.get('description', '新しいコンテンツが利用可能になりました')}\n\n🔗 アクセスURL：\n{result.get('url', 'https://lp-production-9e2c.up.railway.app')}\n\n💡 使い方：\n{result.get('usage', 'LINEアカウントからご利用いただけます')}"
+                send_line_message(event['replyToken'], [{"type": "text", "text": success_message}])
+            else:
+                error_message = result.get('error', f"❌ {content_type}の追加に失敗しました。")
+                send_line_message(event['replyToken'], [{"type": "text", "text": error_message}])
+        except Exception as e:
+            print(f"[ERROR] company_confirm_add 処理エラー: {e}")
+            import traceback; traceback.print_exc()
+            send_line_message(event['replyToken'], [{"type": "text", "text": "❌ 追加処理でエラーが発生しました。"}])
+    elif postback_data == 'company_cancel_add':
+        send_line_message(event['replyToken'], [get_menu_message_company()])
 
 @line_bp.route('/line/debug/test_email_linking/<email>')
 def debug_test_email_linking(email):
