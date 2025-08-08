@@ -28,11 +28,10 @@ RUN pip install --no-cache-dir --disable-pip-version-check -r requirements.txt
 # アプリケーションファイルをコピー
 COPY lp/ .
 
-# ポートを公開
+# ポートを公開（参考値）。実際にはRailwayが割り当てる$PORTで起動します
 EXPOSE 3000
 
 # 環境変数を設定
-ENV PORT=3000
 ENV PYTHONPATH=/app
 
 # ネットワーク切り分け用に、まずは純粋なHTTPサーバで$PORTをリッスンさせる

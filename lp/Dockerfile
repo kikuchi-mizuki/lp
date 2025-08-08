@@ -19,7 +19,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # アプリケーションコピー
 COPY . .
 
-ENV PORT=3000
+# Railwayは動的に$PORTを割り当てるため固定値は設定しない
 EXPOSE 3000
 
 # 最小構成で起動（問題切り分けのため）
