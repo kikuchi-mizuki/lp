@@ -1434,6 +1434,7 @@ def handle_cancel_selection_company(reply_token, company_id, stripe_subscription
         ''', (company_id,))
         
         active_accounts = c.fetchall()
+        print(f'[DEBUG] アクティブアカウント取得結果: {active_accounts}')
         
         # 選択された番号を解析
         numbers = smart_number_extraction(selection_text)
@@ -1444,6 +1445,9 @@ def handle_cancel_selection_company(reply_token, company_id, stripe_subscription
         print(f'[DEBUG] 抽出された数字: {numbers}')
         print(f'[DEBUG] 有効な選択インデックス: {selected_indices}')
         print(f'[DEBUG] 最大選択可能数: {len(active_accounts)}')
+        print(f'[DEBUG] アクティブアカウント詳細:')
+        for i, account in enumerate(active_accounts, 1):
+            print(f'[DEBUG]   {i}. {account}')
         
         if invalid_reasons:
             print(f'[DEBUG] 無効な入力: {invalid_reasons}')
@@ -1464,7 +1468,22 @@ def handle_cancel_selection_company(reply_token, company_id, stripe_subscription
                 })
         
         if not selected_contents:
-            send_line_message(reply_token, [{"type": "text", "text": "解約対象のコンテンツが見つかりませんでした。"}])
+            debug_message = f"""❌ デバッグ情報:
+解約対象のコンテンツが見つかりませんでした。
+
+🔍 詳細情報:
+• 企業ID: {company_id}
+• 選択テキスト: '{selection_text}'
+• アクティブアカウント数: {len(active_accounts)}
+• 抽出された数字: {numbers}
+• 有効な選択: {selected_indices}
+• 無効な理由: {invalid_reasons}
+
+📊 アクティブアカウント一覧:
+{chr(10).join([f"• {i+1}. {content_type} (ID: {account_id})" for i, (account_id, content_type, _) in enumerate(active_accounts)])}
+
+💡 「メニュー」と入力してメインメニューに戻ってください。"""
+            send_line_message(reply_token, [{"type": "text", "text": debug_message}])
             return
         
         # 解約確認メッセージを作成
