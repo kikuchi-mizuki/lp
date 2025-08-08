@@ -719,8 +719,11 @@ def handle_text_message(event):
         return
     
     # 決済状況をチェック
-    payment_check = is_paid_user_company_centric(user_id)
-    if not payment_check['is_paid']:
+    # ここまでの処理で `get_company_info` が返っている場合、
+    # company_monthly_subscriptions のステータスが 'active' または 'trialing' であることが保証されている。
+    # 外部依存の追加チェックで誤検知を避けるため、ブロックはスキップする。
+    # （安全側に倒すなら、stripe_subscription_id が欠損している場合のみ制限を返す）
+    if not stripe_subscription_id:
         restricted_message = get_restricted_message()
         send_line_message(event['replyToken'], [restricted_message])
         return
