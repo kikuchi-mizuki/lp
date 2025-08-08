@@ -48,7 +48,6 @@ try:
     from routes.automation import automation_bp
     from routes.company_line_accounts import company_line_accounts_bp
     from routes.company_registration import company_registration_bp
-    from routes.railway_setup import railway_setup_bp
     from routes.ai_schedule_webhook import ai_schedule_webhook_bp
     from routes.ai_schedule_webhook_simple import ai_schedule_webhook_simple_bp
     from routes.debug import debug_bp
@@ -73,7 +72,6 @@ try:
         (automation_bp, 'automation'),
         (company_line_accounts_bp, 'company_line_accounts'),
         (company_registration_bp, 'company_registration'),
-        (railway_setup_bp, 'railway_setup'),
         (ai_schedule_webhook_bp, 'ai_schedule_webhook'),
         (ai_schedule_webhook_simple_bp, 'ai_schedule_webhook_simple'),
         (debug_bp, 'debug'),
@@ -243,11 +241,29 @@ def company_registration_success():
 
             logger.info(f"✅ 企業登録完了: {company_id}")
 
+            # テンプレートに渡すデータを整形
+            company_data = {
+                'company_name': company_name,
+                'email': email,
+                'content_type': content_type,
+            }
+
+            # 次回請求日の取得（Stripeのサブスクリプション情報から）
+            next_billing_date = None
+            try:
+                if subscription_id:
+                    subscription = stripe.Subscription.retrieve(subscription_id)
+                    import datetime as _dt
+                    period_end = subscription.get('current_period_end')
+                    if period_end:
+                        next_billing_date = _dt.datetime.utcfromtimestamp(int(period_end)).strftime('%Y-%m-%d')
+            except Exception:
+                next_billing_date = None
+
             return render_template(
                 'company_registration_success.html',
-                company_name=company_name,
-                email=email,
-                content_type=content_type,
+                company_data=company_data,
+                next_billing_date=next_billing_date,
             )
         else:
             logger.error("❌ 必要な情報が不足しています")

@@ -42,7 +42,6 @@ try:
     from routes.automation import automation_bp
     from routes.company_line_accounts import company_line_accounts_bp
     from routes.company_registration import company_registration_bp
-    from routes.railway_setup import railway_setup_bp
     from routes.ai_schedule_webhook import ai_schedule_webhook_bp
     from routes.ai_schedule_webhook_simple import ai_schedule_webhook_simple_bp
     from routes.debug import debug_bp
@@ -67,7 +66,6 @@ try:
         (automation_bp, 'automation'),
         (company_line_accounts_bp, 'company_line_accounts'),
         (company_registration_bp, 'company_registration'),
-        (railway_setup_bp, 'railway_setup'),
         (ai_schedule_webhook_bp, 'ai_schedule_webhook'),
         (ai_schedule_webhook_simple_bp, 'ai_schedule_webhook_simple'),
         (debug_bp, 'debug')
