@@ -30,29 +30,29 @@ logger.info("🚀 アプリケーション起動中...")
 
 # Blueprintの登録
 try:
-from routes.line import line_bp
-from routes.stripe import stripe_bp
-from routes.company import company_bp
-from routes.line_api import line_api_bp
-from routes.stripe_payment import stripe_payment_bp
-from routes.content_management import content_management_bp
-from routes.cancellation import cancellation_bp
-from routes.notification import notification_bp
-from routes.scheduler import scheduler_bp
-from routes.backup import backup_bp
-from routes.dashboard import dashboard_bp
-from routes.monitoring import monitoring_bp
-from routes.reminder import reminder_bp
-from routes.security import security_bp
-from routes.dashboard_ui import dashboard_ui_bp
-from routes.automation import automation_bp
-from routes.company_line_accounts import company_line_accounts_bp
-from routes.company_registration import company_registration_bp
-from routes.railway_setup import railway_setup_bp
-from routes.ai_schedule_webhook import ai_schedule_webhook_bp
-from routes.ai_schedule_webhook_simple import ai_schedule_webhook_simple_bp
-from routes.debug import debug_bp
-    
+    from routes.line import line_bp
+    from routes.stripe import stripe_bp
+    from routes.company import company_bp
+    from routes.line_api import line_api_bp
+    from routes.stripe_payment import stripe_payment_bp
+    from routes.content_management import content_management_bp
+    from routes.cancellation import cancellation_bp
+    from routes.notification import notification_bp
+    from routes.scheduler import scheduler_bp
+    from routes.backup import backup_bp
+    from routes.dashboard import dashboard_bp
+    from routes.monitoring import monitoring_bp
+    from routes.reminder import reminder_bp
+    from routes.security import security_bp
+    from routes.dashboard_ui import dashboard_ui_bp
+    from routes.automation import automation_bp
+    from routes.company_line_accounts import company_line_accounts_bp
+    from routes.company_registration import company_registration_bp
+    from routes.railway_setup import railway_setup_bp
+    from routes.ai_schedule_webhook import ai_schedule_webhook_bp
+    from routes.ai_schedule_webhook_simple import ai_schedule_webhook_simple_bp
+    from routes.debug import debug_bp
+
     # Blueprint登録
     blueprints = [
         (line_bp, 'line'),
@@ -76,17 +76,16 @@ from routes.debug import debug_bp
         (railway_setup_bp, 'railway_setup'),
         (ai_schedule_webhook_bp, 'ai_schedule_webhook'),
         (ai_schedule_webhook_simple_bp, 'ai_schedule_webhook_simple'),
-        (debug_bp, 'debug')
+        (debug_bp, 'debug'),
     ]
-    
+
     for blueprint, name in blueprints:
         try:
             app.register_blueprint(blueprint)
             logger.info(f"✅ Blueprint '{name}' を登録しました")
-    except Exception as e:
+        except Exception as e:
             logger.error(f"❌ Blueprint '{name}' の登録に失敗: {e}")
-        
-    except Exception as e:
+except Exception as e:
     logger.error(f"❌ Blueprint登録エラー: {e}")
 
 # データベース初期化
@@ -106,7 +105,7 @@ def root_redirect_to_main():
 @app.route('/main')
 def index():
     """メインページ"""
-        return render_template('index.html')
+    return render_template('index.html')
 
 @app.route('/index')
 def redirect_to_main():
@@ -232,21 +231,22 @@ def company_registration_success():
         if company_name and email and subscription_id:
             # 企業プロファイルを作成・更新
             from app_company_registration import upsert_company_profile_with_subscription
-        company_id = upsert_company_profile_with_subscription(
+            company_id = upsert_company_profile_with_subscription(
                 company_name, email, subscription_id
             )
-            
+
             logger.info(f"✅ 企業登録完了: {company_id}")
-            
-            return render_template('company_registration_success.html', 
-                                company_name=company_name, 
-                                email=email,
-                                content_type=content_type)
-            else:
+
+            return render_template(
+                'company_registration_success.html',
+                company_name=company_name,
+                email=email,
+                content_type=content_type,
+            )
+        else:
             logger.error("❌ 必要な情報が不足しています")
             return render_template('company_registration_cancel.html')
-                
-        except Exception as e:
+    except Exception as e:
         logger.error(f"❌ 企業登録成功処理エラー: {e}")
         return render_template('company_registration_cancel.html')
 
@@ -325,9 +325,9 @@ def system_check():
     try:
         # DB
         db_ok = False
-    try:
-        conn = get_db_connection()
-        conn.close()
+        try:
+            conn = get_db_connection()
+            conn.close()
             db_ok = True
         except Exception:
             db_ok = False
@@ -359,16 +359,16 @@ def spreadsheet_identity():
             with open(creds_file, 'r') as f:
                 data = json.load(f)
                 client_email = data.get('client_email')
-            else:
+        else:
             creds_json = os.getenv('GOOGLE_CREDENTIALS_JSON')
             if creds_json:
                 data = json.loads(creds_json)
                 client_email = data.get('client_email')
 
-            return jsonify({
-                'success': True,
+        return jsonify({
+            'success': True,
             'service_account_email': client_email or 'Not found',
-            'spreadsheet_id': os.getenv('CONTENT_SPREADSHEET_ID')
+            'spreadsheet_id': os.getenv('CONTENT_SPREADSHEET_ID'),
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
