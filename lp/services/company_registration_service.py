@@ -736,6 +736,7 @@ jobs:
             
             # 4. サブスクリプション情報を保存（決済完了後の場合）
             if data.get('subscription_id'):
+                # company_paymentsテーブルに登録
                 c.execute('''
                     INSERT INTO company_payments (
                         company_id, stripe_customer_id, stripe_subscription_id, content_type,
@@ -750,11 +751,26 @@ jobs:
                     'active',
                     datetime.now()
                 ))
+
+                # company_subscriptionsテーブルに登録
+                c.execute('''
+                    INSERT INTO company_subscriptions (
+                        company_id, stripe_subscription_id, content_type,
+                        status, created_at, updated_at
+                    ) VALUES (%s, %s, %s, %s, %s, %s)
+                ''', (
+                    company_id,
+                    data['subscription_id'],
+                    data.get('content_type', 'line_bot'),
+                    'active',
+                    datetime.now(),
+                    datetime.now()
+                ))
             
-            # 5. AI予定秘書プロジェクトを複製（コンテンツタイプがAI予定秘書の場合）
+            # 5. AI予定秘書プロジェクトを複製（自動追加を無効化）
             railway_result = None
             print(f"🔍 content_type確認: {data.get('content_type')}")
-            if data.get('content_type') == 'AI予定秘書':
+            if False:  # AI予定秘書の自動追加を無効化
                 print(f"🚀 AI予定秘書プロジェクト複製開始")
                 
                 line_credentials = {
@@ -1311,9 +1327,9 @@ jobs:
                 
                 line_account_id = c.fetchone()[0]
             
-            # Railwayプロジェクトの自動複製（新規企業の場合のみ、トークンが設定されている場合）
+            # Railwayプロジェクトの自動複製（無効化）
             railway_result = None
-            if is_new and data.get('content_type') == 'AI予定秘書' and railway_token and railway_project_id:
+            if False:  # AI予定秘書の自動追加を無効化
                 print(f"🚀 AI予定秘書プロジェクト自動複製開始")
                 
                 line_credentials = {
