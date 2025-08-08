@@ -523,13 +523,19 @@ def upsert_company_profile_with_subscription(company_name: str, email: str, stri
         c = conn.cursor()
 
         # 既存企業をメールで検索
-        c.execute('SELECT id FROM companies WHERE email = %s', (email,))
+        c.execute('SELECT id, company_name FROM companies WHERE email = %s', (email,))
         existing = c.fetchone()
 
         if existing:
-            company_id = existing[0]
+            company_id, current_name = existing
             # subscription_id を更新
             c.execute('UPDATE companies SET stripe_subscription_id = %s WHERE id = %s', (stripe_subscription_id, company_id))
+            # 会社名が入力されており、かつ現在値と異なる/自動生成名っぽい場合は更新
+            if company_name and company_name.strip() and company_name.strip() != current_name:
+                try:
+                    c.execute('UPDATE companies SET company_name = %s WHERE id = %s', (company_name.strip(), company_id))
+                except Exception:
+                    pass
             conn.commit()
             return company_id
         else:
