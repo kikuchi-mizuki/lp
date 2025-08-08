@@ -380,6 +380,31 @@ def debug_company_pricing(company_id):
     result = debug_company_pricing(company_id)
     return jsonify(result)
 
+# スプレッドシート生データ確認（構造/権限の切り分け用）
+@app.route('/debug/spreadsheet/raw')
+def spreadsheet_raw():
+    try:
+        import json
+        import os
+        spreadsheet_id = os.getenv('CONTENT_SPREADSHEET_ID')
+        client = spreadsheet_content_service._get_google_sheets_client()
+        if not client:
+            return jsonify({'success': False, 'error': 'Google Sheets client is None (auth or API disabled)'}), 500
+
+        ss = client.open_by_key(spreadsheet_id)
+        worksheets = [ws.title for ws in ss.worksheets()]
+        ws = ss.get_worksheet(0)
+        all_values = ws.get_all_values()
+        sample = all_values[:5] if all_values else []
+        return jsonify({
+            'success': True,
+            'worksheets': worksheets,
+            'rows': len(all_values),
+            'sample_first_5_rows': sample
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 # API関連のルート
 @app.route('/api/v1/company/restriction/check', methods=['POST'])
 def check_company_restriction_api():
