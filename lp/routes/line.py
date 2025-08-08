@@ -559,7 +559,7 @@ def handle_follow_event(event):
                 
         else:
             print(f'[DEBUG] 未紐付け企業データが見つかりません: user_id={user_id}')
-            # メールアドレス連携を促すメッセージを送信
+            # メールアドレス連携を促すメッセージ（プッシュ送信し、失敗時のみreplyでフォールバック）
             welcome_message = {
                 "type": "template",
                 "altText": "メールアドレス連携のお願い",
@@ -576,7 +576,13 @@ def handle_follow_event(event):
                     ]
                 }
             }
-            send_line_message(event['replyToken'], [welcome_message])
+            try:
+                from services.line_service import send_line_message_push
+                ok = send_line_message_push(user_id, [welcome_message])
+                if not ok:
+                    send_line_message(event['replyToken'], [welcome_message])
+            except Exception:
+                send_line_message(event['replyToken'], [welcome_message])
         
         conn.close()
         
