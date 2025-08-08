@@ -104,8 +104,14 @@ def root_redirect_to_main():
 
 @app.route('/main')
 def index():
-    """メインページ"""
-    return render_template('index.html')
+    """メインページ（スプレッドシートのコンテンツを動的表示）"""
+    try:
+        result = spreadsheet_content_service.get_available_contents()
+        contents = result.get('contents', {})
+        return render_template('index.html', contents=contents)
+    except Exception:
+        # 失敗時でもテンプレートは表示
+        return render_template('index.html', contents={})
 
 @app.route('/index')
 def redirect_to_main():

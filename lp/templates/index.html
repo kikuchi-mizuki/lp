@@ -48,44 +48,33 @@
             </div>
         </section>
 
-        <!-- Features Section -->
+        <!-- Features Section (dynamic) -->
         <section class="section">
             <h2 class="section-title">ラインアップ</h2>
-            <p class="section-subtitle">コンテンツは随時追加予定です。</p>
+            <p class="section-subtitle">コンテンツはスプレッドシートから自動反映されています。</p>
             
             <div class="features">
-                <div class="feature-card">
-                    <img src="/static/images/secretary_optimized.jpg" alt="AI秘書イラスト" class="feature-icon-image">
-                    <h3 class="feature-title">AI予定秘書</h3>
-                    <p class="feature-description">Googleカレンダー連携で、LINEから予定追加・確認・空き時間提案まで。スケジュール管理を自動化します。</p>
-                    <img src="/static/images/line_schedule_optimized.jpg" alt="LINE予定秘書画面" class="line-screenshot">
-                </div>
-                
-                <div class="feature-card">
-                    <img src="/static/images/accounting_icon_optimized.jpg" alt="AI経理秘書イラスト" class="feature-icon-image">
-                    <h3 class="feature-title">AI経理秘書</h3>
-                    <p class="feature-description">LINEで送るだけで、見積書や請求書を即作成。事務処理もスムーズに、経理業務を効率化します。</p>
-                    <img src="/static/images/line_accounting_optimized.jpg" alt="LINE経理秘書画面" class="line-screenshot">
-                </div>
-                
-                <div class="feature-card">
-                    <img src="/static/images/task_icon_optimized.jpg" alt="AIタスクコンシェルジュイラスト" class="feature-icon-image">
-                    <h3 class="feature-title">AIタスクコンシェルジュ</h3>
-                    <p class="feature-description">登録タスクを自動で最適配置。「やりたいのにできない」を解消し、生産性を最大化します。</p>
-                    <img src="/static/images/line_task_optimized.jpg" alt="LINEタスクコンシェルジュ画面" class="line-screenshot">
-                </div>
-                <div class="col-md-6 mb-4">
-                        <div class="card h-100 shadow-sm">
-                            <div class="card-body text-center">
-                                <i class="fas fa-cog fa-3x text-primary mb-3"></i>
-                                <h5 class="card-title">Railway設定</h5>
-                                <p class="card-text">Railwayトークンの自動設定と環境変数の管理</p>
-                                <a href="/railway-token-setup" class="btn btn-primary">
-                                    <i class="fas fa-magic"></i> 自動設定
-                                </a>
-                            </div>
+                {% if contents %}
+                    {% for cid, item in contents.items() %}
+                        <div class="feature-card">
+                            <h3 class="feature-title">{{ item.name }}</h3>
+                            <p class="feature-description">{{ item.description }}</p>
+                            {% if item.url %}
+                                <p><a href="{{ item.url }}" target="_blank">詳細を見る</a></p>
+                            {% endif %}
+                            <div class="price-sub">価格: {{ item.price }}円</div>
+                            {% if item.features and item.features|length > 0 %}
+                                <ul>
+                                    {% for f in item.features %}
+                                        <li>{{ f }}</li>
+                                    {% endfor %}
+                                </ul>
+                            {% endif %}
                         </div>
-                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div>コンテンツ情報の取得に失敗しました。</div>
+                {% endif %}
             </div>
         </section>
 
