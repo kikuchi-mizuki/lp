@@ -757,9 +757,10 @@ def get_company_info(user_id):
     stripe_subscription_id, subscription_status = monthly_subscription
     print(f'[DEBUG] 月額基本サブスクリプション: stripe_subscription_id={stripe_subscription_id}, status={subscription_status}')
     
-    # 月額サブスクリプションがアクティブでない場合はNoneを返す
-    if subscription_status != 'active':
-        print(f'[DEBUG] 月額サブスクリプションが非アクティブ: status={subscription_status}')
+    # トライアル中('trialing')も有効として扱う
+    valid_statuses = ('active', 'trialing')
+    if subscription_status not in valid_statuses:
+        print(f'[DEBUG] 月額サブスクリプションが有効ではありません: status={subscription_status}')
         conn.close()
         return None
     
