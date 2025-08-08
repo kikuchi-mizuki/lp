@@ -1596,41 +1596,84 @@ def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscript
                 # 追加料金が必要なコンテンツかチェック（1個目は無料、2個目以降は有料）
                 additional_price = 0 if i == 1 else 1500
                 
-                # Stripeの請求項目を更新（追加料金が必要なコンテンツの場合）
+                # データベース更新処理
+                try:
+                    # LINEアカウントを非アクティブ化
+                    c.execute(f'''
+                        UPDATE company_line_accounts 
+                        SET status = 'inactive'
+                        WHERE id = {placeholder}
+                    ''', (account_id,))
+                    print(f'[DEBUG] company_line_accounts更新成功: account_id={account_id}')
+                    
+                    # トランザクションをコミット
+                    conn.commit()
+                    print(f'[DEBUG] データベーストランザクションコミット成功')
+                    
+                except Exception as e:
+                    print(f'[DEBUG] データベース更新エラー: {e}')
+                    import traceback
+                    traceback.print_exc()
+                    
+                    # トランザクションをロールバック
+                    try:
+                        conn.rollback()
+                        print(f'[DEBUG] データベーストランザクションロールバック成功')
+                    except Exception as rollback_error:
+                        print(f'[DEBUG] ロールバックエラー: {rollback_error}')
+                    continue  # エラーの場合は次のループへ
+                
+                # Stripeの請求項目を更新（有料コンテンツ解約の場合のみ）
                 if additional_price > 0 and stripe_subscription_id:
                     try:
                         import stripe
                         stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
                         
-                        # 現在のアクティブコンテンツ数を取得（1個目は無料なので-1）
+                        print(f'[DEBUG] 有料コンテンツ解約後のStripe更新: {content_type}, position={i}, price={additional_price}')
+                        
+                        # 解約後の現在のアクティブコンテンツ数を取得
                         c.execute(f'''
                             SELECT COUNT(*) 
                             FROM company_line_accounts 
                             WHERE company_id = {placeholder} AND status = 'active'
                         ''', (company_id,))
                         
-                        total_current_count = c.fetchone()[0]
-                        current_count = max(0, total_current_count - 1)  # 1個目は無料なので-1
-                        # 解約後の数量を計算（現在の数量 - 1）
-                        new_count = max(0, current_count - 1)
-                        print(f'[DEBUG] コンテンツ数: 総数={total_current_count}, 現在課金対象={current_count}, 解約後={new_count}')
+                        remaining_total_count = c.fetchone()[0]
+                        # 1個目は無料なので、課金対象は総数-1（ただし0未満にはならない）
+                        new_billing_count = max(0, remaining_total_count - 1)
+                        print(f'[DEBUG] 解約後: 残り総数={remaining_total_count}, 課金対象={new_billing_count}')
                         
                         # Stripeサブスクリプションを取得
                         subscription = stripe.Subscription.retrieve(stripe_subscription_id)
                         
-                        # 追加料金の請求項目を更新
+                        # 追加料金の請求項目を更新（複数の条件で検索）
+                        updated = False
                         for item in subscription.items.data:
-                            if "追加" in (item.price.nickname or ""):
-                                print(f'[DEBUG] Stripe請求項目を更新: {item.id}, 数量={new_count}')
+                            price_nickname = item.price.nickname or ""
+                            price_id = item.price.id
+                            
+                            # 複数の条件で追加料金アイテムを特定
+                            if (("追加" in price_nickname) or 
+                                ("additional" in price_nickname.lower()) or
+                                ("metered" in price_nickname.lower()) or
+                                (price_id == 'price_1Rog1nIxg6C5hAVdnqB5MJiT')):
+                                
+                                print(f'[DEBUG] Stripe請求項目を更新: {item.id}, 数量: {item.quantity} → {new_billing_count}')
                                 stripe.SubscriptionItem.modify(
                                     item.id,
-                                    quantity=new_count
+                                    quantity=new_billing_count
                                 )
-                                print(f'[DEBUG] Stripe請求項目更新完了')
+                                print(f'[DEBUG] Stripe請求項目更新完了: {item.id}')
+                                updated = True
                                 break
+                        
+                        if not updated:
+                            print(f'[WARN] 追加料金アイテムが見つかりませんでした。')
                                 
                     except Exception as e:
                         print(f'[DEBUG] Stripe請求項目更新エラー: {e}')
+                        import traceback
+                        traceback.print_exc()
                         # Stripeエラーが発生しても処理を続行
                 
                 # 請求期間同期サービスを呼び出して使用量レコードを月額サブスクリプション期間に合わせる
@@ -1649,36 +1692,10 @@ def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscript
                         print(f'[DEBUG] 解約時の請求期間同期エラー: {e}')
                         # 同期エラーが発生しても処理を続行
                 
-                # データベース更新処理
-                try:
-                    # LINEアカウントを非アクティブ化
-                    c.execute(f'''
-                        UPDATE company_line_accounts 
-                        SET status = 'inactive'
-                        WHERE id = {placeholder}
-                    ''', (account_id,))
-                    print(f'[DEBUG] company_line_accounts更新成功: account_id={account_id}')
-                    
-                    # トランザクションをコミット
-                    conn.commit()
-                    print(f'[DEBUG] データベーストランザクションコミット成功')
-                    
-                    # ai_scheduleをAI予定秘書に変換
-                    display_name = 'AI予定秘書' if content_type == 'ai_schedule' else content_type
-                    cancelled.append(display_name)
-                    print(f'[DEBUG] 企業コンテンツ解約処理完了: content_type={content_type}, account_id={account_id}')
-                    
-                except Exception as e:
-                    print(f'[DEBUG] データベース更新エラー: {e}')
-                    import traceback
-                    traceback.print_exc()
-                    
-                    # トランザクションをロールバック
-                    try:
-                        conn.rollback()
-                        print(f'[DEBUG] データベーストランザクションロールバック成功')
-                    except Exception as rollback_error:
-                        print(f'[DEBUG] ロールバックエラー: {rollback_error}')
+                # ai_scheduleをAI予定秘書に変換
+                display_name = 'AI予定秘書' if content_type == 'ai_schedule' else content_type
+                cancelled.append(display_name)
+                print(f'[DEBUG] 企業コンテンツ解約処理完了: content_type={content_type}, account_id={account_id}')
                     
                     # エラーが発生した場合は処理をスキップ
                     continue
