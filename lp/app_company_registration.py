@@ -1,6 +1,7 @@
 import os
 import logging
 import stripe
+import datetime as dt
 from flask import request, jsonify, url_for, render_template, redirect
 from utils.db import get_db_connection
 
@@ -120,23 +121,40 @@ def create_company_line_account(company_id, company_data):
         raise e
 
 def save_company_subscription(company_id, stripe_subscription_id, content_type=None):
-    """企業サブスクリプション情報を保存"""
+    """企業サブスクリプション情報を保存（Stripe実ステータスを反映）"""
     try:
         conn = get_db_connection()
         c = conn.cursor()
-        
-        # サブスクリプション情報を挿入
+
+        # Stripeのサブスクリプション詳細を取得してステータス/期間を反映
+        subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+        status = subscription.get('status') or 'active'
+        current_period_start = subscription.get('current_period_start')
+        current_period_end = subscription.get('current_period_end')
+
+        # エポック -> datetime 変換（存在時のみ）
+        start_dt = dt.datetime.utcfromtimestamp(int(current_period_start)) if current_period_start else None
+        end_dt = dt.datetime.utcfromtimestamp(int(current_period_end)) if current_period_end else None
+
+        # デフォルトの基本料金はスキーマ既定値を採用（明示する場合は3900）
+        monthly_base_price = 3900
+
+        # UPSERT（企業単位で1レコード）
         c.execute('''
             INSERT INTO company_monthly_subscriptions (
-                company_id, stripe_subscription_id, subscription_status
-            ) VALUES (%s, %s, 'active')
+                company_id, stripe_subscription_id, subscription_status,
+                monthly_base_price, current_period_start, current_period_end
+            ) VALUES (%s, %s, %s, %s, %s, %s)
             ON CONFLICT (company_id) DO UPDATE SET
                 stripe_subscription_id = EXCLUDED.stripe_subscription_id,
-                subscription_status = 'active',
+                subscription_status = EXCLUDED.subscription_status,
+                monthly_base_price = EXCLUDED.monthly_base_price,
+                current_period_start = EXCLUDED.current_period_start,
+                current_period_end = EXCLUDED.current_period_end,
                 updated_at = CURRENT_TIMESTAMP
-        ''', (company_id, stripe_subscription_id))
-        
-        # コンテンツ情報も保存
+        ''', (company_id, stripe_subscription_id, status, monthly_base_price, start_dt, end_dt))
+
+        # コンテンツ情報も保存（指定があれば）
         if content_type:
             c.execute('''
                 INSERT INTO company_contents (
@@ -146,12 +164,12 @@ def save_company_subscription(company_id, stripe_subscription_id, content_type=N
                     content_status = 'active',
                     updated_at = CURRENT_TIMESTAMP
             ''', (company_id, content_type))
-        
+
         conn.commit()
         conn.close()
-        
-        logger.info(f"✅ 企業サブスクリプション保存完了: {company_id}")
-        
+
+        logger.info(f"✅ 企業サブスクリプション保存完了: {company_id} status={status}")
+
     except Exception as e:
         logger.error(f"❌ 企業サブスクリプション保存エラー: {e}")
         if conn:
