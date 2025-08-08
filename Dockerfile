@@ -36,4 +36,4 @@ ENV PORT=3000
 ENV PYTHONPATH=/app
 
 # アプリケーションを起動
-CMD ["gunicorn", "--bind", "0.0.0.0:3000", "--workers", "1", "--timeout", "120", "--max-requests", "1000", "--max-requests-jitter", "100", "app:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:3000", "--workers", "1", "--timeout", "120", "--max-requests", "1000", "--max-requests-jitter", "100", "wsgi:app"]
