@@ -318,6 +318,34 @@ def debug_spreadsheet():
     result = spreadsheet_content_service.get_available_contents(force_refresh=True)
     return jsonify(result)
 
+# システム総合チェック（自動）
+@app.route('/debug/system-check')
+def system_check():
+    """主要機能の自己診断を一括実行"""
+    try:
+        # DB
+        db_ok = False
+        try:
+            conn = get_db_connection()
+            conn.close()
+            db_ok = True
+        except Exception:
+            db_ok = False
+
+        # Webhook/ENV
+        from app_debug import debug_webhook_status as dbg_webhook
+        from app_debug import debug_railway as dbg_railway
+
+        return jsonify({
+            'success': True,
+            'db': 'ok' if db_ok else 'error',
+            'spreadsheet': spreadsheet_content_service.get_available_contents(force_refresh=True),
+            'webhooks': dbg_webhook(),
+            'railway': dbg_railway(),
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/debug/company/pricing/<int:company_id>')
 def debug_company_pricing(company_id):
     """企業料金デバッグ"""
