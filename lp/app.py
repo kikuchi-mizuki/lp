@@ -407,9 +407,13 @@ def company_registration_success():
             print("❌ 決済が完了していません")
             return redirect('/company-registration-cancel')
         
-        # 企業情報をデータベースに保存
-        print("🏢 企業情報を保存中...")
-        company_id = create_company_profile(checkout_session.metadata)
+        # 企業情報をデータベースに保存（重複防止：メールで既存チェックし、subscription_idを付与）
+        print("🏢 企業情報を保存中(重複防止アップサート)...")
+        company_id = upsert_company_profile_with_subscription(
+            company_name=checkout_session.metadata.get('company_name'),
+            email=checkout_session.metadata.get('email'),
+            stripe_subscription_id=checkout_session.subscription
+        )
         print(f"✅ 企業情報保存完了: {company_id}")
         
         # LINEアカウントの自動作成を削除 - ユーザーが手動で追加するまで待機
@@ -501,6 +505,65 @@ def create_company_profile(company_data):
         if conn:
             conn.rollback()
         raise
+    finally:
+        if c:
+            c.close()
+        if conn:
+            conn.close()
+
+def upsert_company_profile_with_subscription(company_name: str, email: str, stripe_subscription_id: str) -> int:
+    """
+    メールアドレスで企業を検索し、存在すれば `stripe_subscription_id` を更新、
+    なければ新規作成時に `stripe_subscription_id` を付与して作成してIDを返す。
+    """
+    conn = None
+    c = None
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+
+        # 既存企業をメールで検索
+        c.execute('SELECT id FROM companies WHERE email = %s', (email,))
+        existing = c.fetchone()
+
+        if existing:
+            company_id = existing[0]
+            # subscription_id を更新
+            c.execute('UPDATE companies SET stripe_subscription_id = %s WHERE id = %s', (stripe_subscription_id, company_id))
+            conn.commit()
+            return company_id
+        else:
+            # 新規作成（subscription_id を付与）
+            # company_code カラムが存在する可能性があるが、存在しなくても動くように最小列で挿入
+            try:
+                c.execute('''
+                    INSERT INTO companies (company_name, email, stripe_subscription_id, status)
+                    VALUES (%s, %s, %s, 'active')
+                    RETURNING id
+                ''', (company_name, email, stripe_subscription_id))
+            except Exception:
+                # stripe_subscription_id カラムが無い環境向けフォールバック
+                c.execute('''
+                    INSERT INTO companies (company_name, email, status)
+                    VALUES (%s, %s, 'active')
+                    RETURNING id
+                ''', (company_name, email))
+                company_id = c.fetchone()[0]
+                # 可能なら追加更新
+                try:
+                    c.execute('UPDATE companies SET stripe_subscription_id = %s WHERE id = %s', (stripe_subscription_id, company_id))
+                except Exception:
+                    pass
+                conn.commit()
+                return company_id
+
+            company_id = c.fetchone()[0]
+            conn.commit()
+            return company_id
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        raise e
     finally:
         if c:
             c.close()
