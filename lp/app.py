@@ -337,15 +337,23 @@ except Exception as e:
 # アプリケーション初期化完了の確認
 logger.info("✅ アプリケーション初期化完了")
 
+# ヘルスチェック用のルートパス（最優先）
 @app.route('/')
 def health_check_root():
-    """Railwayヘルスチェック用のルートパス - シンプルな応答"""
-    return "OK", 200
+    """Railwayヘルスチェック用のルートパス - 最もシンプルな応答"""
+    return "OK", 200, {'Content-Type': 'text/plain'}
 
-@app.route('/home')
+# メインページ（別パス）
+@app.route('/main')
 def index():
     """メインページ"""
     return render_template('index.html')
+
+# リダイレクト用
+@app.route('/index')
+def redirect_to_main():
+    """/index から /main にリダイレクト"""
+    return redirect('/main')
 
 # 企業ユーザー専用の決済フォーム処理
 @app.route('/company-registration', methods=['GET', 'POST'])
