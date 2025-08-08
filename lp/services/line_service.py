@@ -1355,14 +1355,14 @@ def handle_cancel_request_company(reply_token, company_id, stripe_subscription_i
         conn = get_db_connection()
         c = conn.cursor()
         
-        # アクティブなコンテンツを取得
+        # アクティブなコンテンツ（企業の有効なLINEアカウント＝追加済みコンテンツ）を取得
         c.execute(f'''
-            SELECT id, content_type, created_at 
-            FROM company_subscriptions 
-            WHERE company_id = {placeholder} AND subscription_status = 'active'
+            SELECT id, content_type, created_at
+            FROM company_line_accounts
+            WHERE company_id = {placeholder} AND status = 'active'
             ORDER BY created_at DESC
         ''', (company_id,))
-        
+
         active_contents = c.fetchall()
         print(f'[DEBUG] 企業解約対象コンテンツ取得: company_id={company_id}, count={len(active_contents)}')
         
@@ -1372,7 +1372,7 @@ def handle_cancel_request_company(reply_token, company_id, stripe_subscription_i
         
         # コンテンツ選択メッセージを作成
         actions = []
-        for i, (subscription_id, content_type, created_at) in enumerate(active_contents, 1):
+        for i, (account_id, content_type, created_at) in enumerate(active_contents, 1):
             # ai_scheduleをAI予定秘書に変換
             display_name = 'AI予定秘書' if content_type == 'ai_schedule' else content_type
             print(f'[DEBUG] コンテンツ: ({content_type}, {created_at})')
@@ -1881,6 +1881,22 @@ def handle_content_confirmation_company(company_id, content_type):
             except Exception as e:
                 print(f'[DEBUG] Stripe請求項目更新エラー: {e}')
                 # Stripeエラーが発生しても処理を続行
+        
+        # 請求期間同期サービスを呼び出して使用量レコードを月額サブスクリプション期間に合わせる
+        if stripe_subscription_id:
+            try:
+                from services.billing_period_sync_service import BillingPeriodSyncService
+                billing_sync_service = BillingPeriodSyncService()
+                sync_success = billing_sync_service.sync_usage_records_to_subscription_period(stripe_subscription_id)
+                
+                if sync_success:
+                    print(f'[DEBUG] 請求期間同期完了: subscription_id={stripe_subscription_id}')
+                else:
+                    print(f'[WARN] 請求期間同期に失敗: subscription_id={stripe_subscription_id}')
+                    
+            except Exception as e:
+                print(f'[DEBUG] 請求期間同期エラー: {e}')
+                # 同期エラーが発生しても処理を続行
         
         return {
             'success': True,
