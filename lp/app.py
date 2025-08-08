@@ -412,10 +412,9 @@ def company_registration_success():
         company_id = create_company_profile(checkout_session.metadata)
         print(f"✅ 企業情報保存完了: {company_id}")
         
-        # LINEアカウントを自動作成
-        print("📱 LINEアカウントを作成中...")
-        line_account = create_company_line_account(company_id, checkout_session.metadata)
-        print(f"✅ LINEアカウント作成完了: {line_account}")
+        # LINEアカウントの自動作成を削除 - ユーザーが手動で追加するまで待機
+        print("📱 LINEアカウントの自動作成をスキップ - 手動追加まで待機")
+        line_account = None
         
         # サブスクリプション情報を保存
         print("💳 サブスクリプション情報を保存中...")
