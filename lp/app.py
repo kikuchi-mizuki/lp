@@ -339,10 +339,10 @@ logger.info("✅ アプリケーション初期化完了")
 
 @app.route('/')
 def health_check_root():
-    """Railwayヘルスチェック用のルートパス"""
+    """Railwayヘルスチェック用のルートパス - シンプルな応答"""
     return "OK", 200
 
-@app.route('/index')
+@app.route('/home')
 def index():
     """メインページ"""
     return render_template('index.html')
