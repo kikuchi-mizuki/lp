@@ -1582,7 +1582,7 @@ def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscript
                     # LINEアカウントを非アクティブ化（IDで更新、RETURNINGで検証）
                     c.execute(f'''
                         UPDATE company_line_accounts 
-                        SET status = 'inactive', updated_at = CURRENT_TIMESTAMP
+                        SET status = 'inactive'
                         WHERE id = {placeholder} AND status <> 'inactive'
                         RETURNING id
                     ''', (account_id,))
@@ -1594,7 +1594,7 @@ def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscript
                     if affected == 0:
                         c.execute(f'''
                             UPDATE company_line_accounts 
-                            SET status = 'inactive', updated_at = CURRENT_TIMESTAMP
+                            SET status = 'inactive'
                             WHERE company_id = {placeholder} AND content_type = {placeholder} AND status = 'active'
                             RETURNING id
                         ''', (company_id, content_type))
@@ -1603,14 +1603,19 @@ def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscript
 
                     # company_content_additions があれば同時にinactiveへ（存在しない環境では無視）
                     try:
-                        c.execute(f'''
-                            UPDATE company_content_additions
-                            SET status = 'inactive'
-                            WHERE company_id = {placeholder} AND content_type = {placeholder} AND status = 'active'
-                        ''', (company_id, content_type))
-                        print(f'[DEBUG] company_content_additions更新: affected={c.rowcount}')
+                        c.execute(f"SELECT to_regclass('public.company_content_additions')")
+                        exists_row = c.fetchone()
+                        if exists_row and exists_row[0]:
+                            c.execute(f'''
+                                UPDATE company_content_additions
+                                SET status = 'inactive'
+                                WHERE company_id = {placeholder} AND content_type = {placeholder} AND status = 'active'
+                            ''', (company_id, content_type))
+                            print(f'[DEBUG] company_content_additions更新: affected={c.rowcount}')
+                        else:
+                            print('[DEBUG] company_content_additionsテーブル未作成')
                     except Exception as _ignore:
-                        print('[DEBUG] company_content_additionsテーブルなし、または更新不要')
+                        print('[DEBUG] company_content_additions更新スキップ: 例外発生')
 
                     # トランザクションをコミット
                     conn.commit()
@@ -1625,7 +1630,7 @@ def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscript
                             # 最終フォールバック：company_id + content_type を強制inactive
                             c.execute(f'''
                                 UPDATE company_line_accounts
-                                SET status = 'inactive', updated_at = CURRENT_TIMESTAMP
+                                SET status = 'inactive'
                                 WHERE company_id = {placeholder} AND content_type = {placeholder}
                             ''', (company_id, content_type))
                             conn.commit()
