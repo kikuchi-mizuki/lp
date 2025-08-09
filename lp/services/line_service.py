@@ -2036,7 +2036,7 @@ def handle_content_confirmation_company(company_id, content_type):
                         updated = False
                         # 1) ENVのPRICE IDが指定されている場合はそれを優先
                         if additional_price_id_env:
-                            for item in subscription.items.data:
+                            for item in subscription['items']['data']:
                                 if item.price.id == additional_price_id_env:
                                     print(f'[DEBUG] 追加料金アイテム(ENV)更新: {item.id} -> {additional_content_count}')
                                     # metered の場合は使用量レコードを設定
@@ -2055,7 +2055,7 @@ def handle_content_confirmation_company(company_id, content_type):
                                     break
                         # 2) 既知ID/ニックネームでのヒューリスティック探索
                         if not updated:
-                            for item in subscription.items.data:
+                            for item in subscription['items']['data']:
                                 price_nickname = item.price.nickname or ""
                                 price_id = item.price.id
                                 if (("追加" in price_nickname) or 
