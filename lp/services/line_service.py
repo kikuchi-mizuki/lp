@@ -1979,7 +1979,18 @@ def handle_content_confirmation_company(company_id, content_type):
                         if additional_price_id_env:
                             for item in subscription.items.data:
                                 if item.price.id == additional_price_id_env:
-                                    print(f'[DEBUG] 追加料金アイテム(ENV)更新: {item.id} -> {additional_content_count}')
+                                print(f'[DEBUG] 追加料金アイテム(ENV)更新: {item.id} -> {additional_content_count}')
+                                # metered の場合は使用量レコードを設定
+                                usage_type = None
+                                try:
+                                    usage_type = (getattr(item.price, 'recurring', {}) or {}).get('usage_type') if isinstance(getattr(item.price, 'recurring', {}), dict) else getattr(item.price.recurring, 'usage_type', None)
+                                except Exception:
+                                    usage_type = None
+                                if usage_type == 'metered':
+                                    import time as _time
+                                    stripe.UsageRecord.create(subscription_item=item.id, quantity=additional_content_count, timestamp=int(_time.time()), action='set')
+                                    print(f'[DEBUG] metered使用量を設定: item={item.id}, qty={additional_content_count}')
+                                else:
                                     stripe.SubscriptionItem.modify(item.id, quantity=additional_content_count)
                                     updated = True
                                     break
@@ -1993,7 +2004,17 @@ def handle_content_confirmation_company(company_id, content_type):
                                     ("metered" in price_nickname.lower()) or
                                     (price_id == 'price_1Rog1nIxg6C5hAVdnqB5MJiT')):
                                     print(f'[DEBUG] 追加料金アイテム(推定)更新: {item.id} -> {additional_content_count}')
-                                    stripe.SubscriptionItem.modify(item.id, quantity=additional_content_count)
+                                    usage_type = None
+                                    try:
+                                        usage_type = (getattr(item.price, 'recurring', {}) or {}).get('usage_type') if isinstance(getattr(item.price, 'recurring', {}), dict) else getattr(item.price.recurring, 'usage_type', None)
+                                    except Exception:
+                                        usage_type = None
+                                    if usage_type == 'metered':
+                                        import time as _time
+                                        stripe.UsageRecord.create(subscription_item=item.id, quantity=additional_content_count, timestamp=int(_time.time()), action='set')
+                                        print(f'[DEBUG] metered使用量を設定: item={item.id}, qty={additional_content_count}')
+                                    else:
+                                        stripe.SubscriptionItem.modify(item.id, quantity=additional_content_count)
                                     updated = True
                                     break
                         # 3) 見つからなければ新規作成
