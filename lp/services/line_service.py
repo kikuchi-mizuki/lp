@@ -2386,22 +2386,27 @@ def send_company_welcome_message(line_user_id, company_name, email):
         # 60文字制限対応：詳細はテキスト、ボタンは短文
         details_text = f"✅ 企業登録が完了しました\n企業名: {company_name}\nメール: {email}"
 
+        # 余白を抑えたFlexメッセージ（ボタン相当）
         welcome_buttons = {
-            "type": "template",
-            "altText": "AIコレクションズ",
-            "template": {
-                "type": "buttons",
-                "title": "AIコレクションズ",
-                "text": "操作を選択してください",
-                "thumbnailImageUrl": "https://ai-collections.herokuapp.com/static/images/logo.png",
-                "imageAspectRatio": "rectangle",
-                "imageSize": "cover",
-                "imageBackgroundColor": "#FFFFFF",
-                "actions": [
-                    {"type": "message", "label": "コンテンツ追加", "text": "追加"},
-                    {"type": "message", "label": "利用状況確認", "text": "状態"},
-                    {"type": "message", "label": "ヘルプ", "text": "ヘルプ"}
-                ]
+            "type": "flex",
+            "altText": "AIコレクションズ メニュー",
+            "contents": {
+                "type": "bubble",
+                "size": "mega",
+                "body": {
+                    "type": "box",
+                    "layout": "vertical",
+                    "paddingAll": "8px",
+                    "paddingTop": "6px",
+                    "spacing": "8px",
+                    "contents": [
+                        {"type": "text", "text": "AIコレクションズ", "weight": "bold", "size": "md"},
+                        {"type": "text", "text": "操作を選択してください", "size": "sm", "color": "#888888"},
+                        {"type": "button", "style": "primary", "height": "sm", "color": "#4F79FF", "action": {"type": "message", "label": "コンテンツ追加", "text": "追加"}},
+                        {"type": "button", "style": "secondary", "height": "sm", "action": {"type": "message", "label": "利用状況確認", "text": "状態"}},
+                        {"type": "button", "style": "secondary", "height": "sm", "action": {"type": "message", "label": "ヘルプ", "text": "ヘルプ"}}
+                    ]
+                }
             }
         }
 
