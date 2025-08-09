@@ -1151,36 +1151,25 @@ def handle_add_content_company(reply_token, company_id, stripe_subscription_id):
         
         print(f'[DEBUG] 企業コンテンツ追加: company_id={company_id}, total_subscription_count={total_subscription_count}, total_line_account_count={total_line_account_count}')
         
-        # コンテンツ選択メニューを作成（番号選択方式）
-        actions = []
+        # テキストのみの番号選択メニューを作成
+        lines = []
+        lines.append("追加するコンテンツを選択")
+        lines.append("")
+        lines.append(f"現在の利用状況：")
+        lines.append(f"• サブスクリプション：{total_subscription_count}件")
+        lines.append(f"• LINEアカウント：{total_line_account_count}件")
+        lines.append("")
+        lines.append("追加したいコンテンツの番号を送信してください：")
         for i, content in enumerate(available_contents, 1):
-            actions.append({
-                "type": "message",
-                "label": f"{i}. {content['name']}",
-                "text": f"{i}"
-            })
-        
-        # 戻るボタンを追加
-        actions.append({
-            "type": "message",
-            "label": "戻る",
-            "text": "メニュー"
-        })
-        
-        message = {
-            "type": "template",
-            "altText": "コンテンツ追加メニュー",
-            "template": {
-                "type": "buttons",
-                "title": "追加するコンテンツを選択",
-                "text": f"現在の利用状況：\n• サブスクリプション：{total_subscription_count}件\n• LINEアカウント：{total_line_account_count}件\n\n追加したいコンテンツを選択してください：",
-                "actions": actions
-            }
-        }
-        
-        print(f'[DEBUG] メッセージ送信開始: reply_token={reply_token[:20]}...')
-        send_line_message(reply_token, [message])
-        print(f'[DEBUG] メッセージ送信完了')
+            lines.append(f"{i}. {content['name']}")
+        lines.append("")
+        lines.append("戻る場合は『メニュー』と送信してください。")
+
+        menu_text = "\n".join(lines)
+
+        print(f'[DEBUG] テキストメニュー送信開始: reply_token={reply_token[:20]}...')
+        send_line_message(reply_token, [{"type": "text", "text": menu_text}])
+        print(f'[DEBUG] テキストメニュー送信完了')
         
     except Exception as e:
         print(f'[DEBUG] 企業コンテンツ追加エラー: {e}')
