@@ -929,31 +929,14 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
                 selected = contents_list[selection_index - 1]
                 content_name = selected.get('name', f'コンテンツ{selection_index}')
                 description = selected.get('description') or 'このコンテンツを追加しますか？'
-                # 改行や余分な空白を除去して短文化
                 description = ' '.join(str(description).split())
                 price = selected.get('price')
                 price_short = f" 料金:{price:,}円/月" if isinstance(price, int) else ""
-                # LINE Buttons テンプレートの text は60文字以内
-                MAX_TEXT_LEN = 60
-                text_body = f"{description}{price_short} 追加しますか？".strip()
-                if len(text_body) > MAX_TEXT_LEN:
-                    text_body = text_body[:MAX_TEXT_LEN - 1] + '…'
 
-                confirmation_message = {
-                    "type": "template",
-                    "altText": "コンテンツ追加の確認",
-                    "template": {
-                        "type": "buttons",
-                        "title": f"{content_name}を追加",
-                        "text": text_body,
-                        "actions": [
-                            {"type": "postback", "label": "はい", "data": f"company_confirm_add_{selection_index}"},
-                            {"type": "postback", "label": "いいえ", "data": "company_cancel_add"}
-                        ]
-                    }
-                }
-                send_line_message(event['replyToken'], [confirmation_message])
-                # 状態は一旦維持し、postbackで確定
+                # 確認はテキストメッセージで実施（ボタン非使用）
+                confirm_text = f"{content_name}を追加しますか？\n{description}{price_short}\n\n『はい』または『いいえ』と返信してください。"
+                set_user_state(user_id, f'add_confirm_{selection_index}')
+                send_line_message(event['replyToken'], [{"type": "text", "text": confirm_text}])
                 return
 
         # 無効な入力の場合、メインメニューを表示
@@ -961,6 +944,60 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
         from utils.message_templates import get_menu_message_company
         send_line_message(event['replyToken'], [get_menu_message_company()])
         return
+    elif state and str(state).startswith('add_confirm_'):
+        # ユーザーの「はい/いいえ」テキストで追加を確定
+        try:
+            num_str = str(state).replace('add_confirm_', '')
+            selection_index = int(num_str)
+        except Exception:
+            selection_index = None
+        normalized = str(text).strip().lower()
+        yes_words = {'はい', 'yes', 'y'}
+        no_words = {'いいえ', 'no', 'n'}
+        if selection_index is None:
+            set_user_state(user_id, 'welcome_sent')
+            from utils.message_templates import get_menu_message_company
+            send_line_message(event['replyToken'], [get_menu_message_company()])
+            return
+        if normalized in yes_words:
+            from services.spreadsheet_content_service import spreadsheet_content_service
+            contents_result = spreadsheet_content_service.get_available_contents()
+            contents_dict = contents_result.get('contents', {})
+            contents_list = [content_info for _, content_info in contents_dict.items()]
+            if 1 <= selection_index <= len(contents_list):
+                content_name = contents_list[selection_index - 1].get('name')
+            else:
+                content_name = None
+            if not content_name:
+                set_user_state(user_id, 'welcome_sent')
+                send_line_message(event['replyToken'], [{"type": "text", "text": "無効な選択です。"}])
+                return
+            try:
+                result = handle_content_confirmation_company(company_id, content_name)
+                set_user_state(user_id, 'welcome_sent')
+                if result.get('success'):
+                    success_message = f"🎉 {content_name}を追加しました！\n\n✨ {result.get('description', '新しいコンテンツが利用可能になりました')}\n\n🔗 アクセスURL：\n{result.get('url', 'https://lp-production-9e2c.up.railway.app')}\n\n💡 使い方：\n{result.get('usage', 'LINEアカウントからご利用いただけます')}"
+                    send_line_message(event['replyToken'], [{"type": "text", "text": success_message}])
+                else:
+                    error_message = result.get('error', f"❌ {content_name}の追加に失敗しました。")
+                    send_line_message(event['replyToken'], [{"type": "text", "text": error_message}])
+                return
+            except Exception as e:
+                print(f"[ERROR] add_confirm 処理エラー: {e}")
+                import traceback; traceback.print_exc()
+                set_user_state(user_id, 'welcome_sent')
+                send_line_message(event['replyToken'], [{"type": "text", "text": "❌ 追加処理でエラーが発生しました。"}])
+                return
+        elif normalized in no_words:
+            set_user_state(user_id, 'welcome_sent')
+            from utils.message_templates import get_menu_message_company
+            send_line_message(event['replyToken'], [get_menu_message_company()])
+            return
+        else:
+            # 再確認
+            send_line_message(event['replyToken'], [{"type": "text", "text": "『はい』または『いいえ』と返信してください。"}])
+            return
+
     elif state == 'cancel_select':
         print(f'[DEBUG] 解約選択処理開始: user_id={user_id}, state={state}, text={text}')
         
