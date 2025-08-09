@@ -2001,6 +2001,15 @@ def handle_content_confirmation_company(company_id, content_type):
                 ''', (account_id,))
                 conn.commit()
                 print(f'[DEBUG] 非アクティブLINEアカウントを再アクティブ化: account_id={account_id}')
+                # 再アクティブ化時にも請求期間を保存
+                try:
+                    billing_end_epoch = stripe_period_end if stripe_period_end else current_period_end
+                    if billing_end_epoch:
+                        c.execute(f"UPDATE company_line_accounts SET current_period_end = TO_TIMESTAMP({placeholder}) WHERE id = {placeholder}", (int(billing_end_epoch), account_id))
+                        conn.commit()
+                        print(f"[DEBUG] current_period_end 更新(reactivate): id={account_id}, end={billing_end_epoch}")
+                except Exception as _e:
+                    print(f"[DEBUG] current_period_end更新スキップ(reactivate): {_e}")
                 
                 # 再アクティブ化後のアクティブコンテンツ数を取得（1個目は無料なので-1）
                 c.execute(f'''
@@ -2039,12 +2048,27 @@ def handle_content_confirmation_company(company_id, content_type):
                             for item in subscription['items']['data']:
                                 if item.price.id == additional_price_id_env:
                                     print(f'[DEBUG] 追加料金アイテム(ENV)更新: {item.id} -> {additional_content_count}')
-                                    # metered の場合は使用量レコードを設定
-                                    usage_type = None
+                                    # 価格の単価が0/未設定なら正しい価格に差し替え
                                     try:
-                                        usage_type = (getattr(item.price, 'recurring', {}) or {}).get('usage_type') if isinstance(getattr(item.price, 'recurring', {}), dict) else getattr(item.price.recurring, 'usage_type', None)
-                                    except Exception:
-                                        usage_type = None
+                                        current_unit_amount = getattr(item.price, 'unit_amount', None)
+                                        usage_type_obj = getattr(item.price, 'recurring', None)
+                                        usage_type = (usage_type_obj or {}).get('usage_type') if isinstance(usage_type_obj, dict) else getattr(usage_type_obj, 'usage_type', None)
+                                        if not current_unit_amount or current_unit_amount == 0:
+                                            new_price = stripe.Price.create(
+                                                unit_amount=additional_price_value,
+                                                currency='jpy',
+                                                recurring={'interval': 'month', 'usage_type': ('metered' if usage_type == 'metered' else 'licensed')},
+                                                product_data={'name': 'コンテンツ追加料金'},
+                                                nickname='追加コンテンツ料金(修正)'
+                                            )
+                                            stripe.SubscriptionItem.modify(item.id, price=new_price.id)
+                                            print(f"[DEBUG] 単価0のため価格差し替え: item={item.id}, price={new_price.id}")
+                                            # 価格差し替え後は最新のitem参照で継続
+                                            usage_type = 'metered' if ('metered' in new_price.recurring['usage_type']) else usage_type
+                                    except Exception as __e:
+                                        print(f"[WARN] 価格差し替えチェック失敗: {__e}")
+
+                                    # metered の場合は使用量レコードを設定
                                     if usage_type == 'metered':
                                         import time as _time
                                         stripe.UsageRecord.create(subscription_item=item.id, quantity=additional_content_count, timestamp=int(_time.time()), action='set')
@@ -2065,9 +2089,23 @@ def handle_content_confirmation_company(company_id, content_type):
                                     print(f'[DEBUG] 追加料金アイテム(推定)更新: {item.id} -> {additional_content_count}')
                                     usage_type = None
                                     try:
-                                        usage_type = (getattr(item.price, 'recurring', {}) or {}).get('usage_type') if isinstance(getattr(item.price, 'recurring', {}), dict) else getattr(item.price.recurring, 'usage_type', None)
+                                        usage_type_obj = getattr(item.price, 'recurring', None)
+                                        usage_type = (usage_type_obj or {}).get('usage_type') if isinstance(usage_type_obj, dict) else getattr(usage_type_obj, 'usage_type', None)
+                                        current_unit_amount = getattr(item.price, 'unit_amount', None)
+                                        if not current_unit_amount or current_unit_amount == 0:
+                                            new_price = stripe.Price.create(
+                                                unit_amount=additional_price_value,
+                                                currency='jpy',
+                                                recurring={'interval': 'month', 'usage_type': ('metered' if usage_type == 'metered' else 'licensed')},
+                                                product_data={'name': 'コンテンツ追加料金'},
+                                                nickname='追加コンテンツ料金(修正)'
+                                            )
+                                            stripe.SubscriptionItem.modify(item.id, price=new_price.id)
+                                            print(f"[DEBUG] 単価0のため価格差し替え(推定): item={item.id}, price={new_price.id}")
+                                            usage_type = 'metered' if ('metered' in new_price.recurring['usage_type']) else usage_type
                                     except Exception:
-                                        usage_type = None
+                                        pass
+
                                     if usage_type == 'metered':
                                         import time as _time
                                         stripe.UsageRecord.create(subscription_item=item.id, quantity=additional_content_count, timestamp=int(_time.time()), action='set')
