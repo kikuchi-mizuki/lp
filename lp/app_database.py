@@ -137,8 +137,7 @@ def init_db():
                 CREATE TABLE IF NOT EXISTS user_states (
                     id SERIAL PRIMARY KEY,
                     line_user_id VARCHAR(255) UNIQUE,
-                    current_state VARCHAR(100) DEFAULT 'initial',
-                    state_data JSONB,
+                    state VARCHAR(100) DEFAULT 'initial',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
