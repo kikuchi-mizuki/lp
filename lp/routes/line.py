@@ -1010,6 +1010,7 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
         if extracted:
             try:
                 handle_cancel_selection_company(event['replyToken'], company_id, stripe_subscription_id, str(text))
+                # 状態は選択後も cancel_select のままにし、確認ボタンの返信に備える
                 set_user_state(user_id, 'cancel_confirm')
                 return
             except Exception as e:

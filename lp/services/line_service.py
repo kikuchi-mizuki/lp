@@ -1579,23 +1579,27 @@ def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscript
                 
                 # データベース更新処理
                 try:
-                    # LINEアカウントを非アクティブ化（IDで更新）
+                    # LINEアカウントを非アクティブ化（IDで更新、RETURNINGで検証）
                     c.execute(f'''
                         UPDATE company_line_accounts 
-                        SET status = 'inactive'
-                        WHERE id = {placeholder}
+                        SET status = 'inactive', updated_at = CURRENT_TIMESTAMP
+                        WHERE id = {placeholder} AND status <> 'inactive'
+                        RETURNING id
                     ''', (account_id,))
-                    affected = c.rowcount
+                    result = c.fetchone()
+                    affected = 1 if result else 0
                     print(f'[DEBUG] company_line_accounts更新: account_id={account_id}, affected={affected}')
 
                     # もし更新0件なら、念のため company_id + content_type でも更新を試行
                     if affected == 0:
                         c.execute(f'''
                             UPDATE company_line_accounts 
-                            SET status = 'inactive'
+                            SET status = 'inactive', updated_at = CURRENT_TIMESTAMP
                             WHERE company_id = {placeholder} AND content_type = {placeholder} AND status = 'active'
+                            RETURNING id
                         ''', (company_id, content_type))
-                        print(f'[DEBUG] 代替更新 company_id+content_type: affected={c.rowcount}')
+                        alt = c.fetchone()
+                        print(f'[DEBUG] 代替更新 company_id+content_type: affected={1 if alt else 0}')
 
                     # company_content_additions があれば同時にinactiveへ（存在しない環境では無視）
                     try:
@@ -1611,6 +1615,25 @@ def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscript
                     # トランザクションをコミット
                     conn.commit()
                     print(f'[DEBUG] データベーストランザクションコミット成功')
+
+                    # 反映確認ログ
+                    try:
+                        c.execute(f'SELECT status FROM company_line_accounts WHERE id = {placeholder}', (account_id,))
+                        row = c.fetchone()
+                        print(f"[DEBUG] 反映確認 company_line_accounts.id={account_id} → status={row[0] if row else 'N/A'}")
+                        if not row or row[0] != 'inactive':
+                            # 最終フォールバック：company_id + content_type を強制inactive
+                            c.execute(f'''
+                                UPDATE company_line_accounts
+                                SET status = 'inactive', updated_at = CURRENT_TIMESTAMP
+                                WHERE company_id = {placeholder} AND content_type = {placeholder}
+                            ''', (company_id, content_type))
+                            conn.commit()
+                            c.execute(f"SELECT count(*) FROM company_line_accounts WHERE company_id = {placeholder} AND content_type = {placeholder} AND status = 'inactive'", (company_id, content_type))
+                            cnt = c.fetchone()[0]
+                            print(f'[DEBUG] フォールバック更新実施: inactive count for {content_type} = {cnt}')
+                    except Exception as _e:
+                        print(f'[DEBUG] 反映確認クエリエラー: {_e}')
 
                 except Exception as e:
                     print(f'[DEBUG] データベース更新エラー: {e}')
