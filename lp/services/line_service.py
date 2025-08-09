@@ -1094,6 +1094,11 @@ def validate_selection_numbers(numbers, max_count):
 def smart_number_extraction(text):
     """AI技術を活用した高度な数字抽出処理"""
     import re
+    import unicodedata
+    
+    # 全角→半角正規化（日本語の全角数字「１」などに対応）
+    if isinstance(text, str):
+        text = unicodedata.normalize('NFKC', text)
     
     # 基本的な数字抽出
     numbers = re.findall(r'\d+', text)
