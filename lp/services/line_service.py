@@ -1744,21 +1744,6 @@ def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscript
         print(f'[DEBUG] 解約対象コンテンツ数: {len(cancelled)}')
         print(f'[DEBUG] 解約対象: {cancelled}')
         
-        # 企業ステータスの更新（残存アクティブコンテンツ数に応じて）
-        try:
-            c.execute(f"""
-                SELECT COUNT(*)
-                FROM company_line_accounts
-                WHERE company_id = {placeholder} AND status = 'active'
-            """, (company_id,))
-            remain = c.fetchone()[0]
-            new_status = 'active' if remain > 0 else 'inactive'
-            c.execute(f"UPDATE companies SET status = {placeholder} WHERE id = {placeholder}", (new_status, company_id))
-            conn.commit()
-            print(f"[DEBUG] companies.status更新: company_id={company_id}, status={new_status}, remain_active={remain}")
-        except Exception as _e:
-            print(f"[DEBUG] companies.status更新スキップ: {_e}")
-
         # 解約処理完了後、全体の請求期間同期を実行
         if cancelled and stripe_subscription_id:
             try:
