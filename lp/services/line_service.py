@@ -2003,11 +2003,21 @@ def handle_content_confirmation_company(company_id, content_type):
                 print(f'[DEBUG] 非アクティブLINEアカウントを再アクティブ化: account_id={account_id}')
                 # 再アクティブ化時にも請求期間を保存
                 try:
-                    billing_end_epoch = stripe_period_end if stripe_period_end else current_period_end
-                    if billing_end_epoch:
-                        c.execute(f"UPDATE company_line_accounts SET current_period_end = TO_TIMESTAMP({placeholder}) WHERE id = {placeholder}", (int(billing_end_epoch), account_id))
+                    from datetime import datetime as _dt
+                    billing_end_value = stripe_period_end if stripe_period_end else current_period_end
+                    if billing_end_value:
+                        if isinstance(billing_end_value, (int, float)):
+                            c.execute(f"UPDATE company_line_accounts SET current_period_end = TO_TIMESTAMP({placeholder}) WHERE id = {placeholder}", (int(billing_end_value), account_id))
+                        elif isinstance(billing_end_value, _dt):
+                            c.execute(f"UPDATE company_line_accounts SET current_period_end = {placeholder} WHERE id = {placeholder}", (billing_end_value, account_id))
+                        else:
+                            # 文字列やその他はエポックに変換を試みる
+                            try:
+                                c.execute(f"UPDATE company_line_accounts SET current_period_end = TO_TIMESTAMP({placeholder}) WHERE id = {placeholder}", (int(billing_end_value), account_id))
+                            except Exception:
+                                pass
                         conn.commit()
-                        print(f"[DEBUG] current_period_end 更新(reactivate): id={account_id}, end={billing_end_epoch}")
+                        print(f"[DEBUG] current_period_end 更新(reactivate): id={account_id}, end={billing_end_value}")
                 except Exception as _e:
                     print(f"[DEBUG] current_period_end更新スキップ(reactivate): {_e}")
                 
@@ -2068,11 +2078,17 @@ def handle_content_confirmation_company(company_id, content_type):
                                     except Exception as __e:
                                         print(f"[WARN] 価格差し替えチェック失敗: {__e}")
 
-                                    # metered の場合は使用量レコードを設定
+                                    # metered の場合でも請求プレビューに数量・金額を反映させるため、licensedの価格へ差し替えて数量で管理
                                     if usage_type == 'metered':
-                                        import time as _time
-                                        stripe.UsageRecord.create(subscription_item=item.id, quantity=additional_content_count, timestamp=int(_time.time()), action='set')
-                                        print(f'[DEBUG] metered使用量を設定: item={item.id}, qty={additional_content_count}')
+                                        fixed_price = stripe.Price.create(
+                                            unit_amount=additional_price_value,
+                                            currency='jpy',
+                                            recurring={'interval': 'month', 'usage_type': 'licensed'},
+                                            product_data={'name': 'コンテンツ追加料金(定額)'},
+                                            nickname='追加コンテンツ料金(定額)'
+                                        )
+                                        stripe.SubscriptionItem.modify(item.id, price=fixed_price.id, quantity=additional_content_count)
+                                        print(f"[DEBUG] metered→licensedへ差し替え: item={item.id}, price={fixed_price.id}, qty={additional_content_count}")
                                     else:
                                         stripe.SubscriptionItem.modify(item.id, quantity=additional_content_count)
                                     updated = True
@@ -2107,9 +2123,15 @@ def handle_content_confirmation_company(company_id, content_type):
                                         pass
 
                                     if usage_type == 'metered':
-                                        import time as _time
-                                        stripe.UsageRecord.create(subscription_item=item.id, quantity=additional_content_count, timestamp=int(_time.time()), action='set')
-                                        print(f'[DEBUG] metered使用量を設定: item={item.id}, qty={additional_content_count}')
+                                        fixed_price = stripe.Price.create(
+                                            unit_amount=additional_price_value,
+                                            currency='jpy',
+                                            recurring={'interval': 'month', 'usage_type': 'licensed'},
+                                            product_data={'name': 'コンテンツ追加料金(定額)'},
+                                            nickname='追加コンテンツ料金(定額)'
+                                        )
+                                        stripe.SubscriptionItem.modify(item.id, price=fixed_price.id, quantity=additional_content_count)
+                                        print(f"[DEBUG] metered→licensedへ差し替え(推定): item={item.id}, price={fixed_price.id}, qty={additional_content_count}")
                                     else:
                                         stripe.SubscriptionItem.modify(item.id, quantity=additional_content_count)
                                     updated = True
@@ -2196,13 +2218,19 @@ def handle_content_confirmation_company(company_id, content_type):
                 c.execute(f"SELECT id FROM company_line_accounts WHERE company_id = {placeholder} AND content_type = {placeholder} ORDER BY id DESC LIMIT 1", (company_id, content_type))
                 row = c.fetchone()
                 if row:
-                    # integer(Epoch秒) → timestamp へキャスト
+                    # billing_end_date の型に応じて更新
+                    from datetime import datetime as _dt
                     try:
-                        c.execute(f"UPDATE company_line_accounts SET current_period_end = TO_TIMESTAMP({placeholder}) WHERE id = {placeholder}", (int(billing_end_date), row[0]))
+                        if isinstance(billing_end_date, (int, float)):
+                            c.execute(f"UPDATE company_line_accounts SET current_period_end = TO_TIMESTAMP({placeholder}) WHERE id = {placeholder}", (int(billing_end_date), row[0]))
+                        elif isinstance(billing_end_date, _dt):
+                            c.execute(f"UPDATE company_line_accounts SET current_period_end = {placeholder} WHERE id = {placeholder}", (billing_end_date, row[0]))
+                        else:
+                            c.execute(f"UPDATE company_line_accounts SET current_period_end = TO_TIMESTAMP({placeholder}) WHERE id = {placeholder}", (int(billing_end_date), row[0]))
                         conn.commit()
                         print(f"[DEBUG] current_period_end 更新: id={row[0]}, end={billing_end_date}")
                     except Exception as _e:
-                        print(f"[DEBUG] current_period_end列が存在しないためスキップ: {_e}")
+                        print(f"[DEBUG] current_period_end更新スキップ: {_e}")
         except Exception as e:
             print(f"[DEBUG] 請求期間保存エラー: {e}")
         
