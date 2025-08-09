@@ -1248,7 +1248,6 @@ def handle_status_check_company(reply_token, company_id):
         if monthly_subscription:
             subscription_status, monthly_base_price, current_period_end = monthly_subscription
             status_message += f"💳 月額基本料金: {monthly_base_price:,}円/月\n"
-            status_message += f"📅 ステータス: {'アクティブ' if subscription_status == 'active' else '非アクティブ'}\n"
             
             if current_period_end:
                 period_end = current_period_end.strftime('%Y年%m月%d日')
