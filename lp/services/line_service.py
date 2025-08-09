@@ -1493,15 +1493,23 @@ def handle_cancel_selection_company(reply_token, company_id, stripe_subscription
             except Exception as e:
                 print(f'[DEBUG] 請求期間情報取得エラー: {e}')
         
-        # 簡潔な確認メッセージ
-        confirmation_text = f"解約対象:\n{content_list}{price_info}\n\n解約しますか？"
-        
-        # 確認ボタンを作成（簡潔なテキスト）
+        # 詳細はテキストで送信（制限回避）
+        details_text = f"解約対象:\n{content_list}{price_info}{billing_period_info}"
+
+        # ボタン用の短い本文（60文字以内目安）
+        if total_additional_price > 0:
+            short_text = f"対象{len(selected_contents)}件（-{total_additional_price:,}円/月）解約しますか？"
+        else:
+            short_text = f"対象{len(selected_contents)}件 解約しますか？"
+
+        # 複数選択に対応した確認テキスト（カンマ区切り）
+        indices_text = ','.join(str(i) for i in selected_indices) if selected_indices else '1'
+
         actions = [
             {
                 "type": "message",
                 "label": "解約する",
-                "text": f"解約確認_{selected_indices[0]}" if selected_indices else "解約確認_1"
+                "text": f"解約確認_{indices_text}"
             },
             {
                 "type": "message",
@@ -1509,20 +1517,23 @@ def handle_cancel_selection_company(reply_token, company_id, stripe_subscription
                 "text": "メニュー"
             }
         ]
-        
-        message = {
+
+        message_template = {
             "type": "template",
             "altText": "解約確認",
             "template": {
                 "type": "buttons",
                 "title": "解約確認",
-                "text": confirmation_text,
+                "text": short_text,
                 "actions": actions
             }
         }
-        
-        print(f'[DEBUG] LINE API呼び出し開始: message={message}')
-        result = send_line_message(reply_token, [message])
+
+        print(f"[DEBUG] LINE API呼び出し開始: details_text={details_text}, template={message_template}")
+        result = send_line_message(reply_token, [
+            {"type": "text", "text": details_text},
+            message_template
+        ])
         print(f'[DEBUG] 解約確認メッセージ送信完了: result={result}')
         
     except Exception as e:
