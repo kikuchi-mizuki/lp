@@ -605,22 +605,25 @@ def handle_follow_event(event):
                 
         else:
             print(f'[DEBUG] 未紐付け企業データが見つかりません: user_id={user_id}')
-            # メールアドレス連携を促すメッセージ（テキストのみ）
-            welcome_message = {
-                "type": "text",
-                "text": (
-                    "ご利用開始のため、決済時のメールアドレスをこのトークに返信してください。\n\n"
-                    "記入例: example@example.com\n\n"
-                    "※ ご不明点があれば『ヘルプ』と送信してください。"
-                )
-            }
-            try:
-                from services.line_service import send_line_message_push
-                ok = send_line_message_push(user_id, [welcome_message])
-                if not ok:
-                    send_line_message(event['replyToken'], [welcome_message])
-            except Exception:
+        
+        # 2. 必ずメールアドレス連携を促す案内メッセージを送信（未紐付け企業の有無に関係なく）
+        welcome_message = {
+            "type": "text",
+            "text": (
+                "🎉 決済完了！\n\n"
+                "ご利用開始のため、決済時のメールアドレスをこのトークに返信してください。\n\n"
+                "記入例: example@example.com\n\n"
+                "※ メールアドレスを送信すると、自動的に企業データと紐付けされ、すぐにサービスをご利用いただけます。\n"
+                "※ ご不明点があれば『ヘルプ』と送信してください。"
+            )
+        }
+        try:
+            from services.line_service import send_line_message_push
+            ok = send_line_message_push(user_id, [welcome_message])
+            if not ok:
                 send_line_message(event['replyToken'], [welcome_message])
+        except Exception:
+            send_line_message(event['replyToken'], [welcome_message])
         
         conn.close()
         
@@ -631,8 +634,10 @@ def handle_follow_event(event):
         welcome_message = {
             "type": "text",
             "text": (
+                "🎉 決済完了！\n\n"
                 "ご利用開始のため、決済時のメールアドレスをこのトークに返信してください。\n\n"
                 "記入例: example@example.com\n\n"
+                "※ メールアドレスを送信すると、自動的に企業データと紐付けされ、すぐにサービスをご利用いただけます。\n"
                 "※ ご不明点があれば『ヘルプ』と送信してください。"
             )
         }

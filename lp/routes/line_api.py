@@ -317,3 +317,72 @@ def link_company_user():
         except Exception:
             pass
         return jsonify({'success': False, 'error': str(e)}), 500
+
+# --- 決済完了時の自動案内メッセージ送信（既存LINE登録者向け） ---
+@line_api_bp.route('/send-payment-completion-message', methods=['POST'])
+def send_payment_completion_message():
+    """決済完了時に、既にLINE登録済みの企業に案内メッセージを送信。
+
+    Request JSON:
+    {
+      "company_id": 123,
+      "company_name": "企業名",
+      "email": "example@company.com"
+    }
+    """
+    try:
+        data = request.get_json() or {}
+        company_id = data.get('company_id')
+        company_name = data.get('company_name', '')
+        email = data.get('email', '')
+
+        if not company_id:
+            return jsonify({
+                'success': False,
+                'error': 'company_id は必須です'
+            }), 400
+
+        conn = get_db_connection()
+        c = conn.cursor()
+
+        # 企業のLINE登録状況を確認
+        c.execute('SELECT line_user_id FROM companies WHERE id = %s', (company_id,))
+        row = c.fetchone()
+        conn.close()
+
+        if not row or not row[0]:
+            return jsonify({
+                'success': False,
+                'error': 'LINE登録が見つかりません',
+                'message': 'フォロー時の自動送信に委譲されます'
+            }), 404
+
+        line_user_id = row[0]
+
+        # 決済完了時の案内メッセージを送信
+        try:
+            sent = send_company_welcome_message(line_user_id, company_name, email)
+            if sent:
+                return jsonify({
+                    'success': True,
+                    'company_id': company_id,
+                    'line_user_id': line_user_id,
+                    'message': '決済完了の案内メッセージを送信しました'
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': 'メッセージ送信に失敗しました'
+                }), 500
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'error': f'メッセージ送信エラー: {str(e)}'
+            }), 500
+
+    except Exception as e:
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)}), 500
