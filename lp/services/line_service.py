@@ -2383,42 +2383,35 @@ def send_company_welcome_message(line_user_id, company_name, email):
     try:
         print(f'[DEBUG] 企業向け案内メッセージ送信開始: line_user_id={line_user_id}, company_name={company_name}')
         
-        # 企業向けの案内メッセージを作成
-        welcome_message = {
+        # 60文字制限対応：詳細はテキスト、ボタンは短文
+        details_text = f"✅ 企業登録が完了しました\n企業名: {company_name}\nメール: {email}"
+
+        welcome_buttons = {
             "type": "template",
-            "altText": "AIコレクションズ 企業向けサービスへようこそ",
+            "altText": "AIコレクションズ",
             "template": {
                 "type": "buttons",
-                "title": f"🎉 {company_name}様、ようこそ！",
-                "text": f"AIコレクションズの企業向けサービスにご登録いただき、ありがとうございます。\n\n📧 登録メール: {email}\n💰 月額料金: ¥3,900\n\n以下のメニューから操作してください：",
+                "title": "AIコレクションズ",
+                "text": "操作を選択してください",
                 "thumbnailImageUrl": "https://ai-collections.herokuapp.com/static/images/logo.png",
                 "imageAspectRatio": "rectangle",
                 "imageSize": "cover",
                 "imageBackgroundColor": "#FFFFFF",
                 "actions": [
-                    {
-                        "type": "message",
-                        "label": "コンテンツ追加",
-                        "text": "追加"
-                    },
-                    {
-                        "type": "message",
-                        "label": "利用状況確認",
-                        "text": "状態"
-                    },
-                    {
-                        "type": "message",
-                        "label": "ヘルプ",
-                        "text": "ヘルプ"
-                    }
+                    {"type": "message", "label": "コンテンツ追加", "text": "追加"},
+                    {"type": "message", "label": "利用状況確認", "text": "状態"},
+                    {"type": "message", "label": "ヘルプ", "text": "ヘルプ"}
                 ]
             }
         }
-        
-        print(f'[DEBUG] 案内メッセージ作成完了: {welcome_message}')
-        
-        # プッシュメッセージとして送信
-        success = send_line_message_push(line_user_id, [welcome_message])
+
+        print(f'[DEBUG] 案内メッセージ作成完了: details_text, buttons')
+
+        # プッシュメッセージとして送信（2通）
+        success = send_line_message_push(line_user_id, [
+            {"type": "text", "text": details_text},
+            welcome_buttons
+        ])
         
         if success:
             print(f'[DEBUG] 企業向け案内メッセージ送信成功: line_user_id={line_user_id}')
