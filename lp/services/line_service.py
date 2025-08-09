@@ -1355,38 +1355,21 @@ def handle_cancel_request_company(reply_token, company_id, stripe_subscription_i
             conn.close()
             return
         
-        # コンテンツ選択メッセージを作成
-        actions = []
+        # テキストのみの番号選択メッセージを作成
+        lines = []
+        lines.append("解約するコンテンツを選択")
+        lines.append("")
+        lines.append("解約したいコンテンツの番号を送信してください：")
         for i, (account_id, content_type, created_at) in enumerate(active_contents, 1):
-            # ai_scheduleをAI予定秘書に変換
             display_name = 'AI予定秘書' if content_type == 'ai_schedule' else content_type
             print(f'[DEBUG] コンテンツ: ({content_type}, {created_at})')
-            
-            actions.append({
-                "type": "message",
-                "label": f"{i}. {display_name}",
-                "text": str(i)
-            })
-        
-        actions.append({
-            "type": "message",
-            "label": "戻る",
-            "text": "メニュー"
-        })
-        
-        message = {
-            "type": "template",
-            "altText": "コンテンツ解約選択",
-            "template": {
-                "type": "buttons",
-                "title": "解約するコンテンツを選択",
-                "text": "解約したいコンテンツを選択してください：",
-                "actions": actions
-            }
-        }
-        
-        send_line_message(reply_token, [message])
-        print(f'[DEBUG] コンテンツ解約コマンド処理完了')
+            lines.append(f"{i}. {display_name}")
+        lines.append("")
+        lines.append("戻る場合は『メニュー』と送信してください。")
+
+        menu_text = "\n".join(lines)
+        send_line_message(reply_token, [{"type": "text", "text": menu_text}])
+        print(f'[DEBUG] コンテンツ解約コマンド処理完了（テキスト）')
         
     except Exception as e:
         print(f'[DEBUG] コンテンツ解約メニューエラー: {e}')
