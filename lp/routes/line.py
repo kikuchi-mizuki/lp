@@ -917,18 +917,21 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
                 price = selected.get('price')
                 price_short = f" 料金:{price:,}円/月" if isinstance(price, int) else ""
 
-                # 確認はテキスト + クイックリプライ（はい/いいえ）
-                confirm_text = f"{content_name}を追加しますか？\n{description}{price_short}"
+                # 確認は大きいテンプレートボタン（はい/いいえ）
+                confirm_text = f"{description}{price_short}\n\n追加しますか？"
                 set_user_state(user_id, f'add_confirm_{selection_index}')
                 send_line_message(
                     event['replyToken'],
                     [{
-                        "type": "text",
-                        "text": confirm_text,
-                        "quickReply": {
-                            "items": [
-                                {"type": "action", "action": {"type": "message", "label": "はい", "text": "はい"}},
-                                {"type": "action", "action": {"type": "message", "label": "いいえ", "text": "いいえ"}}
+                        "type": "template",
+                        "altText": "コンテンツ追加確認",
+                        "template": {
+                            "type": "buttons",
+                            "title": f"{content_name}を追加",
+                            "text": confirm_text[:120],
+                            "actions": [
+                                {"type": "message", "label": "はい", "text": "はい"},
+                                {"type": "message", "label": "いいえ", "text": "いいえ"}
                             ]
                         }
                     }]
