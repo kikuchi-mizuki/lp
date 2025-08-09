@@ -59,21 +59,42 @@
                         <div class="feature-card">
                             <h3 class="feature-title">{{ item.name }}</h3>
                             <p class="feature-description">{{ item.description }}</p>
-                             {# 画像表示（優先: item.image → フォールバック: コンテンツIDに基づく既存画像） #}
-                             {% set image_src = item.image if item.image is defined and item.image else None %}
-                             {% if not image_src %}
-                                 {% if 'account' in cid %}
-                                     {% set image_src = '/static/images/line_accounting_optimized.jpg' %}
-                                 {% elif 'schedule' in cid %}
-                                     {% set image_src = '/static/images/line_schedule_optimized.jpg' %}
-                                 {% elif 'task' in cid %}
-                                     {% set image_src = '/static/images/line_task_optimized.jpg' %}
-                                 {% else %}
-                                     {% set image_src = '/static/images/secretary_optimized.jpg' %}
-                                 {% endif %}
+                             {# 画像/動画表示（優先: item.image または item.url が画像/動画なら使用。フォールバック: 既存画像） #}
+                             {% set media_src = None %}
+                             {% if item.image is defined and item.image %}
+                                 {% set media_src = item.image %}
+                             {% elif item.url %}
+                                 {% set media_src = item.url %}
                              {% endif %}
+
+                             {% set lower_src = (media_src or '') | lower %}
+                             {% set is_video = lower_src.endswith('.mp4') or lower_src.endswith('.webm') or lower_src.endswith('.mov') %}
+                             {% set is_image = lower_src.endswith('.jpg') or lower_src.endswith('.jpeg') or lower_src.endswith('.png') or lower_src.endswith('.gif') or lower_src.endswith('.svg') %}
+                             {% set is_youtube = 'youtube.com' in lower_src or 'youtu.be' in lower_src %}
+
+                             {% if not media_src or (not is_video and not is_image and not is_youtube) %}
+                                 {# フォールバック画像 #}
+                                 {% if 'account' in cid %}
+                                     {% set media_src = '/static/images/line_accounting_optimized.jpg' %}
+                                 {% elif 'schedule' in cid %}
+                                     {% set media_src = '/static/images/line_schedule_optimized.jpg' %}
+                                 {% elif 'task' in cid %}
+                                     {% set media_src = '/static/images/line_task_optimized.jpg' %}
+                                 {% else %}
+                                     {% set media_src = '/static/images/secretary_optimized.jpg' %}
+                                 {% endif %}
+                                 {% set is_video = false %}
+                             {% endif %}
+
                              <div class="feature-image-wrapper">
-                                 <img src="{{ image_src }}" alt="{{ item.name }}" class="feature-image" loading="lazy">
+                                 {% if is_video %}
+                                     <video class="feature-image" src="{{ media_src }}" autoplay muted loop playsinline preload="metadata"></video>
+                                 {% elif is_youtube %}
+                                     {% set embed_src = media_src | replace('https://youtu.be/', 'https://www.youtube.com/embed/') | replace('http://youtu.be/', 'https://www.youtube.com/embed/') | replace('https://www.youtube.com/watch?v=', 'https://www.youtube.com/embed/') | replace('http://www.youtube.com/watch?v=', 'https://www.youtube.com/embed/') | replace('https://youtube.com/watch?v=', 'https://www.youtube.com/embed/') | replace('http://youtube.com/watch?v=', 'https://www.youtube.com/embed/') %}
+                                     <iframe class="feature-image" src="{{ embed_src }}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen loading="lazy"></iframe>
+                                 {% else %}
+                                     <img src="{{ media_src }}" alt="{{ item.name }}" class="feature-image" loading="lazy">
+                                 {% endif %}
                              </div>
                             {% if item.features and item.features|length > 0 %}
                                 <ul>
