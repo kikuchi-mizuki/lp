@@ -59,10 +59,22 @@
                         <div class="feature-card">
                             <h3 class="feature-title">{{ item.name }}</h3>
                             <p class="feature-description">{{ item.description }}</p>
-                            {% if item.url %}
-                                <p><a href="{{ item.url }}" target="_blank">詳細を見る</a></p>
-                            {% endif %}
-                            <div class="price-sub">価格: {{ item.price }}円</div>
+                             {# 画像表示（優先: item.image → フォールバック: コンテンツIDに基づく既存画像） #}
+                             {% set image_src = item.image if item.image is defined and item.image else None %}
+                             {% if not image_src %}
+                                 {% if 'account' in cid %}
+                                     {% set image_src = '/static/images/line_accounting_optimized.jpg' %}
+                                 {% elif 'schedule' in cid %}
+                                     {% set image_src = '/static/images/line_schedule_optimized.jpg' %}
+                                 {% elif 'task' in cid %}
+                                     {% set image_src = '/static/images/line_task_optimized.jpg' %}
+                                 {% else %}
+                                     {% set image_src = '/static/images/secretary_optimized.jpg' %}
+                                 {% endif %}
+                             {% endif %}
+                             <div class="feature-image-wrapper">
+                                 <img src="{{ image_src }}" alt="{{ item.name }}" class="feature-image" loading="lazy">
+                             </div>
                             {% if item.features and item.features|length > 0 %}
                                 <ul>
                                     {% for f in item.features %}
@@ -78,22 +90,7 @@
             </div>
         </section>
 
-        <!-- Pricing Section -->
-        <section class="pricing">
-            <div class="section">
-                <h2 class="section-title">料金プラン</h2>
-                <p class="section-subtitle">シンプルで分かりやすい料金体系</p>
-                
-                <div class="pricing-card">
-                    <div class="price-main">月額3,900円</div>
-                    <div class="price-sub">＋コンテンツ追加1件1,500円</div>
-                    <p class="price-description">
-                        例：1件だけ使う→合計3,900円<br>
-                        2件使う→合計5,400円
-                    </p>
-                </div>
-            </div>
-        </section>
+        {# 価格表示セクションは非表示にします（要望により削除） #}
 
         <!-- CTA Section -->
         <section class="cta-section">
