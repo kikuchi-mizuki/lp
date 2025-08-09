@@ -1680,7 +1680,7 @@ def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscript
                         updated = False
                         # 1) ENVのPRICE IDがある場合はそれを優先
                         if additional_price_id_env:
-                            for item in subscription.items.data:
+                            for item in subscription['items']['data']:
                                 if item.price.id == additional_price_id_env:
                                     print(f'[DEBUG] 追加料金アイテム(ENV)更新: {item.id}, 数量: {item.quantity} → {new_billing_count}')
                                     stripe.SubscriptionItem.modify(item.id, quantity=new_billing_count)
@@ -1688,7 +1688,7 @@ def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscript
                                     break
                         # 2) 既知ID/ニックネームで推定
                         if not updated:
-                            for item in subscription.items.data:
+                            for item in subscription['items']['data']:
                                 price_nickname = item.price.nickname or ""
                                 price_id = item.price.id
                                 if (("追加" in price_nickname) or 
@@ -2179,13 +2179,13 @@ def handle_content_confirmation_company(company_id, content_type):
                 print(f'[DEBUG] Stripeサブスクリプション取得: {subscription.id}')
                 
                 # サブスクリプションアイテムを詳細にログ出力
-                print(f'[DEBUG] サブスクリプションアイテム数: {len(subscription.items.data)}')
-                for i, item in enumerate(subscription.items.data):
+                print(f"[DEBUG] サブスクリプションアイテム数: {len(subscription['items']['data'])}")
+                for i, item in enumerate(subscription['items']['data']):
                     print(f'[DEBUG] アイテム{i}: ID={item.id}, Price={item.price.id}, Nickname={item.price.nickname}, Quantity={item.quantity}')
                 
                 # 追加料金の請求項目を更新（複数の条件で検索）
                 updated = False
-                for item in subscription.items.data:
+                for item in subscription['items']['data']:
                     price_nickname = item.price.nickname or ""
                     price_id = item.price.id
                     
@@ -2210,14 +2210,14 @@ def handle_content_confirmation_company(company_id, content_type):
                 if not updated:
                     print(f'[WARN] 追加料金アイテムが見つかりませんでした。新しい追加料金アイテムを作成します。')
                     print(f'[DEBUG] 利用可能なアイテム:')
-                    for item in subscription.items.data:
+                    for item in subscription['items']['data']:
                         print(f'  - ID: {item.id}, Price: {item.price.id}, Nickname: {item.price.nickname}')
                     
                     # 追加料金用の価格アイテムを作成
                     try:
                         # 追加料金用の価格を作成（月額1,500円）
                         additional_price_obj = stripe.Price.create(
-                            unit_amount=150000,  # 1,500円（セント単位）
+                            unit_amount=1500,  # 1,500円（最小単位）
                             currency='jpy',
                             recurring={'interval': 'month'},
                             product_data={

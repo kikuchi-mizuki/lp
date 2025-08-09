@@ -626,7 +626,7 @@ def debug_stripe_check(company_id):
         items = []
         additional_item_found = False
         
-        for item in subscription.items.data:
+        for item in subscription['items']['data']:
             price_nickname = item.price.nickname or ""
             
             # 追加料金アイテムかチェック
