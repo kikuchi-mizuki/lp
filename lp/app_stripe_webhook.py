@@ -86,12 +86,26 @@ def handle_company_payment_succeeded(event):
         conn = get_db_connection()
         c = conn.cursor()
         
-        # 企業のサブスクリプション状態を更新
+        # Stripeから現行期間を取得して反映
+        try:
+            subscription = stripe.Subscription.retrieve(subscription_id)
+            status = subscription.get('status') or 'active'
+            start_epoch = subscription.get('current_period_start')
+            end_epoch = subscription.get('current_period_end')
+            import datetime as _dt
+            start_dt = _dt.datetime.utcfromtimestamp(int(start_epoch)) if start_epoch else None
+            end_dt = _dt.datetime.utcfromtimestamp(int(end_epoch)) if end_epoch else None
+        except Exception:
+            status = 'active'
+            start_dt = None
+            end_dt = None
+
+        # 企業のサブスクリプション状態と期間を更新
         c.execute('''
             UPDATE company_monthly_subscriptions 
-            SET subscription_status = 'active', updated_at = CURRENT_TIMESTAMP
+            SET subscription_status = %s, current_period_start = %s, current_period_end = %s, updated_at = CURRENT_TIMESTAMP
             WHERE stripe_subscription_id = %s
-        ''', (subscription_id,))
+        ''', (status, start_dt, end_dt, subscription_id))
         
         conn.commit()
         conn.close()

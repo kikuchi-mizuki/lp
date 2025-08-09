@@ -248,15 +248,22 @@ def company_registration_success():
                 'content_type': content_type,
             }
 
-            # 次回請求日の取得（Stripeのサブスクリプション情報から）
+            # 次回請求日の取得（トライアル中はtrial_end、以降はcurrent_period_end）
             next_billing_date = None
             try:
                 if subscription_id:
                     subscription = stripe.Subscription.retrieve(subscription_id)
                     import datetime as _dt
-                    period_end = subscription.get('current_period_end')
-                    if period_end:
-                        next_billing_date = _dt.datetime.utcfromtimestamp(int(period_end)).strftime('%Y-%m-%d')
+                    status = subscription.get('status')
+                    epoch = None
+                    if status == 'trialing':
+                        epoch = subscription.get('trial_end') or subscription.get('current_period_end')
+                    else:
+                        epoch = subscription.get('current_period_end')
+                    if epoch:
+                        # JST表示（+9時間）
+                        dt_utc = _dt.datetime.utcfromtimestamp(int(epoch))
+                        next_billing_date = (dt_utc + _dt.timedelta(hours=9)).strftime('%Y-%m-%d')
             except Exception:
                 next_billing_date = None
 
