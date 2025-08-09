@@ -71,12 +71,18 @@
                         </a>
                     </div>
                     <div class="text-center mb-3">
-                        <p class="mb-2">2. メールアドレスを送信</p>
-                        <div class="bg-white p-3 rounded">
-                            <p class="mb-1"><strong>送信するメールアドレス:</strong></p>
+                        <p class="mb-2">2. LINEで自動連携（おすすめ）</p>
+                        <button id="liff-link-button" class="btn btn-success btn-lg">
+                            <i class="fab fa-line me-2"></i>
+                            LINEと自動で連携する
+                        </button>
+                        <div class="mt-2 text-muted small">ボタンを押すだけで、LINEと自動で紐付けされます</div>
+                        <div class="bg-white p-3 rounded mt-3">
+                            <p class="mb-1"><strong>連携対象メールアドレス:</strong></p>
                             <p class="mb-0 text-primary">{{ company_data.email }}</p>
                         </div>
-                        <small class="text-muted d-block mt-2">※このメールアドレスをLINEで送信してください</small>
+                        <small class="text-muted d-block mt-2">※うまくいかない場合は、LINEトークでこのメールアドレスを送信してください</small>
+                        <div id="link-result" class="text-center small mt-2"></div>
                     </div>
                     <div class="text-center">
                         <p class="mb-2">3. サービスを利用開始</p>
@@ -106,5 +112,60 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script>
+    (function(){
+        const LIFF_ID = '{{ liff_id or "" }}';
+        const email = '{{ company_data.email }}';
+        const button = document.getElementById('liff-link-button');
+        const resultEl = document.getElementById('link-result');
+
+        function setResult(text, ok){
+            resultEl.textContent = text;
+            resultEl.style.color = ok ? '#198754' : '#dc3545';
+        }
+
+        async function initLiff(){
+            if(!LIFF_ID){
+                setResult('LIFF設定が未完了です。手動でメール送信してください。', false);
+                button.disabled = true;
+                return;
+            }
+            await liff.init({ liffId: LIFF_ID });
+            if(!liff.isLoggedIn()){
+                liff.login();
+                return;
+            }
+        }
+
+        async function linkNow(){
+            try{
+                await initLiff();
+                const profile = await liff.getProfile();
+                const lineUserId = profile.userId;
+                const resp = await fetch('/api/v1/line/link-company-user', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: email, line_user_id: lineUserId })
+                });
+                const data = await resp.json();
+                if(data && data.success){
+                    setResult('LINEと自動連携が完了しました。案内をLINEに送信しました。', true);
+                }else{
+                    setResult('連携に失敗しました。LINEでメールアドレスを送信してください。', false);
+                }
+            }catch(e){
+                console.error(e);
+                setResult('エラーが発生しました。LINEでメールアドレスを送信してください。', false);
+            }
+        }
+
+        if(button){
+            button.addEventListener('click', function(){
+                linkNow();
+            });
+        }
+    })();
+    </script>
 </body>
 </html> 

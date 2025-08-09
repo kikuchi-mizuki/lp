@@ -244,6 +244,35 @@ def company_registration_success():
 
             logger.info(f"✅ 企業登録完了: {company_id}")
 
+            # 決済完了→LINE遷移時の自動案内メッセージ送信
+            # すでに企業データに line_user_id が紐付いている場合は、ユーザーからの送信を待たず即時にプッシュ送信する
+            try:
+                conn = get_db_connection()
+                c = conn.cursor()
+                c.execute('SELECT line_user_id FROM companies WHERE id = %s', (company_id,))
+                row = c.fetchone()
+                conn.close()
+
+                if row and row[0]:
+                    line_user_id = row[0]
+                    try:
+                        # 企業向けのウェルカム案内（詳細テキスト + メニューボタン）を自動送信
+                        from services.line_service import send_company_welcome_message
+                        sent = send_company_welcome_message(line_user_id, company_name, email)
+                        if sent:
+                            logger.info(f"✅ 決済完了後の自動案内メッセージ送信成功: company_id={company_id}")
+                        else:
+                            logger.warning(f"⚠️ 決済完了後の自動案内メッセージ送信失敗: company_id={company_id}")
+                    except Exception as e:
+                        logger.error(f"❌ 自動案内メッセージ送信エラー: {e}")
+                else:
+                    # line_user_id 未紐付けの場合は、LINEのフォロー（follow）イベントで自動送信される
+                    logger.info(
+                        f"ℹ️ line_user_id未紐付けのため、フォロー時の自動送信に委譲: company_id={company_id}"
+                    )
+            except Exception as e:
+                logger.error(f"❌ 自動案内メッセージ事前チェックエラー: {e}")
+
             # テンプレートに渡すデータを整形
             company_data = {
                 'company_name': company_name,
@@ -274,6 +303,7 @@ def company_registration_success():
                 'company_registration_success.html',
                 company_data=company_data,
                 next_billing_date=next_billing_date,
+                liff_id=os.getenv('LINE_LIFF_ID')
             )
         else:
             logger.error("❌ 必要な情報が不足しています")

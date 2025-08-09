@@ -7,6 +7,8 @@ LINE API用ルート
 from flask import Blueprint, request, jsonify
 from services.line_api_service import line_api_service
 from services.company_service import CompanyService
+from utils.db import get_db_connection
+from services.line_service import send_company_welcome_message
 
 # インスタンスを作成
 company_service = CompanyService()
@@ -250,3 +252,68 @@ def health_check():
         'message': 'LINE API サービスが正常に動作しています',
         'timestamp': '2024-07-30T12:00:00Z'
     }), 200 
+
+# --- LIFF連携: 決済直後にメールとLINE userIdで企業を紐付けし、自動案内を送信 ---
+@line_api_bp.route('/link-company-user', methods=['POST'])
+def link_company_user():
+    """LIFFから送られた email と line_user_id を使って企業レコードを紐付け、案内メッセージを自動送信。
+
+    Request JSON:
+    {
+      "email": "example@company.com",
+      "line_user_id": "Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    }
+    """
+    try:
+        data = request.get_json() or {}
+        email = (data.get('email') or '').strip().lower()
+        line_user_id = (data.get('line_user_id') or '').strip()
+
+        if not email or not line_user_id:
+            return jsonify({
+                'success': False,
+                'error': 'email と line_user_id は必須です'
+            }), 400
+
+        conn = get_db_connection()
+        c = conn.cursor()
+
+        # 該当企業を取得
+        c.execute('SELECT id, company_name, email, line_user_id FROM companies WHERE email = %s', (email,))
+        company = c.fetchone()
+        if not company:
+            conn.close()
+            return jsonify({'success': False, 'error': '企業が見つかりません'}), 404
+
+        company_id, company_name, stored_email, stored_line_user_id = company
+
+        # すでに同じIDが設定済みなら何もしない（Idempotent）
+        if stored_line_user_id == line_user_id:
+            conn.close()
+            # 案内は既送かもしれないが、重複送信は避ける
+            return jsonify({'success': True, 'message': '既に紐付け済みです'})
+
+        # 他のユーザーIDが入っている場合でも上書き（重複登録防止のため最新を採用）
+        c.execute('UPDATE companies SET line_user_id = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s', (line_user_id, company_id))
+        conn.commit()
+        conn.close()
+
+        # 紐付け後に自動案内を送信
+        try:
+            sent = send_company_welcome_message(line_user_id, company_name, stored_email)
+        except Exception:
+            sent = False
+
+        return jsonify({
+            'success': True,
+            'company_id': company_id,
+            'message': '紐付けが完了しました',
+            'push_sent': bool(sent)
+        })
+
+    except Exception as e:
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)}), 500
