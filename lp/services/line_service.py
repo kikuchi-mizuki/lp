@@ -1902,6 +1902,21 @@ def handle_content_confirmation_company(company_id, content_type):
                 print(f'[DEBUG] Stripe請求期間取得エラー: {e}')
                 # Stripeエラーが発生しても処理を続行
         
+        # スプレッドシートからコンテンツ情報を取得（名称ベースで一致させる）
+        from services.spreadsheet_content_service import spreadsheet_content_service
+        contents_result = spreadsheet_content_service.get_available_contents()
+        contents_dict = contents_result.get('contents', {})
+        spreadsheet_content = None
+        for _, info in contents_dict.items():
+            if info.get('name') == content_type:
+                spreadsheet_content = info
+                break
+        if not spreadsheet_content:
+            return {
+                'success': False,
+                'error': f'❌ 無効なコンテンツタイプ: {content_type}'
+            }
+
         # 既存のLINEアカウントをチェック
         c.execute(f'''
             SELECT id, content_type, status
@@ -1947,7 +1962,10 @@ def handle_content_confirmation_company(company_id, content_type):
                     
                 print(f'[DEBUG] 再アクティブ化: 総数={total_content_count}, 課金対象={additional_content_count}, 料金={additional_price}')
                 
-                if additional_price > 0 and stripe_subscription_id:
+                # スプレッドシートの価格（未設定時は1500円）
+                additional_price_value = int(spreadsheet_content.get('price', 1500))
+
+                if additional_price_value > 0 and stripe_subscription_id:
                     try:
                         import stripe
                         stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
@@ -1996,38 +2014,13 @@ def handle_content_confirmation_company(company_id, content_type):
                     'additional_price': additional_price
                 }
         
-        # コンテンツ情報を定義
-        content_info = {
-            'AI予定秘書': {
-                'description': '日程調整のストレスから解放される、スケジュール管理の相棒',
-                'usage': 'Googleカレンダーと連携し、LINEで予定の追加・確認・空き時間の提案まで。調整のやりとりに追われる時間を、もっとクリエイティブに使えるように。',
-                'url': 'https://lp-production-9e2c.up.railway.app/schedule',
-                'line_url': 'https://line.me/R/ti/p/@ai_schedule_secretary',
-                'additional_price': 1500  # 追加料金対象に変更
-            },
-            'AI経理秘書': {
-                'description': '打合せ後すぐ送れる、スマートな請求書作成アシスタント',
-                'usage': 'LINEで項目を送るだけで、見積書や請求書を即作成。営業から事務処理までを一気通貫でスムーズに。',
-                'url': 'https://lp-production-9e2c.up.railway.app/accounting',
-                'line_url': 'https://line.me/R/ti/p/@ai_accounting_secretary',
-                'additional_price': 1500
-            },
-            'AIタスクコンシェルジュ': {
-                'description': '今日やるべきことを、ベストなタイミングで',
-                'usage': '登録したタスクを空き時間に自動で配置し、理想的な1日をAIが提案。「やりたいのにできない」を、「自然にこなせる」毎日に。',
-                'url': 'https://lp-production-9e2c.up.railway.app/task',
-                'line_url': 'https://line.me/R/ti/p/@ai_task_concierge',
-                'additional_price': 1500
-            }
+        # スプレッドシート由来の情報を採用
+        content = {
+            'description': spreadsheet_content.get('description') or f'{content_type} を追加しました',
+            'usage': spreadsheet_content.get('usage', 'LINEアカウントからご利用いただけます'),
+            'url': spreadsheet_content.get('url') or 'https://lp-production-9e2c.up.railway.app',
+            'additional_price': int(spreadsheet_content.get('price', 1500))
         }
-        
-        if content_type not in content_info:
-            return {
-                'success': False, 
-                'error': f'❌ 無効なコンテンツタイプ: {content_type}'
-            }
-        
-        content = content_info[content_type]
         
         # 既存のアクティブコンテンツ数を取得
         c.execute(f'''
@@ -2044,7 +2037,7 @@ def handle_content_confirmation_company(company_id, content_type):
             additional_price = 0  # 初回コンテンツは無料
             print(f'[DEBUG] 初回コンテンツのため無料: {content_type}')
         else:
-            additional_price = content['additional_price']  # 2個目以降は有料
+            additional_price = content['additional_price']  # 2個目以降は有料（シートの価格）
             print(f'[DEBUG] 追加コンテンツのため有料: {content_type}, 料金={additional_price}円')
         
         # 請求期間を月額サブスクリプションに合わせる
