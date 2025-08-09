@@ -1114,6 +1114,26 @@ def smart_number_extraction(text):
     for japanese, number in japanese_numbers.items():
         if japanese in text:
             numbers.append(str(number))
+
+    # 英語の数詞（one, two ... ten）に対応
+    text_lower = text.lower() if isinstance(text, str) else ''
+    english_numbers = {
+        'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5,
+        'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10
+    }
+    for word, number in english_numbers.items():
+        if re.search(rf'\b{word}\b', text_lower):
+            numbers.append(str(number))
+
+    # ローマ数字（I, II, ... X）に対応
+    roman_numbers = {
+        'i': 1, 'ii': 2, 'iii': 3, 'iv': 4, 'v': 5,
+        'vi': 6, 'vii': 7, 'viii': 8, 'ix': 9, 'x': 10
+    }
+    # NFKC化で Ⅰ,Ⅱ → I,II に正規化済み
+    for roman, number in roman_numbers.items():
+        if re.search(rf'\b{roman}\b', text_lower):
+            numbers.append(str(number))
     
     # 重複を除去してソート
     unique_numbers = list(set(numbers))
