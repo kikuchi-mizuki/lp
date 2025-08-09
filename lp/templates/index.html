@@ -25,7 +25,7 @@
                 <form id="subscription-form" class="hero-form">
                     <input type="text" name="company_name" placeholder="企業名を入力" required class="hero-input">
                     <input type="email" name="email" placeholder="メールアドレスを入力" required class="hero-input">
-                    <button type="submit" class="hero-btn">１週間無料トライアル中！</button>
+                    <button type="submit" class="hero-btn">２週間無料トライアル中！</button>
                 </form>
             </div>
         </section>
@@ -156,7 +156,7 @@
                 if (data.error) {
                     alert('エラーが発生しました: ' + data.error);
                     submitButton.disabled = false;
-                    submitButton.textContent = '１週間無料トライアル中！';
+                    submitButton.textContent = '２週間無料トライアル中！';
                     return;
                 }
                 
@@ -167,7 +167,7 @@
                 console.error('Error:', error);
                 alert('エラーが発生しました。もう一度お試しください。');
                 submitButton.disabled = false;
-                submitButton.textContent = '１週間無料トライアル中！';
+                submitButton.textContent = '２週間無料トライアル中！';
             }
         });
     </script>
