@@ -2168,16 +2168,14 @@ def handle_content_confirmation_company(company_id, content_type):
                     'success': True,
                     'company_id': company_id,
                     'content_type': content_type,
-                    'description': f'{content_type}を再アクティブ化しました',
-                    'url': 'https://lp-production-9e2c.up.railway.app',
-                    'usage': 'LINEアカウントからご利用いただけます',
+                    # 再アクティブ化の説明や使い方は不要。URLはスプレッドシートが優先。
+                    'url': spreadsheet_content.get('url') or 'https://lp-production-9e2c.up.railway.app',
                     'additional_price': additional_price
                 }
         
         # スプレッドシート由来の情報を採用
         content = {
-            'description': spreadsheet_content.get('description') or f'{content_type} を追加しました',
-            'usage': spreadsheet_content.get('usage', 'LINEアカウントからご利用いただけます'),
+            # 説明/使い方は送信しないが、将来用に保持はする
             'url': spreadsheet_content.get('url') or 'https://lp-production-9e2c.up.railway.app',
             'additional_price': int(spreadsheet_content.get('price', 1500))
         }

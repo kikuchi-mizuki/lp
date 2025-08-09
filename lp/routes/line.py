@@ -959,7 +959,9 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
                 result = handle_content_confirmation_company(company_id, content_name)
                 set_user_state(user_id, 'welcome_sent')
                 if result.get('success'):
-                    success_message = f"🎉 {content_name}を追加しました！\n\n✨ {result.get('description', '新しいコンテンツが利用可能になりました')}\n\n🔗 アクセスURL：\n{result.get('url', 'https://lp-production-9e2c.up.railway.app')}\n\n💡 使い方：\n{result.get('usage', 'LINEアカウントからご利用いただけます')}"
+                    # スプレッドシート由来のURLに一本化。説明や使い方、再アクティブ化文言は不要。
+                    content_url = result.get('url', 'https://lp-production-9e2c.up.railway.app')
+                    success_message = f"🎉 {content_name}を追加しました！\n\n🔗 アクセスはこちら：\n{content_url}"
                     send_line_message(event['replyToken'], [{"type": "text", "text": success_message}])
                 else:
                     error_message = result.get('error', f"❌ {content_name}の追加に失敗しました。")
@@ -1128,7 +1130,8 @@ https://lp-production-9e2c.up.railway.app
         try:
             result = handle_content_confirmation_company(company_id, content_name)
             if result['success']:
-                success_message = f"🎉 {content_type}を追加しました！\n\n✨ {result.get('description', '新しいコンテンツが利用可能になりました')}\n\n🔗 アクセスURL：\n{result.get('url', 'https://lp-production-9e2c.up.railway.app')}\n\n💡 使い方：\n{result.get('usage', 'LINEアカウントからご利用いただけます')}"
+                content_url = result.get('url', 'https://lp-production-9e2c.up.railway.app')
+                success_message = f"🎉 {content_type}を追加しました！\n\n🔗 アクセスはこちら：\n{content_url}"
                 send_line_message(event['replyToken'], [{"type": "text", "text": success_message}])
             else:
                 error_message = result.get('error', f"❌ {content_type}の追加に失敗しました。")
