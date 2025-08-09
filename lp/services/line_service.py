@@ -1969,36 +1969,55 @@ def handle_content_confirmation_company(company_id, content_type):
                     try:
                         import stripe
                         stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+                        additional_price_id_env = os.getenv('STRIPE_ADDITIONAL_PRICE_ID')
                         
                         # Stripeサブスクリプションを取得
                         subscription = stripe.Subscription.retrieve(stripe_subscription_id)
                         
                         # 追加料金の請求項目を更新（複数の条件で検索）
                         updated = False
-                        for item in subscription.items.data:
-                            price_nickname = item.price.nickname or ""
-                            price_id = item.price.id
-                            
-                            # 複数の条件で追加料金アイテムを特定
-                            if (("追加" in price_nickname) or 
-                                ("additional" in price_nickname.lower()) or
-                                ("metered" in price_nickname.lower()) or
-                                (price_id == 'price_1Rog1nIxg6C5hAVdnqB5MJiT')):
-                                
-                                print(f'[DEBUG] Stripe請求項目を更新: {item.id}, 数量={additional_content_count}')
-                                stripe.SubscriptionItem.modify(
-                                    item.id,
-                                    quantity=additional_content_count
-                                )
-                                print(f'[DEBUG] Stripe請求項目更新完了')
-                                updated = True
-                                break
-                        
-                        if not updated:
-                            print(f'[WARN] 再アクティブ化: 追加料金アイテムが見つかりませんでした。')
-                            print(f'[INFO] 利用可能なアイテム:')
+                        # 1) ENVのPRICE IDが指定されている場合はそれを優先
+                        if additional_price_id_env:
                             for item in subscription.items.data:
-                                print(f'  - ID: {item.id}, Price: {item.price.id}, Nickname: {item.price.nickname}')
+                                if item.price.id == additional_price_id_env:
+                                    print(f'[DEBUG] 追加料金アイテム(ENV)更新: {item.id} -> {additional_content_count}')
+                                    stripe.SubscriptionItem.modify(item.id, quantity=additional_content_count)
+                                    updated = True
+                                    break
+                        # 2) 既知ID/ニックネームでのヒューリスティック探索
+                        if not updated:
+                            for item in subscription.items.data:
+                                price_nickname = item.price.nickname or ""
+                                price_id = item.price.id
+                                if (("追加" in price_nickname) or 
+                                    ("additional" in price_nickname.lower()) or
+                                    ("metered" in price_nickname.lower()) or
+                                    (price_id == 'price_1Rog1nIxg6C5hAVdnqB5MJiT')):
+                                    print(f'[DEBUG] 追加料金アイテム(推定)更新: {item.id} -> {additional_content_count}')
+                                    stripe.SubscriptionItem.modify(item.id, quantity=additional_content_count)
+                                    updated = True
+                                    break
+                        # 3) 見つからなければ新規作成
+                        if not updated:
+                            print(f'[WARN] 再アクティブ化: 追加料金アイテムが見つかりませんでした。新規作成します。')
+                            target_price_id = additional_price_id_env
+                            if not target_price_id:
+                                # jpyはゼロ小数通貨のため単位は「円」
+                                additional_price_obj = stripe.Price.create(
+                                    unit_amount=additional_price_value,
+                                    currency='jpy',
+                                    recurring={'interval': 'month'},
+                                    product_data={'name': 'コンテンツ追加料金'},
+                                    nickname='追加コンテンツ料金'
+                                )
+                                target_price_id = additional_price_obj.id
+                                print(f'[DEBUG] 追加料金用価格を作成: {target_price_id}')
+                            stripe.SubscriptionItem.create(
+                                subscription=stripe_subscription_id,
+                                price=target_price_id,
+                                quantity=additional_content_count
+                            )
+                            print(f'[DEBUG] 追加料金アイテムを新規作成: price={target_price_id}, qty={additional_content_count}')
                                 
                     except Exception as e:
                         print(f'[DEBUG] Stripe請求項目更新エラー: {e}')
