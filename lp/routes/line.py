@@ -621,22 +621,14 @@ def handle_follow_event(event):
                 
         else:
             print(f'[DEBUG] 未紐付け企業データが見つかりません: user_id={user_id}')
-            # メールアドレス連携を促すメッセージ（プッシュ送信し、失敗時のみreplyでフォールバック）
+            # メールアドレス連携を促すメッセージ（テキストのみ）
             welcome_message = {
-                "type": "template",
-                "altText": "メールアドレス連携のお願い",
-                "template": {
-                    "type": "buttons",
-                    "title": "メールアドレス連携のお願い",
-                    "text": "AIコレクションズをご利用いただくには、決済時のメールアドレスとの連携が必要です。\n\n以下のメールアドレスを送信してください：\n\n例: example@example.com",
-                    "actions": [
-                        {
-                            "type": "message",
-                            "label": "メールアドレスを送信",
-                            "text": "メールアドレスを送信します"
-                        }
-                    ]
-                }
+                "type": "text",
+                "text": (
+                    "ご利用開始のため、決済時のメールアドレスをこのトークに返信してください。\n\n"
+                    "記入例: example@example.com\n\n"
+                    "※ ご不明点があれば『ヘルプ』と送信してください。"
+                )
             }
             try:
                 from services.line_service import send_line_message_push
@@ -653,20 +645,12 @@ def handle_follow_event(event):
         import traceback
         traceback.print_exc()
         welcome_message = {
-            "type": "template",
-            "altText": "メールアドレス連携のお願い",
-            "template": {
-                "type": "buttons",
-                "title": "メールアドレス連携のお願い",
-                "text": "AIコレクションズをご利用いただくには、決済時のメールアドレスとの連携が必要です。\n\n以下のメールアドレスを送信してください：\n\n例: example@example.com",
-                "actions": [
-                    {
-                        "type": "message",
-                        "label": "メールアドレスを送信",
-                        "text": "メールアドレスを送信します"
-                    }
-                ]
-            }
+            "type": "text",
+            "text": (
+                "ご利用開始のため、決済時のメールアドレスをこのトークに返信してください。\n\n"
+                "記入例: example@example.com\n\n"
+                "※ ご不明点があれば『ヘルプ』と送信してください。"
+            )
         }
         send_line_message(event['replyToken'], [welcome_message])
 
