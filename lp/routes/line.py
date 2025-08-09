@@ -959,10 +959,29 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
                 result = handle_content_confirmation_company(company_id, content_name)
                 set_user_state(user_id, 'welcome_sent')
                 if result.get('success'):
-                    # スプレッドシート由来のURLに一本化。説明や使い方、再アクティブ化文言は不要。
+                    # スプレッドシートURLへ誘導する軽量Flex（上余白を最小化）
                     content_url = result.get('url', 'https://lp-production-9e2c.up.railway.app')
-                    success_message = f"🎉 {content_name}を追加しました！\n\n🔗 アクセスはこちら：\n{content_url}"
-                    send_line_message(event['replyToken'], [{"type": "text", "text": success_message}])
+                    flex = {
+                        "type": "flex",
+                        "altText": f"{content_name}を追加しました",
+                        "contents": {
+                            "type": "bubble",
+                            "size": "mega",
+                            "body": {
+                                "type": "box",
+                                "layout": "vertical",
+                                "paddingAll": "8px",
+                                "paddingTop": "6px",
+                                "spacing": "6px",
+                                "contents": [
+                                    {"type": "text", "text": f"🎉 {content_name}を追加しました", "weight": "bold", "size": "md", "wrap": True},
+                                    {"type": "text", "text": "アクセスはこちら", "size": "sm", "color": "#888888"},
+                                    {"type": "button", "style": "link", "height": "sm", "action": {"type": "uri", "label": content_url, "uri": content_url}}
+                                ]
+                            }
+                        }
+                    }
+                    send_line_message(event['replyToken'], [flex])
                 else:
                     error_message = result.get('error', f"❌ {content_name}の追加に失敗しました。")
                     send_line_message(event['replyToken'], [{"type": "text", "text": error_message}])
@@ -1131,8 +1150,27 @@ https://lp-production-9e2c.up.railway.app
             result = handle_content_confirmation_company(company_id, content_name)
             if result['success']:
                 content_url = result.get('url', 'https://lp-production-9e2c.up.railway.app')
-                success_message = f"🎉 {content_type}を追加しました！\n\n🔗 アクセスはこちら：\n{content_url}"
-                send_line_message(event['replyToken'], [{"type": "text", "text": success_message}])
+                flex = {
+                    "type": "flex",
+                    "altText": f"{content_type}を追加しました",
+                    "contents": {
+                        "type": "bubble",
+                        "size": "mega",
+                        "body": {
+                            "type": "box",
+                            "layout": "vertical",
+                            "paddingAll": "8px",
+                            "paddingTop": "6px",
+                            "spacing": "6px",
+                            "contents": [
+                                {"type": "text", "text": f"🎉 {content_type}を追加しました", "weight": "bold", "size": "md", "wrap": True},
+                                {"type": "text", "text": "アクセスはこちら", "size": "sm", "color": "#888888"},
+                                {"type": "button", "style": "link", "height": "sm", "action": {"type": "uri", "label": content_url, "uri": content_url}}
+                            ]
+                        }
+                    }
+                }
+                send_line_message(event['replyToken'], [flex])
             else:
                 error_message = result.get('error', f"❌ {content_type}の追加に失敗しました。")
                 send_line_message(event['replyToken'], [{"type": "text", "text": error_message}])
