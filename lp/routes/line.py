@@ -11,7 +11,8 @@ from services.line_service import send_welcome_with_buttons
 from services.line_service import (
     handle_add_content_company, handle_status_check_company, handle_cancel_menu_company,
     handle_content_confirmation_company, handle_cancel_request_company, 
-    handle_cancel_selection_company, handle_subscription_cancel_company
+    handle_cancel_selection_company, handle_subscription_cancel_company,
+    handle_cancel_confirmation_company
 )
 from utils.message_templates import get_menu_message_company, get_help_message_company
 from utils.db import get_db_connection
@@ -36,24 +37,7 @@ def get_cancelled_contents(user_id):
     """解約されたコンテンツを取得（一時的に無効化）"""
     return []
 
-def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscription_id, confirmation_text):
-    """解約確認処理（一時的な実装）"""
-    try:
-        # 解約確認の処理を実装
-        # TODO: 実際の解約処理を実装
-        print(f'[DEBUG] 解約確認処理: company_id={company_id}, confirmation_text={confirmation_text}')
-        
-        # 解約処理のロジックをここに実装
-        # 現在は一時的な実装として成功メッセージを返す
-        
-        send_line_message(reply_token, [{"type": "text", "text": "解約処理が完了しました。"}])
-        return True
-    except Exception as e:
-        print(f'[ERROR] 解約確認処理エラー: {e}')
-        import traceback
-        traceback.print_exc()
-        send_line_message(reply_token, [{"type": "text", "text": "解約処理中にエラーが発生しました。"}])
-        return False
+## 以前の一時的なスタブを削除し、サービス実装を使用します
 
 @line_bp.route('/line/payment_completed/user/<int:user_id>')
 def payment_completed_webhook_by_user_id(user_id):
