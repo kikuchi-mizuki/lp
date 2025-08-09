@@ -52,7 +52,7 @@ try:
     from routes.ai_schedule_webhook_simple import ai_schedule_webhook_simple_bp
     from routes.debug import debug_bp
 
-    # Blueprint登録
+    # Blueprint登録（デバッグ系はENVで有効化）
     blueprints = [
         (line_bp, 'line'),
         (stripe_bp, 'stripe'),
@@ -74,8 +74,11 @@ try:
         (company_registration_bp, 'company_registration'),
         (ai_schedule_webhook_bp, 'ai_schedule_webhook'),
         (ai_schedule_webhook_simple_bp, 'ai_schedule_webhook_simple'),
-        (debug_bp, 'debug'),
     ]
+
+    # デバッグ系Blueprintは明示的に有効化された場合のみ登録
+    if os.getenv('ENABLE_DEBUG_ROUTES', '0') in ('1', 'true', 'TRUE', 'True'):
+        blueprints.append((debug_bp, 'debug'))
 
     for blueprint, name in blueprints:
         try:
@@ -457,4 +460,5 @@ def cancel_company_content_api(company_id, content_type):
 logger.info("✅ アプリケーション初期化完了")
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 3000))) 
+    debug_mode = os.getenv('FLASK_DEBUG', '0').lower() in ('1', 'true', 'yes')
+    app.run(debug=debug_mode, host='0.0.0.0', port=int(os.environ.get('PORT', 3000)))

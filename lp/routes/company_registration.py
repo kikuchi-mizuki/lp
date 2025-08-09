@@ -34,7 +34,7 @@ def save_company_settings_to_db(company_id, company_name, line_channel_id, line_
             "LINE_CHANNEL_ID": line_channel_id,
             "LINE_CHANNEL_ACCESS_TOKEN": line_access_token,
             "LINE_CHANNEL_SECRET": line_channel_secret,
-            "FLASK_SECRET_KEY": "your_flask_secret_key_here",
+            # 重要: アプリのシークレットは環境にのみ配置し、DBに保存しない
             "TIMEZONE": "Asia/Tokyo",
             "DEFAULT_EVENT_DURATION": "60"
         }
@@ -54,7 +54,6 @@ Webhook URL: {webhook_url or '未設定'}
 - LINE_CHANNEL_ID={line_channel_id}
 - LINE_CHANNEL_ACCESS_TOKEN={line_access_token[:10]}...
 - LINE_CHANNEL_SECRET={line_channel_secret[:10]}...
-- FLASK_SECRET_KEY=your_flask_secret_key_here
 - TIMEZONE=Asia/Tokyo
         """.strip()
         

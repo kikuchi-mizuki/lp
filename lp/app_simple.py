@@ -29,4 +29,5 @@ def test():
 if __name__ == '__main__':
     # Railwayが提供する$PORTを最優先で使用
     port = int(os.environ.get('PORT', 3000))
-    app.run(debug=True, host='0.0.0.0', port=port)
+    debug_mode = os.getenv('FLASK_DEBUG', '0').lower() in ('1', 'true', 'yes')
+    app.run(debug=debug_mode, host='0.0.0.0', port=port)

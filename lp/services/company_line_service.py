@@ -244,7 +244,7 @@ class CompanyLineService:
             if isinstance(message_data, str):
                 # テキストメッセージの場合
                 payload = {
-                    'to': message_data.get('to', 'all'),  # 全ユーザーに送信
+                    'to': 'all',  # 単純送信（必要に応じて関数引数で受け取る設計に変更可）
                     'messages': [
                         {
                             'type': 'text',

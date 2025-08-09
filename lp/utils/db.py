@@ -1,4 +1,5 @@
 import os
+import logging
 import psycopg2
 import sqlite3
 from psycopg2.extras import RealDictCursor
@@ -11,7 +12,11 @@ def get_db_connection():
     # 機密情報をログに出さないよう、存在フラグのみ出力
     railway_url_env = os.getenv('RAILWAY_DATABASE_URL')
     database_url_env = os.getenv('DATABASE_URL')
-    print(f"[DEBUG] DB URL presence: RAILWAY_DATABASE_URL={'set' if railway_url_env else 'unset'}, DATABASE_URL={'set' if database_url_env else 'unset'}")
+    logging.getLogger(__name__).debug(
+        "DB URL presence: RAILWAY_DATABASE_URL=%s, DATABASE_URL=%s",
+        'set' if railway_url_env else 'unset',
+        'set' if database_url_env else 'unset'
+    )
 
     database_url = railway_url_env or database_url_env
 

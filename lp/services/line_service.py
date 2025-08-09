@@ -1,5 +1,4 @@
 import requests
-import sqlite3
 import psycopg2
 import os
 import stripe
@@ -53,7 +52,7 @@ def send_line_message(reply_token, messages):
         'Content-Type': 'application/json'
     }
     
-    print(f'[DEBUG] ヘッダー設定完了: Authorization={headers["Authorization"][:20]}...')
+    # Authorizationはログ出力しない（機密値保護）
     
     # 単一メッセージの場合はリスト化
     if not isinstance(messages, list):

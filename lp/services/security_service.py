@@ -15,8 +15,13 @@ class SecurityService:
     
     def __init__(self):
         self.logger = logging.getLogger(__name__)
-        self.secret_key = os.getenv('SECRET_KEY', 'your-secret-key-change-this')
-        self.jwt_secret = os.getenv('JWT_SECRET', 'your-jwt-secret-change-this')
+        self.secret_key = os.getenv('SECRET_KEY')
+        self.jwt_secret = os.getenv('JWT_SECRET')
+
+        # 本番相当ではシークレット未設定なら例外を投げる（開発既定は無効）
+        if os.getenv('REQUIRE_SECRETS', '0') in ('1', 'true', 'TRUE', 'True'):
+            if not self.secret_key or not self.jwt_secret:
+                raise RuntimeError('SECRET_KEY / JWT_SECRET が未設定です')
         
         # セキュリティ設定
         self.security_config = {
