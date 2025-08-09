@@ -48,13 +48,7 @@ class BillingPeriodSyncService:
             
             print(f"[DEBUG] 従量課金アイテム確定: {usage_item['id']}")
             
-            # 既存の使用量レコードを確認
-            existing_usage = stripe.UsageRecord.list(
-                subscription_item=usage_item['id'],
-                limit=100
-            )
-            
-            print(f"[DEBUG] 既存の使用量レコード数: {len(existing_usage['data'])}")
+            # 既存使用量の取得APIは無いため、同期は常にsetで上書きする
             
             # 現在のアクティブコンテンツ数を取得（データベースから）
             try:

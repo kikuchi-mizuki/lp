@@ -2142,18 +2142,18 @@ def handle_content_confirmation_company(company_id, content_type):
         print(f'[DEBUG] LINEアカウント登録完了: company_id={company_id}, content_type={content_type}')
 
         # Stripeの請求期間終了をテーブルへ保存（列があれば）
-        try:
-            if billing_end_date:
-                c.execute(f"SELECT id FROM company_line_accounts WHERE company_id = {placeholder} AND content_type = {placeholder} ORDER BY id DESC LIMIT 1", (company_id, content_type))
-                row = c.fetchone()
-                if row:
-                    # 列が存在しない場合はスキップ
                     try:
-                        c.execute(f"UPDATE company_line_accounts SET current_period_end = {placeholder} WHERE id = {placeholder}", (billing_end_date, row[0]))
-                        conn.commit()
-                        print(f"[DEBUG] current_period_end 更新: id={row[0]}, end={billing_end_date}")
-                    except Exception as _e:
-                        print(f"[DEBUG] current_period_end列が存在しないためスキップ: {_e}")
+                        if billing_end_date:
+                            c.execute(f"SELECT id FROM company_line_accounts WHERE company_id = {placeholder} AND content_type = {placeholder} ORDER BY id DESC LIMIT 1", (company_id, content_type))
+                            row = c.fetchone()
+                            if row:
+                                # integer(Epoch秒) → timestamp へキャスト
+                                try:
+                                    c.execute(f"UPDATE company_line_accounts SET current_period_end = TO_TIMESTAMP({placeholder}) WHERE id = {placeholder}", (int(billing_end_date), row[0]))
+                                    conn.commit()
+                                    print(f"[DEBUG] current_period_end 更新: id={row[0]}, end={billing_end_date}")
+                                except Exception as _e:
+                                    print(f"[DEBUG] current_period_end列が存在しないためスキップ: {_e}")
         except Exception as e:
             print(f"[DEBUG] 請求期間保存エラー: {e}")
         
