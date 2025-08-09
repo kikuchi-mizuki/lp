@@ -917,10 +917,22 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
                 price = selected.get('price')
                 price_short = f" 料金:{price:,}円/月" if isinstance(price, int) else ""
 
-                # 確認はテキストメッセージで実施（ボタン非使用）
-                confirm_text = f"{content_name}を追加しますか？\n{description}{price_short}\n\n『はい』または『いいえ』と返信してください。"
+                # 確認はテキスト + クイックリプライ（はい/いいえ）
+                confirm_text = f"{content_name}を追加しますか？\n{description}{price_short}"
                 set_user_state(user_id, f'add_confirm_{selection_index}')
-                send_line_message(event['replyToken'], [{"type": "text", "text": confirm_text}])
+                send_line_message(
+                    event['replyToken'],
+                    [{
+                        "type": "text",
+                        "text": confirm_text,
+                        "quickReply": {
+                            "items": [
+                                {"type": "action", "action": {"type": "message", "label": "はい", "text": "はい"}},
+                                {"type": "action", "action": {"type": "message", "label": "いいえ", "text": "いいえ"}}
+                            ]
+                        }
+                    }]
+                )
                 return
 
         # 無効な入力の場合、メインメニューを表示
