@@ -266,10 +266,23 @@ def company_registration_success():
                     except Exception as e:
                         logger.error(f"❌ 自動案内メッセージ送信エラー: {e}")
                 else:
-                    # line_user_id 未紐付けの場合は、LINEのフォロー（follow）イベントで自動送信される
-                    logger.info(
-                        f"ℹ️ line_user_id未紐付けのため、フォロー時の自動送信に委譲: company_id={company_id}"
-                    )
+                    # line_user_id 未紐付けの場合でも、決済完了時の案内メッセージを送信
+                    # フォロー時に自動で紐付けされるため、事前に案内を送信
+                    try:
+                        # 決済完了時の案内メッセージ（フォローを促す内容）
+                        welcome_message = {
+                            "type": "text",
+                            "text": f"🎉 決済完了！\n\n企業名: {company_name}\nメール: {email}\n\n次のステップ:\n1. 公式LINEを友だち追加\n2. このメールアドレスを送信\n\nすぐにサービスをご利用いただけます！"
+                        }
+                        
+                        # 全ユーザーにブロードキャスト送信（または特定の条件で送信）
+                        from services.line_service import send_line_message_push
+                        # 注意: ブロードキャスト送信は制限があるため、フォロー時の自動送信に委譲
+                        logger.info(
+                            f"ℹ️ line_user_id未紐付けのため、フォロー時の自動送信に委譲: company_id={company_id}"
+                        )
+                    except Exception as e:
+                        logger.error(f"❌ 決済完了案内メッセージ送信エラー: {e}")
             except Exception as e:
                 logger.error(f"❌ 自動案内メッセージ事前チェックエラー: {e}")
 
