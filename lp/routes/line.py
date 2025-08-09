@@ -928,9 +928,16 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
             if 1 <= selection_index <= len(contents_list):
                 selected = contents_list[selection_index - 1]
                 content_name = selected.get('name', f'コンテンツ{selection_index}')
-                description = selected.get('description', 'このコンテンツを追加しますか？')
+                description = selected.get('description') or 'このコンテンツを追加しますか？'
+                # 改行や余分な空白を除去して短文化
+                description = ' '.join(str(description).split())
                 price = selected.get('price')
-                price_text = f"料金：{price:,}円/月（2個目以降）\n※1個目は無料" if isinstance(price, int) else ""
+                price_short = f" 料金:{price:,}円/月" if isinstance(price, int) else ""
+                # LINE Buttons テンプレートの text は60文字以内
+                MAX_TEXT_LEN = 60
+                text_body = f"{description}{price_short} 追加しますか？".strip()
+                if len(text_body) > MAX_TEXT_LEN:
+                    text_body = text_body[:MAX_TEXT_LEN - 1] + '…'
 
                 confirmation_message = {
                     "type": "template",
@@ -938,7 +945,7 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
                     "template": {
                         "type": "buttons",
                         "title": f"{content_name}を追加",
-                        "text": f"{description}\n\n{price_text}\n\nこのコンテンツを追加しますか？".strip(),
+                        "text": text_body,
                         "actions": [
                             {"type": "postback", "label": "はい", "data": f"company_confirm_add_{selection_index}"},
                             {"type": "postback", "label": "いいえ", "data": "company_cancel_add"}
