@@ -1609,7 +1609,7 @@ def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscript
                     try:
                         import stripe
                         stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
-                        additional_price_id_env = os.getenv('STRIPE_ADDITIONAL_PRICE_ID')
+                        additional_price_id_env = os.getenv('STRIPE_ADDITIONAL_PRICE_ID') or os.getenv('STRIPE_USAGE_PRICE_ID')
                         
                         print(f'[DEBUG] 有料コンテンツ解約後のStripe更新: {content_type}, position={i}, price={additional_price}')
                         
@@ -1968,7 +1968,7 @@ def handle_content_confirmation_company(company_id, content_type):
                     try:
                         import stripe
                         stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
-                        additional_price_id_env = os.getenv('STRIPE_ADDITIONAL_PRICE_ID')
+                        additional_price_id_env = os.getenv('STRIPE_ADDITIONAL_PRICE_ID') or os.getenv('STRIPE_USAGE_PRICE_ID')
                         
                         # Stripeサブスクリプションを取得
                         subscription = stripe.Subscription.retrieve(stripe_subscription_id)
