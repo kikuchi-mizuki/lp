@@ -1292,20 +1292,24 @@ def handle_cancel_menu_company(reply_token, company_id, stripe_subscription_id):
     """企業ユーザー専用：解約メニュー表示"""
     try:
         print(f'[DEBUG] handle_cancel_menu_company開始: company_id={company_id}, stripe_subscription_id={stripe_subscription_id}')
-        # テキストのみの解約メニュー
-        lines = []
-        lines.append("解約メニュー")
-        lines.append("")
-        lines.append("どの解約を行いますか？")
-        lines.append("• サブスクリプション解約 と送信")
-        lines.append("• コンテンツ解約 と送信")
-        lines.append("")
-        lines.append("戻る場合は『メニュー』と送信してください。")
-        menu_text = "\n".join(lines)
-
-        print(f'[DEBUG] 解約メニューテキスト送信開始: reply_token={reply_token[:20]}...')
-        send_line_message(reply_token, [{"type": "text", "text": menu_text}])
-        print(f'[DEBUG] 解約メニューテキスト送信完了')
+        # 固定選択肢のためボタンテンプレートで表示
+        message = {
+            "type": "template",
+            "altText": "解約メニュー",
+            "template": {
+                "type": "buttons",
+                "title": "解約メニュー",
+                "text": "どの解約を行いますか？",
+                "actions": [
+                    {"type": "message", "label": "サブスクリプション解約", "text": "サブスクリプション解約"},
+                    {"type": "message", "label": "コンテンツ解約", "text": "コンテンツ解約"},
+                    {"type": "message", "label": "戻る", "text": "メニュー"}
+                ]
+            }
+        }
+        print(f'[DEBUG] 解約メニューメッセージ送信開始: reply_token={reply_token[:20]}...')
+        send_line_message(reply_token, [message])
+        print(f'[DEBUG] 解約メニューメッセージ送信完了')
         
     except Exception as e:
         print(f'[DEBUG] 解約メニューエラー: {e}')
