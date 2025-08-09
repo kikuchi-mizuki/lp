@@ -2073,12 +2073,11 @@ def handle_content_confirmation_company(company_id, content_type):
                                             )
                                             stripe.SubscriptionItem.modify(item.id, price=new_price.id)
                                             print(f"[DEBUG] 単価0のため価格差し替え: item={item.id}, price={new_price.id}")
-                                            # 価格差し替え後は最新のitem参照で継続
-                                            usage_type = 'metered' if ('metered' in new_price.recurring['usage_type']) else usage_type
+                                            usage_type = (new_price.recurring or {}).get('usage_type') if isinstance(new_price.recurring, dict) else getattr(new_price.recurring, 'usage_type', usage_type)
                                     except Exception as __e:
                                         print(f"[WARN] 価格差し替えチェック失敗: {__e}")
 
-                                    # metered の場合でも請求プレビューに数量・金額を反映させるため、licensedの価格へ差し替えて数量で管理
+                                    # metered の場合は既存アイテムを削除し、licensedの新アイテムを作成
                                     if usage_type == 'metered':
                                         fixed_price = stripe.Price.create(
                                             unit_amount=additional_price_value,
@@ -2087,8 +2086,9 @@ def handle_content_confirmation_company(company_id, content_type):
                                             product_data={'name': 'コンテンツ追加料金(定額)'},
                                             nickname='追加コンテンツ料金(定額)'
                                         )
-                                        stripe.SubscriptionItem.modify(item.id, price=fixed_price.id, quantity=additional_content_count)
-                                        print(f"[DEBUG] metered→licensedへ差し替え: item={item.id}, price={fixed_price.id}, qty={additional_content_count}")
+                                        stripe.SubscriptionItem.create(subscription=stripe_subscription_id, price=fixed_price.id, quantity=additional_content_count)
+                                        stripe.SubscriptionItem.delete(item.id)
+                                        print(f"[DEBUG] meteredアイテム削除→licensedで再作成: old_item={item.id}, new_price={fixed_price.id}, qty={additional_content_count}")
                                     else:
                                         stripe.SubscriptionItem.modify(item.id, quantity=additional_content_count)
                                     updated = True
@@ -2118,7 +2118,7 @@ def handle_content_confirmation_company(company_id, content_type):
                                             )
                                             stripe.SubscriptionItem.modify(item.id, price=new_price.id)
                                             print(f"[DEBUG] 単価0のため価格差し替え(推定): item={item.id}, price={new_price.id}")
-                                            usage_type = 'metered' if ('metered' in new_price.recurring['usage_type']) else usage_type
+                                            usage_type = (new_price.recurring or {}).get('usage_type') if isinstance(new_price.recurring, dict) else getattr(new_price.recurring, 'usage_type', usage_type)
                                     except Exception:
                                         pass
 
@@ -2130,8 +2130,9 @@ def handle_content_confirmation_company(company_id, content_type):
                                             product_data={'name': 'コンテンツ追加料金(定額)'},
                                             nickname='追加コンテンツ料金(定額)'
                                         )
-                                        stripe.SubscriptionItem.modify(item.id, price=fixed_price.id, quantity=additional_content_count)
-                                        print(f"[DEBUG] metered→licensedへ差し替え(推定): item={item.id}, price={fixed_price.id}, qty={additional_content_count}")
+                                        stripe.SubscriptionItem.create(subscription=stripe_subscription_id, price=fixed_price.id, quantity=additional_content_count)
+                                        stripe.SubscriptionItem.delete(item.id)
+                                        print(f"[DEBUG] meteredアイテム削除→licensedで再作成(推定): old_item={item.id}, new_price={fixed_price.id}, qty={additional_content_count}")
                                     else:
                                         stripe.SubscriptionItem.modify(item.id, quantity=additional_content_count)
                                     updated = True
