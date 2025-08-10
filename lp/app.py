@@ -579,19 +579,32 @@ def fix_database_schema():
             c.execute("SELECT id FROM companies WHERE line_user_id = %s", ('U1b9d0d75b0c770dc1107dde349d572f7',))
             company_id = c.fetchone()[0]
         
-        # company_monthly_subscriptionsテーブルにデータを挿入
-        c.execute('''
-            INSERT INTO company_monthly_subscriptions (company_id, stripe_subscription_id, subscription_status, monthly_base_price, current_period_start, current_period_end, trial_end) 
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-        ''', (
-            company_id,
-            'sub_1RuM84Ixg6C5hAVdp1EIGCrm',
-            'trialing',
-            3900,
-            '2025-01-10 00:00:00',
-            '2025-02-10 00:00:00',
-            '2025-02-10 00:00:00'
-        ))
+        # company_monthly_subscriptionsテーブルのスキーマを確認
+        c.execute("""
+            SELECT column_name, data_type 
+            FROM information_schema.columns 
+            WHERE table_name = 'company_monthly_subscriptions' 
+            ORDER BY ordinal_position
+        """)
+        monthly_subscription_columns = c.fetchall()
+        print(f"company_monthly_subscriptionsテーブルのカラム: {monthly_subscription_columns}")
+        
+        # 存在するカラムのみを使用してデータを挿入
+        available_columns = [col[0] for col in monthly_subscription_columns]
+        
+        if 'company_id' in available_columns and 'stripe_subscription_id' in available_columns:
+            # 基本的なカラムのみを使用
+            c.execute('''
+                INSERT INTO company_monthly_subscriptions (company_id, stripe_subscription_id, subscription_status, monthly_base_price) 
+                VALUES (%s, %s, %s, %s)
+            ''', (
+                company_id,
+                'sub_1RuM84Ixg6C5hAVdp1EIGCrm',
+                'trialing',
+                3900
+            ))
+        else:
+            print("company_monthly_subscriptionsテーブルに必要なカラムが存在しません")
         
         # ユーザー状態データ
         c.execute("DELETE FROM user_states WHERE line_user_id = %s", ('U1b9d0d75b0c770dc1107dde349d572f7',))
