@@ -559,10 +559,11 @@ def fix_database_schema():
         
         # 企業データ（UPSERTではなくINSERT）
         c.execute('''
-            INSERT INTO companies (company_name, line_user_id, stripe_subscription_id, subscription_status, current_period_start, current_period_end, trial_end, company_code) 
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO companies (company_name, email, line_user_id, stripe_subscription_id, subscription_status, current_period_start, current_period_end, trial_end, company_code) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         ''', (
             'サンプル株式会社',
+            'sample@example.com',
             'U1b9d0d75b0c770dc1107dde349d572f7',
             'sub_1RuM84Ixg6C5hAVdp1EIGCrm',
             'trialing',
