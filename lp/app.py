@@ -683,15 +683,12 @@ def fix_stripe_subscription():
         correct_start = 1755907200  # 日本時間 2025-08-23 00:00:00
         correct_end = 1758412799    # 日本時間 2025-09-22 23:59:59
         
-        # サブスクリプションの期間を更新
-        updated_subscription = stripe.Subscription.modify(
-            subscription_id,
-            billing_cycle_anchor=correct_start,
-            proration_behavior='none'
-        )
+        # サブスクリプションの期間を更新（billing_cycle_anchorは使用しない）
+        # 既存のサブスクリプションの期間は変更せず、追加料金アイテムのみ作成
+        print(f"既存のサブスクリプション期間を維持: {subscription.current_period_start} - {subscription.current_period_end}")
         
-        print(f"修正後のサブスクリプション: {updated_subscription.id}")
-        print(f"修正後の期間: {updated_subscription.current_period_start} - {updated_subscription.current_period_end}")
+        print(f"既存のサブスクリプション: {subscription.id}")
+        print(f"既存の期間: {subscription.current_period_start} - {subscription.current_period_end}")
         
         # 追加料金アイテムを作成
         try:
@@ -720,8 +717,8 @@ def fix_stripe_subscription():
             'success': True,
             'message': 'Stripeサブスクリプション修正完了',
             'subscription_id': subscription_id,
-            'period_start': updated_subscription.current_period_start,
-            'period_end': updated_subscription.current_period_end
+            'period_start': subscription.current_period_start,
+            'period_end': subscription.current_period_end
         })
         
     except Exception as e:
