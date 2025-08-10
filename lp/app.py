@@ -573,6 +573,26 @@ def fix_database_schema():
             'SAMPLE001'
         ))
         
+        # 企業IDを取得
+        company_id = c.lastrowid if hasattr(c, 'lastrowid') else None
+        if not company_id:
+            c.execute("SELECT id FROM companies WHERE line_user_id = %s", ('U1b9d0d75b0c770dc1107dde349d572f7',))
+            company_id = c.fetchone()[0]
+        
+        # company_monthly_subscriptionsテーブルにデータを挿入
+        c.execute('''
+            INSERT INTO company_monthly_subscriptions (company_id, stripe_subscription_id, subscription_status, monthly_base_price, current_period_start, current_period_end, trial_end) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        ''', (
+            company_id,
+            'sub_1RuM84Ixg6C5hAVdp1EIGCrm',
+            'trialing',
+            3900,
+            '2025-01-10 00:00:00',
+            '2025-02-10 00:00:00',
+            '2025-02-10 00:00:00'
+        ))
+        
         # ユーザー状態データ
         c.execute("DELETE FROM user_states WHERE line_user_id = %s", ('U1b9d0d75b0c770dc1107dde349d572f7',))
         c.execute('''
