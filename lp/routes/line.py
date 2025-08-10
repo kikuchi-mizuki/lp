@@ -1081,6 +1081,8 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
     else:
         # 登録されていないメッセージの場合、メニューを表示
         print(f'[DEBUG] 登録されていないメッセージ: user_id={user_id}, text="{text}", state="{state}"')
+        print(f'[DEBUG] 状態の詳細: state_type={type(state)}, state_value="{state}"')
+        print(f'[DEBUG] 条件チェック: text=="追加"={text=="追加"}, text=="1"={text=="1"}, state=="add_select"={state=="add_select"}')
         try:
             from utils.message_templates import get_menu_message_company
             print(f'[DEBUG] メニューメッセージ送信開始: reply_token={event["replyToken"][:20]}...')

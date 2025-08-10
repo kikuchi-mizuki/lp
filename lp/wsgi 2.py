@@ -4,10 +4,6 @@ WSGI entry point for production deployment
 """
 import os
 import sys
-import logging
-
-# ログレベルをDEBUGに設定
-logging.basicConfig(level=logging.DEBUG)
 
 # Add the current directory to Python path
 sys.path.insert(0, os.path.dirname(__file__))
@@ -22,6 +18,4 @@ def startup_check():
     return "Application started successfully", 200
 
 if __name__ == "__main__":
-    port = int(os.environ.get('PORT', 8000))
-    print(f"Starting application on port {port}")
-    app.run(host='0.0.0.0', port=port, debug=False) 
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 3000))) 
