@@ -557,7 +557,7 @@ def fix_database_schema():
         # 最後にcompaniesテーブルのデータを削除
         c.execute("DELETE FROM companies WHERE line_user_id = %s", ('U1b9d0d75b0c770dc1107dde349d572f7',))
         
-        # 企業データ（UPSERTではなくINSERT）
+        # 企業データ（UPSERTではなくINSERT）- 日本時間で設定
         c.execute('''
             INSERT INTO companies (company_name, email, line_user_id, stripe_subscription_id, subscription_status, current_period_start, current_period_end, trial_end, company_code) 
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
@@ -567,9 +567,9 @@ def fix_database_schema():
             'U1b9d0d75b0c770dc1107dde349d572f7',
             'sub_1RuM84Ixg6C5hAVdp1EIGCrm',
             'trialing',
-            '2025-01-10 00:00:00',
-            '2025-02-10 00:00:00',
-            '2025-02-10 00:00:00',
+            '2025-08-23 00:00:00',  # 日本時間
+            '2025-09-22 23:59:59',  # 日本時間
+            '2025-09-22 23:59:59',  # 日本時間
             'SAMPLE001'
         ))
         
@@ -595,13 +595,16 @@ def fix_database_schema():
         if 'company_id' in available_columns and 'stripe_subscription_id' in available_columns:
             # 基本的なカラムのみを使用
             c.execute('''
-                INSERT INTO company_monthly_subscriptions (company_id, stripe_subscription_id, subscription_status, monthly_base_price) 
-                VALUES (%s, %s, %s, %s)
+                INSERT INTO company_monthly_subscriptions (company_id, stripe_subscription_id, subscription_status, monthly_base_price, current_period_start, current_period_end, trial_end) 
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
             ''', (
                 company_id,
                 'sub_1RuM84Ixg6C5hAVdp1EIGCrm',
                 'trialing',
-                3900
+                3900,
+                '2025-08-23 00:00:00',  # 日本時間
+                '2025-09-22 23:59:59',  # 日本時間
+                '2025-09-22 23:59:59'   # 日本時間
             ))
         else:
             print("company_monthly_subscriptionsテーブルに必要なカラムが存在しません")
@@ -658,9 +661,10 @@ def fix_stripe_subscription():
         print(f"現在のサブスクリプション: {subscription.id}")
         print(f"現在の期間: {subscription.current_period_start} - {subscription.current_period_end}")
         
-        # 正しい期間に修正（日本時間 2025年8月23日から9月22日をUTC時間に変換）
-        correct_start = 1755907200  # 2025-08-22 15:00:00 UTC（日本時間 2025-08-23 00:00:00）
-        correct_end = 1758412799    # 2025-09-21 14:59:59 UTC（日本時間 2025-09-22 23:59:59）
+        # 日本時間で正確な期間を設定（2025年8月23日から9月22日）
+        # 日本時間 2025-08-23 00:00:00 から 2025-09-22 23:59:59
+        correct_start = 1755907200  # 日本時間 2025-08-23 00:00:00
+        correct_end = 1758412799    # 日本時間 2025-09-22 23:59:59
         
         # サブスクリプションの期間を更新
         updated_subscription = stripe.Subscription.modify(

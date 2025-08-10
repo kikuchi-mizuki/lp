@@ -2008,14 +2008,15 @@ def handle_content_confirmation_company(company_id, content_type):
                     billing_end_value = stripe_period_end if stripe_period_end else current_period_end
                     if billing_end_value:
                         if isinstance(billing_end_value, (int, float)):
-                            # Stripeのepoch(UTC) → JST(naive) に変換して保存
+                            # Stripeのepoch → 日本時間に変換して保存
                             c.execute(f"UPDATE company_line_accounts SET current_period_end = (TO_TIMESTAMP({placeholder}) AT TIME ZONE 'UTC') + INTERVAL '9 hours' WHERE id = {placeholder}", (int(billing_end_value), account_id))
                         elif isinstance(billing_end_value, _dt):
+                            # 既に日本時間の場合はそのまま保存
                             c.execute(f"UPDATE company_line_accounts SET current_period_end = {placeholder} WHERE id = {placeholder}", (billing_end_value, account_id))
                         else:
-                            # 文字列やその他はエポックに変換を試みる
+                            # 文字列の場合は日本時間として保存
                             try:
-                                c.execute(f"UPDATE company_line_accounts SET current_period_end = TO_TIMESTAMP({placeholder}) WHERE id = {placeholder}", (int(billing_end_value), account_id))
+                                c.execute(f"UPDATE company_line_accounts SET current_period_end = TO_TIMESTAMP({placeholder}) AT TIME ZONE 'JST' WHERE id = {placeholder}", (str(billing_end_value), account_id))
                             except Exception:
                                 pass
                         conn.commit()
@@ -2223,12 +2224,14 @@ def handle_content_confirmation_company(company_id, content_type):
                     from datetime import datetime as _dt
                     try:
                         if isinstance(billing_end_date, (int, float)):
-                            # Stripeのepoch(UTC) → JST(naive) に変換して保存
+                            # Stripeのepoch → 日本時間に変換して保存
                             c.execute(f"UPDATE company_line_accounts SET current_period_end = (TO_TIMESTAMP({placeholder}) AT TIME ZONE 'UTC') + INTERVAL '9 hours' WHERE id = {placeholder}", (int(billing_end_date), row[0]))
                         elif isinstance(billing_end_date, _dt):
+                            # 既に日本時間の場合はそのまま保存
                             c.execute(f"UPDATE company_line_accounts SET current_period_end = {placeholder} WHERE id = {placeholder}", (billing_end_date, row[0]))
                         else:
-                            c.execute(f"UPDATE company_line_accounts SET current_period_end = TO_TIMESTAMP({placeholder}) WHERE id = {placeholder}", (int(billing_end_date), row[0]))
+                            # 文字列の場合は日本時間として保存
+                            c.execute(f"UPDATE company_line_accounts SET current_period_end = TO_TIMESTAMP({placeholder}) AT TIME ZONE 'JST' WHERE id = {placeholder}", (str(billing_end_date), row[0]))
                         conn.commit()
                         print(f"[DEBUG] current_period_end 更新: id={row[0]}, end={billing_end_date}")
                     except Exception as _e:
