@@ -785,6 +785,112 @@ def fix_trial_period():
             'error': str(e)
         })
 
+@app.route('/debug/sync_stripe_periods')
+def sync_stripe_periods():
+    """Stripeの期間とデータベースの期間を同期"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 企業のStripeサブスクリプション情報を取得
+        c.execute('''
+            SELECT id, company_name, stripe_subscription_id 
+            FROM companies 
+            WHERE stripe_subscription_id IS NOT NULL
+        ''')
+        companies = c.fetchall()
+        
+        import stripe
+        stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+        
+        from datetime import datetime, timezone, timedelta
+        jst = timezone(timedelta(hours=9))
+        
+        sync_results = []
+        
+        for company in companies:
+            company_id, company_name, stripe_subscription_id = company
+            
+            try:
+                # Stripeサブスクリプションを取得
+                subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+                
+                # 期間情報を取得
+                current_period_start = subscription.get('current_period_start')
+                current_period_end = subscription.get('current_period_end')
+                trial_end = subscription.get('trial_end')
+                
+                # UTC → JST変換
+                if current_period_start:
+                    period_start_utc = datetime.fromtimestamp(current_period_start, tz=timezone.utc)
+                    period_start_jst = period_start_utc.astimezone(jst)
+                else:
+                    period_start_jst = None
+                
+                if current_period_end:
+                    period_end_utc = datetime.fromtimestamp(current_period_end, tz=timezone.utc)
+                    period_end_jst = period_end_utc.astimezone(jst)
+                else:
+                    period_end_jst = None
+                
+                if trial_end:
+                    trial_end_utc = datetime.fromtimestamp(trial_end, tz=timezone.utc)
+                    trial_end_jst = trial_end_utc.astimezone(jst)
+                else:
+                    trial_end_jst = None
+                
+                # データベースを更新
+                c.execute('''
+                    UPDATE companies 
+                    SET trial_end = %s 
+                    WHERE id = %s
+                ''', (trial_end_jst, company_id))
+                
+                # company_monthly_subscriptionsも更新
+                c.execute('''
+                    UPDATE company_monthly_subscriptions 
+                    SET current_period_start = %s, current_period_end = %s
+                    WHERE company_id = %s
+                ''', (period_start_jst, period_end_jst, company_id))
+                
+                sync_results.append({
+                    'company_id': company_id,
+                    'company_name': company_name,
+                    'stripe_subscription_id': stripe_subscription_id,
+                    'trial_end': trial_end_jst.strftime('%Y-%m-%d %H:%M:%S JST') if trial_end_jst else None,
+                    'current_period_start': period_start_jst.strftime('%Y-%m-%d %H:%M:%S JST') if period_start_jst else None,
+                    'current_period_end': period_end_jst.strftime('%Y-%m-%d %H:%M:%S JST') if period_end_jst else None,
+                    'status': subscription.get('status')
+                })
+                
+                print(f'[DEBUG] 期間同期完了: company_id={company_id}, trial_end={trial_end_jst}, period_end={period_end_jst}')
+                
+            except Exception as e:
+                print(f'[ERROR] 企業{company_id}の期間同期エラー: {e}')
+                sync_results.append({
+                    'company_id': company_id,
+                    'company_name': company_name,
+                    'error': str(e)
+                })
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Stripeの期間とデータベースの期間を同期しました',
+            'sync_results': sync_results
+        })
+        
+    except Exception as e:
+        print(f'[ERROR] 期間同期エラー: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
 # アプリケーション初期化完了の確認
 logger.info("✅ アプリケーション初期化完了")
 
