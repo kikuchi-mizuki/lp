@@ -1547,22 +1547,9 @@ def handle_cancel_selection_company(reply_token, company_id, stripe_subscription
                 period_info = billing_sync_service.get_subscription_billing_period(stripe_subscription_id)
                 
                 if period_info:
-                    from datetime import datetime, timezone, timedelta
+                    from datetime import datetime
                     period_end = period_info['period_end']
-                    # 現在の日付を取得（JST）
-                    jst = timezone(timedelta(hours=9))
-                    now = datetime.now(jst)
-                    
-                    # 次回請求日が過去の場合は、現在の日付から1ヶ月後を計算
-                    if period_end < now:
-                        # 現在の日付から1ヶ月後の同じ日を計算
-                        if now.month == 12:
-                            next_month = datetime(now.year + 1, 1, now.day, tzinfo=jst)
-                        else:
-                            next_month = datetime(now.year, now.month + 1, now.day, tzinfo=jst)
-                        billing_period_info = f"\n📅 次回請求日: {next_month.strftime('%Y年%m月%d日')}"
-                    else:
-                        billing_period_info = f"\n📅 次回請求日: {period_end.strftime('%Y年%m月%d日')}"
+                    billing_period_info = f"\n📅 次回請求日: {period_end.strftime('%Y年%m月%d日')}"
                     
             except Exception as e:
                 print(f'[DEBUG] 請求期間情報取得エラー: {e}')
@@ -1884,22 +1871,9 @@ def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscript
                     period_info = billing_sync_service.get_subscription_billing_period(stripe_subscription_id)
                     
                     if period_info:
-                        from datetime import datetime, timezone, timedelta
+                        from datetime import datetime
                         period_end = period_info['period_end']
-                        # 現在の日付を取得（JST）
-                        jst = timezone(timedelta(hours=9))
-                        now = datetime.now(jst)
-                        
-                        # 次回請求日が過去の場合は、現在の日付から1ヶ月後を計算
-                        if period_end < now:
-                            # 現在の日付から1ヶ月後の同じ日を計算
-                            if now.month == 12:
-                                next_month = datetime(now.year + 1, 1, now.day, tzinfo=jst)
-                            else:
-                                next_month = datetime(now.year, now.month + 1, now.day, tzinfo=jst)
-                            billing_period_info = f"\n📅 次回請求日: {next_month.strftime('%Y年%m月%d日')}"
-                        else:
-                            billing_period_info = f"\n📅 次回請求日: {period_end.strftime('%Y年%m月%d日')}"
+                        billing_period_info = f"\n📅 次回請求日: {period_end.strftime('%Y年%m月%d日')}"
                         
                 except Exception as e:
                     print(f'[DEBUG] 請求期間情報取得エラー: {e}')

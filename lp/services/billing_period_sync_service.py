@@ -93,9 +93,19 @@ class BillingPeriodSyncService:
         try:
             subscription = stripe.Subscription.retrieve(stripe_subscription_id)
             
+            # UTCタイムスタンプをJSTに変換
+            from datetime import timezone, timedelta
+            jst = timezone(timedelta(hours=9))
+            
+            period_start_utc = datetime.fromtimestamp(subscription['current_period_start'], tz=timezone.utc)
+            period_start_jst = period_start_utc.astimezone(jst)
+            
+            period_end_utc = datetime.fromtimestamp(subscription['current_period_end'], tz=timezone.utc)
+            period_end_jst = period_end_utc.astimezone(jst)
+            
             return {
-                'period_start': datetime.fromtimestamp(subscription['current_period_start']),
-                'period_end': datetime.fromtimestamp(subscription['current_period_end']),
+                'period_start': period_start_jst,
+                'period_end': period_end_jst,
                 'status': subscription['status']
             }
         except Exception as e:
