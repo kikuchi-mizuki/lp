@@ -1475,7 +1475,7 @@ def force_stripe_update():
         # Stripeサブスクリプションを取得
         subscription = stripe.Subscription.retrieve(stripe_subscription_id)
         
-        # 追加料金アイテムを更新
+        # 追加料金アイテムを更新（数量が0より大きい場合のみ）
         updated = False
         for item in subscription['items']['data']:
             price_nickname = item.price.nickname or ""
@@ -1496,18 +1496,14 @@ def force_stripe_update():
                             quantity=additional_content_count
                         )
                         updated = True
+                        print(f'[DEBUG] 強制更新: 数量更新完了: {item.id}')
                     except Exception as modify_error:
                         print(f'[ERROR] 数量更新エラー: {modify_error}')
                         # エラーが発生しても処理を続行
                 else:
-                    # 数量が0の場合はアイテムを削除
-                    try:
-                        stripe.SubscriptionItem.delete(item.id)
-                        print(f'[DEBUG] 強制更新: 数量0のためアイテム削除: {item.id}')
-                        updated = True
-                    except Exception as delete_error:
-                        print(f'[WARN] アイテム削除エラー（無視）: {delete_error}')
-                        updated = True
+                    # 数量が0の場合は何もしない（アイテムを残す）
+                    print(f'[DEBUG] 強制更新: 数量0のためアイテムをそのまま残す: {item.id}')
+                    updated = True
                 break
         
         if not updated:
@@ -1552,36 +1548,6 @@ def cleanup_duplicate_items():
         # Stripeサブスクリプションを取得
         subscription = stripe.Subscription.retrieve(stripe_subscription_id)
         
-        # 追加料金アイテムを特定して削除
-        items_to_delete = []
-        for item in subscription['items']['data']:
-            price_nickname = item.price.nickname or ""
-            price_id = item.price.id
-            
-            # 追加料金アイテムを特定
-            if (("追加" in price_nickname) or 
-                ("additional" in price_nickname.lower()) or
-                ("metered" in price_nickname.lower()) or
-                (price_id == 'price_1Rog1nIxg6C5hAVdnqB5MJiT')):
-                
-                items_to_delete.append({
-                    'id': item.id,
-                    'price_id': price_id,
-                    'nickname': price_nickname,
-                    'quantity': item.quantity
-                })
-        
-        # 重複アイテムを削除（最初の1つ以外）
-        deleted_items = []
-        for i, item in enumerate(items_to_delete):
-            if i > 0:  # 最初の1つ以外を削除
-                try:
-                    stripe.SubscriptionItem.delete(item['id'])
-                    deleted_items.append(item)
-                    print(f'[DEBUG] 重複アイテム削除: {item["id"]}')
-                except Exception as e:
-                    print(f'[ERROR] アイテム削除エラー: {e}')
-        
         # 現在のアクティブコンテンツ数を取得
         c.execute('''
             SELECT COUNT(*) 
@@ -1592,27 +1558,55 @@ def cleanup_duplicate_items():
         total_content_count = c.fetchone()[0]
         additional_content_count = max(0, total_content_count - 1)  # 1個目は無料なので-1
         
-        # 残ったアイテムの数量を更新
-        if items_to_delete:
+        print(f'[DEBUG] クリーンアップ: 総コンテンツ数={total_content_count}, 追加料金対象={additional_content_count}')
+        
+        # 追加料金アイテムを特定
+        additional_items = []
+        for item in subscription['items']['data']:
+            price_nickname = item.price.nickname or ""
+            price_id = item.price.id
+            
+            # 追加料金アイテムを特定
+            if (("追加" in price_nickname) or 
+                ("additional" in price_nickname.lower()) or
+                ("metered" in price_nickname.lower()) or
+                (price_id == 'price_1Rog1nIxg6C5hAVdnqB5MJiT')):
+                
+                additional_items.append({
+                    'id': item.id,
+                    'price_id': price_id,
+                    'nickname': price_nickname,
+                    'quantity': item.quantity
+                })
+        
+        print(f'[DEBUG] クリーンアップ: 追加料金アイテム数={len(additional_items)}')
+        
+        # 重複アイテムを削除（最初の1つ以外）
+        deleted_items = []
+        for i, item in enumerate(additional_items):
+            if i > 0:  # 最初の1つ以外を削除
+                try:
+                    stripe.SubscriptionItem.delete(item['id'])
+                    deleted_items.append(item)
+                    print(f'[DEBUG] 重複アイテム削除: {item["id"]}')
+                except Exception as e:
+                    print(f'[ERROR] アイテム削除エラー: {e}')
+        
+        # 残ったアイテムの数量を更新（数量が0より大きい場合のみ）
+        if additional_items and additional_content_count > 0:
             try:
-                remaining_item_id = items_to_delete[0]['id']
-                if additional_content_count > 0:
-                    # 数量が0より大きい場合は更新
-                    try:
-                        stripe.SubscriptionItem.modify(
-                            remaining_item_id,
-                            quantity=additional_content_count
-                        )
-                        print(f'[DEBUG] 残ったアイテムの数量を更新: {remaining_item_id} → {additional_content_count}')
-                    except Exception as modify_error:
-                        print(f'[ERROR] 数量更新エラー: {modify_error}')
-                        # エラーが発生しても処理を続行
-                else:
-                    # 数量が0の場合は何もしない（アイテムを残す）
-                    print(f'[DEBUG] 数量0のためアイテムをそのまま残す: {remaining_item_id}')
+                remaining_item_id = additional_items[0]['id']
+                stripe.SubscriptionItem.modify(
+                    remaining_item_id,
+                    quantity=additional_content_count
+                )
+                print(f'[DEBUG] 残ったアイテムの数量を更新: {remaining_item_id} → {additional_content_count}')
             except Exception as e:
                 print(f'[ERROR] 数量更新エラー: {e}')
-                # エラーが発生しても処理を続行
+        elif additional_items and additional_content_count == 0:
+            print(f'[DEBUG] 数量0のためアイテムをそのまま残す: {additional_items[0]["id"]}')
+        else:
+            print(f'[DEBUG] 追加料金アイテムなし')
         
         conn.close()
         
