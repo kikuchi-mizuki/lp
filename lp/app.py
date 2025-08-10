@@ -2215,6 +2215,87 @@ def fix_metered_to_licensed():
     except Exception as e:
         return jsonify({"error": str(e)})
 
+@app.route('/debug/check_stripe_periods')
+def check_stripe_periods():
+    """Stripeの期間情報を直接確認"""
+    try:
+        import stripe
+        stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+        
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 最新の企業のサブスクリプションIDを取得
+        c.execute('SELECT id, company_name, stripe_subscription_id FROM companies WHERE stripe_subscription_id IS NOT NULL ORDER BY id DESC LIMIT 1')
+        result = c.fetchone()
+        conn.close()
+        
+        if not result:
+            return jsonify({"error": "サブスクリプションが見つかりません"})
+        
+        company_id, company_name, stripe_subscription_id = result
+        
+        # Stripeからサブスクリプション情報を取得
+        subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+        
+        # 期間情報を取得
+        current_period_start = subscription.get('current_period_start')
+        current_period_end = subscription.get('current_period_end')
+        trial_end = subscription.get('trial_end')
+        billing_cycle_anchor = subscription.get('billing_cycle_anchor')
+        
+        # JSTに変換
+        from datetime import datetime, timezone, timedelta
+        jst = timezone(timedelta(hours=9))
+        
+        result_data = {
+            'company_id': company_id,
+            'company_name': company_name,
+            'stripe_subscription_id': stripe_subscription_id,
+            'status': subscription.get('status'),
+            'raw_data': {
+                'current_period_start': current_period_start,
+                'current_period_end': current_period_end,
+                'trial_end': trial_end,
+                'billing_cycle_anchor': billing_cycle_anchor
+            }
+        }
+        
+        # JST変換
+        if current_period_start:
+            start_utc = datetime.fromtimestamp(current_period_start, tz=timezone.utc)
+            start_jst = start_utc.astimezone(jst)
+            result_data['current_period_start_jst'] = start_jst.isoformat()
+        
+        if current_period_end:
+            end_utc = datetime.fromtimestamp(current_period_end, tz=timezone.utc)
+            end_jst = end_utc.astimezone(jst)
+            result_data['current_period_end_jst'] = end_jst.isoformat()
+        
+        if trial_end:
+            trial_utc = datetime.fromtimestamp(trial_end, tz=timezone.utc)
+            trial_jst = trial_utc.astimezone(jst)
+            result_data['trial_end_jst'] = trial_jst.isoformat()
+        
+        if billing_cycle_anchor:
+            anchor_utc = datetime.fromtimestamp(billing_cycle_anchor, tz=timezone.utc)
+            anchor_jst = anchor_utc.astimezone(jst)
+            result_data['billing_cycle_anchor_jst'] = anchor_jst.isoformat()
+        
+        # 現在の日付
+        now = datetime.now(jst)
+        result_data['current_time_jst'] = now.isoformat()
+        
+        # 次回請求日までの日数
+        if current_period_end:
+            days_until_billing = (end_jst - now).days
+            result_data['days_until_billing'] = days_until_billing
+        
+        return jsonify(result_data)
+        
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
 # アプリケーション初期化完了の確認
 logger.info("✅ アプリケーション初期化完了")
 
