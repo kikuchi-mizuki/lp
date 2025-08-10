@@ -546,7 +546,15 @@ def fix_database_schema():
         # テストデータを作成
         print("テストデータを作成中...")
         
-        # 既存のデータを削除
+        # 既存のデータを削除（外部キー制約を考慮）
+        print("既存データを削除中...")
+        
+        # まず関連テーブルのデータを削除
+        c.execute("DELETE FROM company_subscriptions WHERE company_id IN (SELECT id FROM companies WHERE line_user_id = %s)", ('U1b9d0d75b0c770dc1107dde349d572f7',))
+        c.execute("DELETE FROM company_monthly_subscriptions WHERE company_id IN (SELECT id FROM companies WHERE line_user_id = %s)", ('U1b9d0d75b0c770dc1107dde349d572f7',))
+        c.execute("DELETE FROM usage_logs WHERE company_id IN (SELECT id FROM companies WHERE line_user_id = %s)", ('U1b9d0d75b0c770dc1107dde349d572f7',))
+        
+        # 最後にcompaniesテーブルのデータを削除
         c.execute("DELETE FROM companies WHERE line_user_id = %s", ('U1b9d0d75b0c770dc1107dde349d572f7',))
         
         # 企業データ（UPSERTではなくINSERT）
