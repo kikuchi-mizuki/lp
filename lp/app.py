@@ -546,16 +546,13 @@ def fix_database_schema():
         # テストデータを作成
         print("テストデータを作成中...")
         
-        # 企業データ（存在するカラムのみを使用）
+        # 既存のデータを削除
+        c.execute("DELETE FROM companies WHERE line_user_id = %s", ('U1b9d0d75b0c770dc1107dde349d572f7',))
+        
+        # 企業データ（UPSERTではなくINSERT）
         c.execute('''
             INSERT INTO companies (company_name, line_user_id, stripe_subscription_id, subscription_status, current_period_start, current_period_end, trial_end, company_code) 
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (line_user_id) DO UPDATE SET
-                stripe_subscription_id = EXCLUDED.stripe_subscription_id,
-                subscription_status = EXCLUDED.subscription_status,
-                current_period_start = EXCLUDED.current_period_start,
-                current_period_end = EXCLUDED.current_period_end,
-                trial_end = EXCLUDED.trial_end
         ''', (
             'サンプル株式会社',
             'U1b9d0d75b0c770dc1107dde349d572f7',
@@ -568,12 +565,10 @@ def fix_database_schema():
         ))
         
         # ユーザー状態データ
+        c.execute("DELETE FROM user_states WHERE line_user_id = %s", ('U1b9d0d75b0c770dc1107dde349d572f7',))
         c.execute('''
             INSERT INTO user_states (line_user_id, state) 
             VALUES (%s, %s)
-            ON CONFLICT (line_user_id) DO UPDATE SET
-                state = EXCLUDED.state,
-                updated_at = CURRENT_TIMESTAMP
         ''', ('U1b9d0d75b0c770dc1107dde349d572f7', 'welcome_sent'))
         
         conn.commit()
