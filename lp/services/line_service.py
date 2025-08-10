@@ -2346,8 +2346,6 @@ def handle_content_confirmation_company(company_id, content_type):
             'success': True,
             'company_id': company_id,
             'content_type': content_type,
-            'description': content['description'],
-            'usage': content['usage'],
             'url': content['url'],
             'additional_price': additional_price,
             'billing_end_date': billing_end_date
