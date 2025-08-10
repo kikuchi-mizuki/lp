@@ -553,6 +553,12 @@ def fix_database_schema():
         c.execute("DELETE FROM company_subscriptions WHERE company_id IN (SELECT id FROM companies WHERE line_user_id = %s)", ('U1b9d0d75b0c770dc1107dde349d572f7',))
         c.execute("DELETE FROM company_monthly_subscriptions WHERE company_id IN (SELECT id FROM companies WHERE line_user_id = %s)", ('U1b9d0d75b0c770dc1107dde349d572f7',))
         c.execute("DELETE FROM usage_logs WHERE company_id IN (SELECT id FROM companies WHERE line_user_id = %s)", ('U1b9d0d75b0c770dc1107dde349d572f7',))
+        c.execute("DELETE FROM company_line_accounts WHERE company_id IN (SELECT id FROM companies WHERE line_user_id = %s)", ('U1b9d0d75b0c770dc1107dde349d572f7',))
+        c.execute("DELETE FROM company_content_additions WHERE company_id IN (SELECT id FROM companies WHERE line_user_id = %s)", ('U1b9d0d75b0c770dc1107dde349d572f7',))
+        c.execute("DELETE FROM company_contents WHERE company_id IN (SELECT id FROM companies WHERE line_user_id = %s)", ('U1b9d0d75b0c770dc1107dde349d572f7',))
+        c.execute("DELETE FROM company_cancellations WHERE company_id IN (SELECT id FROM companies WHERE line_user_id = %s)", ('U1b9d0d75b0c770dc1107dde349d572f7',))
+        c.execute("DELETE FROM company_notifications WHERE company_id IN (SELECT id FROM companies WHERE line_user_id = %s)", ('U1b9d0d75b0c770dc1107dde349d572f7',))
+        c.execute("DELETE FROM company_payments WHERE company_id IN (SELECT id FROM companies WHERE line_user_id = %s)", ('U1b9d0d75b0c770dc1107dde349d572f7',))
         
         # 最後にcompaniesテーブルのデータを削除
         c.execute("DELETE FROM companies WHERE line_user_id = %s", ('U1b9d0d75b0c770dc1107dde349d572f7',))
