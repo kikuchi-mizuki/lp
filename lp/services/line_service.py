@@ -1201,6 +1201,7 @@ def handle_status_check_company(reply_token, company_id):
     """企業ユーザー専用：利用状況確認（company_line_accountsベース）"""
     try:
         print(f'[DEBUG] 企業利用状況確認開始: company_id={company_id}')
+        print(f'[DEBUG] LINEボット状態確認処理が実行されました')
         
         conn = get_db_connection()
         c = conn.cursor()
@@ -1258,13 +1259,21 @@ def handle_status_check_company(reply_token, company_id):
             jst = timezone(timedelta(hours=9))
             current_time = datetime.now(jst)
             
+            # デバッグ情報を出力
+            print(f'[DEBUG] 現在時刻: {current_time}')
+            print(f'[DEBUG] トライアル終了日: {trial_end}')
+            
             # タイムゾーン情報を統一（trial_endをawareに変換）
             if trial_end.tzinfo is None:
                 trial_end = trial_end.replace(tzinfo=jst)
             
             if current_time < trial_end:
                 is_trial_active = True
-                trial_days_remaining = (trial_end - current_time).days
+                # 日付のみで計算（時刻を無視）
+                trial_end_date = trial_end.date()
+                current_date = current_time.date()
+                trial_days_remaining = (trial_end_date - current_date).days
+                print(f'[DEBUG] 残り日数計算: {trial_end_date} - {current_date} = {trial_days_remaining}日')
                 status_message += f"🎉 トライアル期間中（残り{trial_days_remaining}日間）\n"
                 status_message += f"📅 トライアル終了日: {trial_end.strftime('%Y年%m月%d日')}\n\n"
         
@@ -1275,7 +1284,13 @@ def handle_status_check_company(reply_token, company_id):
             # 料金体系を明確に表示
             status_message += f"💳 月額基本料金: {monthly_base_price:,}円/月（トライアル期間中は無料）\n"
             
-            if current_period_end:
+            # 次回更新日をStripeと一致させる（trial_end + 1ヶ月）
+            if trial_end:
+                from datetime import timedelta
+                next_billing_date = trial_end + timedelta(days=31)  # トライアル終了日から1ヶ月後
+                next_billing_date = next_billing_date.strftime('%Y年%m月%d日')
+                status_message += f"📅 次回更新日: {next_billing_date}\n"
+            elif current_period_end:
                 period_end = current_period_end.strftime('%Y年%m月%d日')
                 status_message += f"📅 次回更新日: {period_end}\n"
             
@@ -1750,20 +1765,38 @@ def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscript
                         traceback.print_exc()
                         # Stripeエラーが発生しても処理を続行
                 
-                # 請求期間同期サービスを呼び出して使用量レコードを月額サブスクリプション期間に合わせる
+                # Stripeの請求期間を正しく同期
                 if stripe_subscription_id:
                     try:
-                        from services.billing_period_sync_service import BillingPeriodSyncService
-                        billing_sync_service = BillingPeriodSyncService()
-                        sync_success = billing_sync_service.sync_usage_records_to_subscription_period(stripe_subscription_id)
+                        import stripe
+                        stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
                         
-                        if sync_success:
-                            print(f'[DEBUG] 解約時の請求期間同期完了: subscription_id={stripe_subscription_id}')
-                        else:
-                            print(f'[WARN] 解約時の請求期間同期に失敗: subscription_id={stripe_subscription_id}')
+                        # Stripeサブスクリプションの現在の期間を取得
+                        subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+                        stripe_current_period_end = subscription.current_period_end
+                        
+                        print(f'[DEBUG] 解約時Stripe請求期間同期: current_period_end={stripe_current_period_end}')
+                        
+                        # データベースの請求期間をStripeと同期
+                        if stripe_current_period_end:
+                            from datetime import datetime, timezone, timedelta
+                            jst = timezone(timedelta(hours=9))
+                            
+                            # Stripeのepoch → 日本時間に変換
+                            stripe_period_end_jst = datetime.fromtimestamp(stripe_current_period_end, tz=jst)
+                            
+                            # company_monthly_subscriptionsテーブルを更新
+                            c.execute(f'''
+                                UPDATE company_monthly_subscriptions 
+                                SET current_period_end = %s 
+                                WHERE company_id = %s
+                            ''', (stripe_period_end_jst, company_id))
+                            
+                            conn.commit()
+                            print(f'[DEBUG] 解約時データベース請求期間同期完了: {stripe_period_end_jst}')
                             
                     except Exception as e:
-                        print(f'[DEBUG] 解約時の請求期間同期エラー: {e}')
+                        print(f'[DEBUG] 解約時Stripe請求期間同期エラー: {e}')
                         # 同期エラーが発生しても処理を続行
                 
                 # ai_scheduleをAI予定秘書に変換
@@ -1774,20 +1807,38 @@ def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscript
         print(f'[DEBUG] 解約対象コンテンツ数: {len(cancelled)}')
         print(f'[DEBUG] 解約対象: {cancelled}')
         
-        # 解約処理完了後、全体の請求期間同期を実行
+        # 解約処理完了後、全体のStripe請求期間同期を実行
         if cancelled and stripe_subscription_id:
             try:
-                from services.billing_period_sync_service import BillingPeriodSyncService
-                billing_sync_service = BillingPeriodSyncService()
-                sync_success = billing_sync_service.sync_usage_records_to_subscription_period(stripe_subscription_id)
+                import stripe
+                stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
                 
-                if sync_success:
-                    print(f'[DEBUG] 解約処理後の請求期間同期完了: subscription_id={stripe_subscription_id}')
-                else:
-                    print(f'[WARN] 解約処理後の請求期間同期に失敗: subscription_id={stripe_subscription_id}')
+                # Stripeサブスクリプションの現在の期間を取得
+                subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+                stripe_current_period_end = subscription.current_period_end
+                
+                print(f'[DEBUG] 解約処理後Stripe請求期間同期: current_period_end={stripe_current_period_end}')
+                
+                # データベースの請求期間をStripeと同期
+                if stripe_current_period_end:
+                    from datetime import datetime, timezone, timedelta
+                    jst = timezone(timedelta(hours=9))
+                    
+                    # Stripeのepoch → 日本時間に変換
+                    stripe_period_end_jst = datetime.fromtimestamp(stripe_current_period_end, tz=jst)
+                    
+                    # company_monthly_subscriptionsテーブルを更新
+                    c.execute(f'''
+                        UPDATE company_monthly_subscriptions 
+                        SET current_period_end = %s 
+                        WHERE company_id = %s
+                    ''', (stripe_period_end_jst, company_id))
+                    
+                    conn.commit()
+                    print(f'[DEBUG] 解約処理後データベース請求期間同期完了: {stripe_period_end_jst}')
                     
             except Exception as e:
-                print(f'[DEBUG] 解約処理後の請求期間同期エラー: {e}')
+                print(f'[DEBUG] 解約処理後Stripe請求期間同期エラー: {e}')
                 # 同期エラーが発生しても処理を続行
         
         if cancelled:
@@ -2360,20 +2411,38 @@ def handle_content_confirmation_company(company_id, content_type):
                 traceback.print_exc()
                 # Stripeエラーが発生しても処理を続行
         
-        # 請求期間同期サービスを呼び出して使用量レコードを月額サブスクリプション期間に合わせる
+        # Stripeの請求期間を正しく同期
         if stripe_subscription_id:
             try:
-                from services.billing_period_sync_service import BillingPeriodSyncService
-                billing_sync_service = BillingPeriodSyncService()
-                sync_success = billing_sync_service.sync_usage_records_to_subscription_period(stripe_subscription_id)
+                import stripe
+                stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
                 
-                if sync_success:
-                    print(f'[DEBUG] 請求期間同期完了: subscription_id={stripe_subscription_id}')
-                else:
-                    print(f'[WARN] 請求期間同期に失敗: subscription_id={stripe_subscription_id}')
+                # Stripeサブスクリプションの現在の期間を取得
+                subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+                stripe_current_period_end = subscription.current_period_end
+                
+                print(f'[DEBUG] Stripe請求期間同期: current_period_end={stripe_current_period_end}')
+                
+                # データベースの請求期間をStripeと同期
+                if stripe_current_period_end:
+                    from datetime import datetime, timezone, timedelta
+                    jst = timezone(timedelta(hours=9))
+                    
+                    # Stripeのepoch → 日本時間に変換
+                    stripe_period_end_jst = datetime.fromtimestamp(stripe_current_period_end, tz=jst)
+                    
+                    # company_monthly_subscriptionsテーブルを更新
+                    c.execute(f'''
+                        UPDATE company_monthly_subscriptions 
+                        SET current_period_end = %s 
+                        WHERE company_id = %s
+                    ''', (stripe_period_end_jst, company_id))
+                    
+                    conn.commit()
+                    print(f'[DEBUG] データベース請求期間同期完了: {stripe_period_end_jst}')
                     
             except Exception as e:
-                print(f'[DEBUG] 請求期間同期エラー: {e}')
+                print(f'[DEBUG] Stripe請求期間同期エラー: {e}')
                 # 同期エラーが発生しても処理を続行
         
         return {

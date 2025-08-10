@@ -1183,12 +1183,12 @@ def fix_correct_periods():
                 
                 print(f'[DEBUG] サブスクリプション期間修正完了: {updated_subscription.id}')
                 
-                # データベースも更新
+                # データベースも更新（タイムゾーン情報を明示的に指定）
                 c.execute('''
                     UPDATE companies 
-                    SET trial_end = %s 
+                    SET trial_end = '2025-08-23 00:00:00+09:00' 
                     WHERE id = %s
-                ''', (correct_trial_end, company_id))
+                ''', (company_id,))
                 
                 c.execute('''
                     UPDATE company_monthly_subscriptions 
@@ -1235,6 +1235,987 @@ def fix_correct_periods():
             'success': False,
             'error': str(e)
         })
+
+@app.route('/debug/check_periods')
+def check_periods():
+    """データベースの期間情報を確認"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 企業情報を取得（companiesテーブルから期間情報も取得）
+        c.execute('''
+            SELECT id, company_name, trial_end, current_period_start, current_period_end
+            FROM companies 
+            ORDER BY id DESC LIMIT 1
+        ''')
+        company_result = c.fetchone()
+        
+        # 月額サブスクリプション情報を取得
+        subscription_result = None
+        if company_result:
+            company_id = company_result[0]
+            try:
+                c.execute('''
+                    SELECT current_period_start, current_period_end
+                    FROM company_monthly_subscriptions 
+                    WHERE company_id = %s
+                ''', (company_id,))
+                subscription_result = c.fetchone()
+            except Exception as e:
+                # company_monthly_subscriptionsテーブルに期間カラムが存在しない場合
+                print(f"company_monthly_subscriptions期間カラムエラー: {e}")
+                subscription_result = None
+        
+        conn.close()
+        
+        if company_result:
+            company_id, company_name, trial_end, cp_start, cp_end = company_result
+            result = {
+                "company": {
+                    "id": company_id,
+                    "name": company_name,
+                    "trial_end": trial_end.isoformat() if trial_end else None,
+                    "current_period_start": cp_start.isoformat() if cp_start else None,
+                    "current_period_end": cp_end.isoformat() if cp_end else None
+                }
+            }
+            
+            if subscription_result:
+                sub_cp_start, sub_cp_end = subscription_result
+                result["subscription"] = {
+                    "current_period_start": sub_cp_start.isoformat() if sub_cp_start else None,
+                    "current_period_end": sub_cp_end.isoformat() if sub_cp_end else None
+                }
+            else:
+                # company_monthly_subscriptionsから取得できない場合は、companiesテーブルの値を使用
+                result["subscription"] = {
+                    "current_period_start": cp_start.isoformat() if cp_start else None,
+                    "current_period_end": cp_end.isoformat() if cp_end else None
+                }
+            
+            return jsonify(result)
+        else:
+            return jsonify({"error": "企業情報が見つかりません"})
+            
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+@app.route('/debug/fix_database_periods_direct')
+def fix_database_periods_direct():
+    """データベースの期間を直接修正"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 最新の企業IDを取得
+        c.execute('SELECT id FROM companies ORDER BY id DESC LIMIT 1')
+        company_id = c.fetchone()[0]
+        
+        # 正しい期間で更新（2025/08/24 - 2025/09/24）
+        c.execute('''
+            UPDATE company_monthly_subscriptions 
+            SET 
+                current_period_start = '2025-08-24 00:00:00+09:00',
+                current_period_end = '2025-09-24 00:00:00+09:00'
+            WHERE company_id = %s
+        ''', (company_id,))
+        
+        # companiesテーブルも更新
+        c.execute('''
+            UPDATE companies 
+            SET trial_end = '2025-08-24 00:00:00+09:00'
+            WHERE id = %s
+        ''', (company_id,))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': 'データベースの期間を直接修正しました',
+            'company_id': company_id,
+            'updated_periods': {
+                'current_period_start': '2025-08-23 00:00:00+09:00',
+                'current_period_end': '2025-09-23 00:00:00+09:00',
+                'trial_end': '2025-08-23 00:00:00+09:00'
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+@app.route('/debug/update_periods_sql')
+def update_periods_sql():
+    """SQLで直接期間情報を更新"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 最新の企業IDを取得
+        c.execute('SELECT id FROM companies ORDER BY id DESC LIMIT 1')
+        company_id = c.fetchone()[0]
+        
+        # companiesテーブルのtrial_endを更新
+        c.execute('''
+            UPDATE companies 
+            SET trial_end = '2025-08-24 00:00:00+09:00' 
+            WHERE id = %s
+        ''', (company_id,))
+        
+        # company_monthly_subscriptionsテーブルの期間を更新
+        c.execute('''
+            UPDATE company_monthly_subscriptions 
+            SET current_period_start = '2025-08-24 00:00:00+09:00', 
+                current_period_end = '2025-09-24 00:00:00+09:00' 
+            WHERE company_id = %s
+        ''', (company_id,))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': 'SQLで期間情報を直接更新しました（2025/08/24 - 2025/09/24）',
+            'trial_end': '2025-08-24 00:00:00+09:00',
+            'period_start': '2025-08-24 00:00:00+09:00',
+            'period_end': '2025-09-24 00:00:00+09:00',
+            'company_id': company_id
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+@app.route('/debug/update_trial_end_sql')
+def update_trial_end_sql():
+    """trial_endを直接SQLで更新"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 最新の企業IDを取得
+        c.execute('SELECT id FROM companies ORDER BY id DESC LIMIT 1')
+        company_id = c.fetchone()[0]
+        
+        # companiesテーブルのtrial_endを更新
+        c.execute('''
+            UPDATE companies 
+            SET trial_end = '2025-08-23 00:00:00+09:00' 
+            WHERE id = %s
+        ''', (company_id,))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': f'trial_endを2025-08-23 00:00:00+09:00に更新しました（企業ID: {company_id}）'
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+@app.route('/debug/fix_trial_end_only')
+def fix_trial_end_only():
+    """trial_endのみを修正"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # companiesテーブルのtrial_endを更新
+        c.execute('''
+            UPDATE companies 
+            SET trial_end = '2025-08-23 00:00:00+09:00' 
+            WHERE id = 10
+        ''')
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': 'trial_endを2025-08-23 00:00:00+09:00に更新しました'
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+@app.route('/debug/force_stripe_update')
+def force_stripe_update():
+    """Stripeの請求書プレビューを強制更新"""
+    try:
+        import stripe
+        stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+        
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 最新の企業IDを取得
+        c.execute('SELECT id, stripe_subscription_id FROM companies ORDER BY id DESC LIMIT 1')
+        company_result = c.fetchone()
+        
+        if not company_result:
+            return jsonify({"error": "企業情報が見つかりません"})
+        
+        company_id, stripe_subscription_id = company_result
+        
+        if not stripe_subscription_id:
+            return jsonify({"error": "StripeサブスクリプションIDがありません"})
+        
+        # 現在のアクティブコンテンツ数を取得
+        c.execute('''
+            SELECT COUNT(*) 
+            FROM company_line_accounts 
+            WHERE company_id = %s AND status = 'active'
+        ''', (company_id,))
+        
+        total_content_count = c.fetchone()[0]
+        additional_content_count = max(0, total_content_count - 1)  # 1個目は無料なので-1
+        
+        print(f'[DEBUG] 強制更新: 総数={total_content_count}, 課金対象={additional_content_count}')
+        
+        # Stripeサブスクリプションを取得
+        subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+        
+        # 追加料金アイテムを更新
+        updated = False
+        for item in subscription['items']['data']:
+            price_nickname = item.price.nickname or ""
+            price_id = item.price.id
+            
+            if (("追加" in price_nickname) or 
+                ("additional" in price_nickname.lower()) or
+                ("metered" in price_nickname.lower()) or
+                (price_id == 'price_1Rog1nIxg6C5hAVdnqB5MJiT')):
+                
+                print(f'[DEBUG] 強制更新: アイテム{item.id}, 数量: {item.quantity} → {additional_content_count}')
+                
+                # 数量を更新
+                stripe.SubscriptionItem.modify(
+                    item.id,
+                    quantity=additional_content_count
+                )
+                updated = True
+                break
+        
+        if not updated:
+            return jsonify({"error": "追加料金アイテムが見つかりませんでした"})
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Stripeの請求書プレビューを強制更新しました',
+            'company_id': company_id,
+            'total_content_count': total_content_count,
+            'additional_content_count': additional_content_count,
+            'stripe_subscription_id': stripe_subscription_id
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+@app.route('/debug/check_stripe_status')
+def check_stripe_status():
+    """Stripeの詳細状況を確認"""
+    try:
+        import stripe
+        stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+        
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 最新の企業IDを取得
+        c.execute('SELECT id, stripe_subscription_id FROM companies ORDER BY id DESC LIMIT 1')
+        company_result = c.fetchone()
+        
+        if not company_result:
+            return jsonify({"error": "企業情報が見つかりません"})
+        
+        company_id, stripe_subscription_id = company_result
+        
+        if not stripe_subscription_id:
+            return jsonify({"error": "StripeサブスクリプションIDがありません"})
+        
+        # 現在のアクティブコンテンツ数を取得
+        c.execute('''
+            SELECT content_type, status, created_at 
+            FROM company_line_accounts 
+            WHERE company_id = %s 
+            ORDER BY created_at
+        ''', (company_id,))
+        
+        accounts = c.fetchall()
+        active_count = len([acc for acc in accounts if acc[1] == 'active'])
+        
+        # Stripeサブスクリプションを取得
+        subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+        
+        # サブスクリプションアイテムの詳細
+        items_info = []
+        for item in subscription['items']['data']:
+            items_info.append({
+                'id': item.id,
+                'price_id': item.price.id,
+                'price_nickname': item.price.nickname,
+                'quantity': item.quantity,
+                'amount': item.price.unit_amount,
+                'currency': item.price.currency
+            })
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'company_id': company_id,
+            'stripe_subscription_id': stripe_subscription_id,
+            'active_content_count': active_count,
+            'expected_billing_count': max(0, active_count - 1),  # 1個目は無料
+            'all_accounts': [
+                {
+                    'content_type': acc[0],
+                    'status': acc[1],
+                    'created_at': str(acc[2])
+                } for acc in accounts
+            ],
+            'stripe_items': items_info,
+            'subscription_status': subscription.status,
+            'trial_end': subscription.trial_end,
+            'current_period_start': subscription.current_period_start,
+            'current_period_end': subscription.current_period_end
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+@app.route('/debug/check_raw_db')
+def check_raw_db():
+    """データベースの生の値を確認"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 最新の企業IDを取得
+        c.execute('SELECT id FROM companies ORDER BY id DESC LIMIT 1')
+        company_id = c.fetchone()[0]
+        
+        # companiesテーブルの値を確認
+        c.execute('SELECT trial_end FROM companies WHERE id = %s', (company_id,))
+        company_trial_end = c.fetchone()[0]
+        
+        # company_monthly_subscriptionsテーブルの値を確認
+        c.execute('''
+            SELECT current_period_start, current_period_end 
+            FROM company_monthly_subscriptions 
+            WHERE company_id = %s
+        ''', (company_id,))
+        subscription_result = c.fetchone()
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'company_id': company_id,
+            'raw_values': {
+                'companies_trial_end': str(company_trial_end) if company_trial_end else None,
+                'subscription_period_start': str(subscription_result[0]) if subscription_result and subscription_result[0] else None,
+                'subscription_period_end': str(subscription_result[1]) if subscription_result and subscription_result[1] else None
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+@app.route('/debug/fix_stripe_periods_direct')
+def fix_stripe_periods_direct():
+    """Stripeの期間を直接修正"""
+    try:
+        import stripe
+        stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+        
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 最新の企業IDを取得
+        c.execute('SELECT id, stripe_subscription_id FROM companies ORDER BY id DESC LIMIT 1')
+        company_result = c.fetchone()
+        
+        if not company_result:
+            return jsonify({"error": "企業情報が見つかりません"})
+        
+        company_id, stripe_subscription_id = company_result
+        
+        if not stripe_subscription_id:
+            return jsonify({"error": "StripeサブスクリプションIDがありません"})
+        
+        # Stripeサブスクリプションを取得
+        subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+        
+        # 正しい期間を設定（JST）
+        correct_trial_end = 1755991488  # 2025-08-23 00:00:00 JST
+        correct_period_start = 1755991488  # 2025-08-23 00:00:00 JST
+        correct_period_end = 1758587888  # 2025-09-23 00:00:00 JST
+        
+        # Stripeサブスクリプションを更新
+        updated_subscription = stripe.Subscription.modify(
+            stripe_subscription_id,
+            trial_end=correct_trial_end,
+            billing_cycle_anchor=correct_period_start
+        )
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Stripeの期間を直接修正しました',
+            'company_id': company_id,
+            'stripe_subscription_id': stripe_subscription_id,
+            'updated_periods': {
+                'trial_end': '2025-08-23 00:00:00 JST',
+                'period_start': '2025-08-23 00:00:00 JST',
+                'period_end': '2025-09-23 00:00:00 JST'
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+@app.route('/debug/fix_stripe_direct')
+def fix_stripe_direct():
+    """Stripeの期間を直接修正"""
+    try:
+        import stripe
+        stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+        
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 最新の企業IDを取得
+        c.execute('SELECT id, stripe_subscription_id FROM companies ORDER BY id DESC LIMIT 1')
+        company_result = c.fetchone()
+        
+        if not company_result:
+            return jsonify({"error": "企業情報が見つかりません"})
+        
+        company_id, stripe_subscription_id = company_result
+        
+        if not stripe_subscription_id:
+            return jsonify({"error": "StripeサブスクリプションIDがありません"})
+        
+        # 正しい期間を設定（JST）
+        correct_trial_end = 1755991488  # 2025-08-23 00:00:00 JST
+        correct_period_start = 1755991488  # 2025-08-23 00:00:00 JST
+        correct_period_end = 1758587888  # 2025-09-23 00:00:00 JST
+        
+        # Stripeサブスクリプションを更新
+        updated_subscription = stripe.Subscription.modify(
+            stripe_subscription_id,
+            trial_end=correct_trial_end,
+            billing_cycle_anchor=correct_period_start
+        )
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Stripeの期間を直接修正しました',
+            'company_id': company_id,
+            'stripe_subscription_id': stripe_subscription_id,
+            'updated_periods': {
+                'trial_end': '2025-08-23 00:00:00 JST',
+                'period_start': '2025-08-23 00:00:00 JST',
+                'period_end': '2025-09-23 00:00:00 JST'
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+@app.route('/debug/force_fix_stripe')
+def force_fix_stripe():
+    """Stripeの期間を強制的に修正"""
+    try:
+        import stripe
+        stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+        
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 最新の企業IDを取得
+        c.execute('SELECT id, stripe_subscription_id FROM companies ORDER BY id DESC LIMIT 1')
+        company_result = c.fetchone()
+        
+        if not company_result:
+            return jsonify({"error": "企業情報が見つかりません"})
+        
+        company_id, stripe_subscription_id = company_result
+        
+        if not stripe_subscription_id:
+            return jsonify({"error": "StripeサブスクリプションIDがありません"})
+        
+        # 正しい期間を設定（JST）
+        correct_trial_end = 1755991488  # 2025-08-23 00:00:00 JST
+        correct_period_start = 1755991488  # 2025-08-23 00:00:00 JST
+        correct_period_end = 1758587888  # 2025-09-23 00:00:00 JST
+        
+        print(f'[DEBUG] Stripe期間修正開始: subscription_id={stripe_subscription_id}')
+        
+        # Stripeサブスクリプションを強制更新
+        updated_subscription = stripe.Subscription.modify(
+            stripe_subscription_id,
+            trial_end=correct_trial_end,
+            billing_cycle_anchor=correct_period_start
+        )
+        
+        print(f'[DEBUG] Stripe期間修正完了: trial_end={updated_subscription.trial_end}, current_period_end={updated_subscription.current_period_end}')
+        
+        # データベースも強制更新
+        from datetime import datetime, timezone, timedelta
+        jst = timezone(timedelta(hours=9))
+        
+        trial_end_jst = datetime.fromtimestamp(correct_trial_end, tz=jst)
+        period_start_jst = datetime.fromtimestamp(correct_period_start, tz=jst)
+        period_end_jst = datetime.fromtimestamp(correct_period_end, tz=jst)
+        
+        # companiesテーブルを強制更新
+        c.execute('''
+            UPDATE companies 
+            SET trial_end = %s 
+            WHERE id = %s
+        ''', (trial_end_jst, company_id))
+        
+        # company_monthly_subscriptionsテーブルを強制更新
+        c.execute('''
+            UPDATE company_monthly_subscriptions 
+            SET 
+                current_period_start = %s,
+                current_period_end = %s
+            WHERE company_id = %s
+        ''', (period_start_jst, period_end_jst, company_id))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Stripeの期間を強制的に修正しました',
+            'company_id': company_id,
+            'stripe_subscription_id': stripe_subscription_id,
+            'updated_periods': {
+                'trial_end': trial_end_jst.strftime('%Y-%m-%d %H:%M:%S JST'),
+                'period_start': period_start_jst.strftime('%Y-%m-%d %H:%M:%S JST'),
+                'period_end': period_end_jst.strftime('%Y-%m-%d %H:%M:%S JST')
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+@app.route('/debug/fix_display_periods')
+def fix_display_periods():
+    """表示用の期間を直接修正"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 最新の企業IDを取得
+        c.execute('SELECT id FROM companies ORDER BY id DESC LIMIT 1')
+        company_id = c.fetchone()[0]
+        
+        # 正しい期間で直接更新（JST）
+        c.execute('''
+            UPDATE company_monthly_subscriptions 
+            SET 
+                current_period_start = '2025-08-23 00:00:00+09:00',
+                current_period_end = '2025-09-23 00:00:00+09:00'
+            WHERE company_id = %s
+        ''', (company_id,))
+        
+        # companiesテーブルも更新
+        c.execute('''
+            UPDATE companies 
+            SET trial_end = '2025-08-23 00:00:00+09:00'
+            WHERE id = %s
+        ''', (company_id,))
+        
+        conn.commit()
+        
+        # 更新後の値を確認
+        c.execute('''
+            SELECT trial_end FROM companies WHERE id = %s
+        ''', (company_id,))
+        trial_end = c.fetchone()[0]
+        
+        c.execute('''
+            SELECT current_period_start, current_period_end 
+            FROM company_monthly_subscriptions 
+            WHERE company_id = %s
+        ''', (company_id,))
+        subscription_result = c.fetchone()
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': '表示用の期間を修正しました',
+            'company_id': company_id,
+            'updated_values': {
+                'trial_end': str(trial_end),
+                'period_start': str(subscription_result[0]),
+                'period_end': str(subscription_result[1])
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+@app.route('/debug/fix_correct_periods_2025')
+def fix_correct_periods_2025():
+    """正しい期間（2025/08/24 - 2025/09/24）に修正"""
+    try:
+        import stripe
+        stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+        
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 最新の企業IDを取得
+        c.execute('SELECT id, stripe_subscription_id FROM companies ORDER BY id DESC LIMIT 1')
+        company_result = c.fetchone()
+        
+        if not company_result:
+            return jsonify({"error": "企業情報が見つかりません"})
+        
+        company_id, stripe_subscription_id = company_result
+        
+        if not stripe_subscription_id:
+            return jsonify({"error": "StripeサブスクリプションIDがありません"})
+        
+        # 正しい期間を設定（JST）
+        correct_trial_end = 1755991488  # 2025-08-24 00:00:00 JST
+        correct_period_start = 1755991488  # 2025-08-24 00:00:00 JST
+        correct_period_end = 1758587888  # 2025-09-24 00:00:00 JST
+        
+        print(f'[DEBUG] 正しい期間修正開始: subscription_id={stripe_subscription_id}')
+        
+        # Stripeサブスクリプションを更新
+        updated_subscription = stripe.Subscription.modify(
+            stripe_subscription_id,
+            trial_end=correct_trial_end,
+            billing_cycle_anchor=correct_period_start
+        )
+        
+        print(f'[DEBUG] Stripe期間修正完了: trial_end={updated_subscription.trial_end}, current_period_end={updated_subscription.current_period_end}')
+        
+        # データベースも同期
+        from datetime import datetime, timezone, timedelta
+        jst = timezone(timedelta(hours=9))
+        
+        trial_end_jst = datetime.fromtimestamp(correct_trial_end, tz=jst)
+        period_start_jst = datetime.fromtimestamp(correct_period_start, tz=jst)
+        period_end_jst = datetime.fromtimestamp(correct_period_end, tz=jst)
+        
+        # companiesテーブルを更新
+        c.execute('''
+            UPDATE companies 
+            SET trial_end = %s 
+            WHERE id = %s
+        ''', (trial_end_jst, company_id))
+        
+        # company_monthly_subscriptionsテーブルを更新
+        c.execute('''
+            UPDATE company_monthly_subscriptions 
+            SET 
+                current_period_start = %s,
+                current_period_end = %s
+            WHERE company_id = %s
+        ''', (period_start_jst, period_end_jst, company_id))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': '正しい期間（2025/08/24 - 2025/09/24）に修正しました',
+            'company_id': company_id,
+            'stripe_subscription_id': stripe_subscription_id,
+            'updated_periods': {
+                'trial_end': trial_end_jst.strftime('%Y-%m-%d %H:%M:%S JST'),
+                'period_start': period_start_jst.strftime('%Y-%m-%d %H:%M:%S JST'),
+                'period_end': period_end_jst.strftime('%Y-%m-%d %H:%M:%S JST')
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+@app.route('/debug/fix_company_13')
+def fix_company_13():
+    """企業ID 13を直接修正"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        company_id = 13
+        
+        # companiesテーブルのtrial_endを更新
+        c.execute('''
+            UPDATE companies 
+            SET trial_end = '2025-08-24 00:00:00+09:00' 
+            WHERE id = %s
+        ''', (company_id,))
+        
+        # company_monthly_subscriptionsテーブルの期間を更新
+        c.execute('''
+            UPDATE company_monthly_subscriptions 
+            SET 
+                current_period_start = '2025-08-24 00:00:00+09:00',
+                current_period_end = '2025-09-24 00:00:00+09:00'
+            WHERE company_id = %s
+        ''', (company_id,))
+        
+        conn.commit()
+        
+        # 更新後の値を確認
+        c.execute('SELECT trial_end FROM companies WHERE id = %s', (company_id,))
+        trial_end = c.fetchone()[0]
+        
+        c.execute('''
+            SELECT current_period_start, current_period_end 
+            FROM company_monthly_subscriptions 
+            WHERE company_id = %s
+        ''', (company_id,))
+        subscription_result = c.fetchone()
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': '企業ID 13を直接修正しました',
+            'company_id': company_id,
+            'updated_values': {
+                'trial_end': str(trial_end) if trial_end else None,
+                'period_start': str(subscription_result[0]) if subscription_result and subscription_result[0] else None,
+                'period_end': str(subscription_result[1]) if subscription_result and subscription_result[1] else None
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+@app.route('/debug/fix_stripe_direct_2025')
+def fix_stripe_direct_2025():
+    """Stripeの期間を直接修正（2025/08/24 - 2025/09/24）"""
+    try:
+        import stripe
+        stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+        
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 最新の企業IDを取得
+        c.execute('SELECT id, stripe_subscription_id FROM companies ORDER BY id DESC LIMIT 1')
+        company_result = c.fetchone()
+        
+        if not company_result:
+            return jsonify({"error": "企業情報が見つかりません"})
+        
+        company_id, stripe_subscription_id = company_result
+        
+        if not stripe_subscription_id:
+            return jsonify({"error": "StripeサブスクリプションIDがありません"})
+        
+        # 正しい期間を設定（JST）
+        correct_trial_end = 1756077888  # 2025-08-24 00:00:00 JST
+        correct_period_start = 1756077888  # 2025-08-24 00:00:00 JST
+        correct_period_end = 1758674288  # 2025-09-24 00:00:00 JST
+        
+        print(f'[DEBUG] Stripe期間修正開始: subscription_id={stripe_subscription_id}')
+        
+        # Stripeサブスクリプションを更新
+        updated_subscription = stripe.Subscription.modify(
+            stripe_subscription_id,
+            trial_end=correct_trial_end,
+            billing_cycle_anchor=correct_period_start
+        )
+        
+        print(f'[DEBUG] Stripe期間修正完了: trial_end={updated_subscription.trial_end}, current_period_end={updated_subscription.current_period_end}')
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Stripeの期間を直接修正しました（2025/08/24 - 2025/09/24）',
+            'company_id': company_id,
+            'stripe_subscription_id': stripe_subscription_id,
+            'updated_periods': {
+                'trial_end': '2025-08-24 00:00:00 JST',
+                'period_start': '2025-08-24 00:00:00 JST',
+                'period_end': '2025-09-24 00:00:00 JST'
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+@app.route('/debug/fix_additional_price')
+def fix_additional_price():
+    """追加料金アイテムをlicensedタイプに修正"""
+    try:
+        import stripe
+        stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+        
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 最新の企業IDを取得
+        c.execute('SELECT id, stripe_subscription_id FROM companies ORDER BY id DESC LIMIT 1')
+        company_result = c.fetchone()
+        
+        if not company_result:
+            return jsonify({"error": "企業情報が見つかりません"})
+        
+        company_id, stripe_subscription_id = company_result
+        
+        if not stripe_subscription_id:
+            return jsonify({"error": "StripeサブスクリプションIDがありません"})
+        
+        # 現在のアクティブコンテンツ数を取得
+        c.execute('''
+            SELECT COUNT(*) 
+            FROM company_line_accounts 
+            WHERE company_id = %s AND status = 'active'
+        ''', (company_id,))
+        
+        total_content_count = c.fetchone()[0]
+        additional_content_count = max(0, total_content_count - 1)  # 1個目は無料
+        
+        print(f'[DEBUG] 追加料金修正: 総数={total_content_count}, 課金対象={additional_content_count}')
+        
+        # Stripeサブスクリプションを取得
+        subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+        
+        # 追加料金アイテムを修正
+        for item in subscription['items']['data']:
+            price_id = item.price.id
+            if price_id == 'price_1Rog1nIxg6C5hAVdnqB5MJiT':  # 追加料金のPrice ID
+                print(f'[DEBUG] 追加料金アイテム発見: {item.id}')
+                
+                # 新しいlicensedタイプのPriceを作成
+                new_price = stripe.Price.create(
+                    unit_amount=1500,
+                    currency='jpy',
+                    recurring={'interval': 'month', 'usage_type': 'licensed'},
+                    product_data={'name': 'コンテンツ追加料金'},
+                    nickname='追加コンテンツ料金(licensed)'
+                )
+                
+                # 新しいアイテムを作成
+                new_item = stripe.SubscriptionItem.create(
+                    subscription=stripe_subscription_id,
+                    price=new_price.id,
+                    quantity=additional_content_count
+                )
+                
+                # 古いアイテムを削除
+                stripe.SubscriptionItem.delete(item.id)
+                
+                print(f'[DEBUG] 追加料金アイテム修正完了: old_item={item.id}, new_item={new_item.id}, quantity={additional_content_count}')
+                break
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': '追加料金アイテムをlicensedタイプに修正しました',
+            'company_id': company_id,
+            'stripe_subscription_id': stripe_subscription_id,
+            'total_content_count': total_content_count,
+            'additional_content_count': additional_content_count
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+@app.route('/debug/fix_metered_to_licensed')
+def fix_metered_to_licensed():
+    """meteredタイプの追加料金アイテムをlicensedタイプに修正"""
+    try:
+        import stripe
+        stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+        
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 最新の企業IDを取得
+        c.execute('SELECT id, stripe_subscription_id FROM companies ORDER BY id DESC LIMIT 1')
+        company_result = c.fetchone()
+        
+        if not company_result:
+            return jsonify({"error": "企業情報が見つかりません"})
+        
+        company_id, stripe_subscription_id = company_result
+        
+        if not stripe_subscription_id:
+            return jsonify({"error": "StripeサブスクリプションIDがありません"})
+        
+        # 現在のアクティブコンテンツ数を取得
+        c.execute('''
+            SELECT COUNT(*) 
+            FROM company_line_accounts 
+            WHERE company_id = %s AND status = 'active'
+        ''', (company_id,))
+        
+        total_content_count = c.fetchone()[0]
+        additional_content_count = max(0, total_content_count - 1)  # 1個目は無料
+        
+        print(f'[DEBUG] metered→licensed修正: 総数={total_content_count}, 課金対象={additional_content_count}')
+        
+        # Stripeサブスクリプションを取得
+        subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+        
+        # meteredタイプの追加料金アイテムを削除
+        for item in subscription['items']['data']:
+            price_id = item.price.id
+            if price_id == 'price_1Rog1nIxg6C5hAVdnqB5MJiT':  # 追加料金のPrice ID
+                print(f'[DEBUG] meteredアイテム削除: {item.id}')
+                stripe.SubscriptionItem.delete(item.id)
+                break
+        
+        # 新しいlicensedタイプのPriceを作成
+        new_price = stripe.Price.create(
+            unit_amount=1500,
+            currency='jpy',
+            recurring={'interval': 'month', 'usage_type': 'licensed'},
+            product_data={'name': 'コンテンツ追加料金'},
+            nickname='追加コンテンツ料金(licensed)'
+        )
+        
+        # 新しいlicensedアイテムを作成
+        if additional_content_count > 0:
+            new_item = stripe.SubscriptionItem.create(
+                subscription=stripe_subscription_id,
+                price=new_price.id,
+                quantity=additional_content_count
+            )
+            print(f'[DEBUG] licensedアイテム作成: {new_item.id}, quantity={additional_content_count}')
+        else:
+            print(f'[DEBUG] 課金対象コンテンツなし: quantity=0')
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': 'meteredタイプをlicensedタイプに修正しました',
+            'company_id': company_id,
+            'stripe_subscription_id': stripe_subscription_id,
+            'total_content_count': total_content_count,
+            'additional_content_count': additional_content_count,
+            'new_price_id': new_price.id
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)})
 
 # アプリケーション初期化完了の確認
 logger.info("✅ アプリケーション初期化完了")
