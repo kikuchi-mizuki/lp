@@ -2068,7 +2068,7 @@ def handle_content_confirmation_company(company_id, content_type):
         
         print(f'[DEBUG] 月額基本サブスクリプション確認: status={subscription_status}, stripe_id={stripe_subscription_id}')
         
-        # Stripeサブスクリプションの請求期間を取得
+        # Stripeサブスクリプションの請求期間を取得（日本時間で計算）
         stripe_period_end = None
         if stripe_subscription_id:
             try:
@@ -2077,7 +2077,15 @@ def handle_content_confirmation_company(company_id, content_type):
                 
                 subscription = stripe.Subscription.retrieve(stripe_subscription_id)
                 stripe_period_end = subscription.current_period_end
-                print(f'[DEBUG] Stripe請求期間終了: {stripe_period_end}')
+                
+                # 日本時間に変換して表示
+                from datetime import datetime, timezone, timedelta
+                jst = timezone(timedelta(hours=9))
+                if stripe_period_end:
+                    stripe_period_end_jst = datetime.fromtimestamp(stripe_period_end, tz=jst)
+                    print(f'[DEBUG] Stripe請求期間終了: {stripe_period_end} (UTC) → {stripe_period_end_jst} (JST)')
+                else:
+                    print(f'[DEBUG] Stripe請求期間終了: {stripe_period_end}')
                 
             except Exception as e:
                 print(f'[DEBUG] Stripe請求期間取得エラー: {e}')
@@ -2322,9 +2330,18 @@ def handle_content_confirmation_company(company_id, content_type):
             additional_price = content['additional_price']  # 2個目以降は有料（シートの価格）
             print(f'[DEBUG] 追加コンテンツのため有料: {content_type}, 料金={additional_price}円')
         
-        # 請求期間を月額サブスクリプションに合わせる
+        # 請求期間を月額サブスクリプションに合わせる（日本時間で計算）
         billing_end_date = stripe_period_end if stripe_period_end else current_period_end
-        print(f'[DEBUG] 請求期間同期: billing_end_date={billing_end_date}')
+        if billing_end_date:
+            from datetime import datetime, timezone, timedelta
+            jst = timezone(timedelta(hours=9))
+            if isinstance(billing_end_date, (int, float)):
+                billing_end_date_jst = datetime.fromtimestamp(billing_end_date, tz=jst)
+                print(f'[DEBUG] 請求期間同期: billing_end_date={billing_end_date} (UTC) → {billing_end_date_jst} (JST)')
+            else:
+                print(f'[DEBUG] 請求期間同期: billing_end_date={billing_end_date}')
+        else:
+            print(f'[DEBUG] 請求期間同期: billing_end_date={billing_end_date}')
         
         # 新しいLINEアカウントを登録
         c.execute(f'''
@@ -2335,6 +2352,8 @@ def handle_content_confirmation_company(company_id, content_type):
         
         conn.commit()
         print(f'[DEBUG] LINEアカウント登録完了: company_id={company_id}, content_type={content_type}')
+
+        # 新規追加後、Stripeの請求項目を更新（統一処理で実行されるため削除）
 
         # Stripeの請求期間終了をテーブルへ保存（列があれば）
         try:
@@ -2361,11 +2380,18 @@ def handle_content_confirmation_company(company_id, content_type):
         except Exception as e:
             print(f"[DEBUG] 請求期間保存エラー: {e}")
         
-        # Stripeの請求項目を更新（常に実行して追加料金アイテムを管理）
+        # Stripeの請求項目を更新（統一処理）
         if stripe_subscription_id:
             try:
                 import stripe
                 stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+                
+                if not stripe.api_key:
+                    print(f'[ERROR] STRIPE_SECRET_KEYが設定されていません')
+                    return {
+                        'success': False,
+                        'error': '❌ Stripe設定エラー: 環境変数が設定されていません'
+                    }
                 
                 # 現在のアクティブコンテンツ数を取得（1個目は無料なので-1）
                 c.execute(f'''
@@ -2376,48 +2402,42 @@ def handle_content_confirmation_company(company_id, content_type):
                 
                 total_content_count = c.fetchone()[0]
                 additional_content_count = max(0, total_content_count - 1)  # 1個目は無料なので-1
-                print(f'[DEBUG] 総コンテンツ数: {total_content_count}, 追加料金対象: {additional_content_count}')
+                print(f'[DEBUG] 統一処理: 総コンテンツ数: {total_content_count}, 追加料金対象: {additional_content_count}')
                 
                 # Stripeサブスクリプションを取得
                 subscription = stripe.Subscription.retrieve(stripe_subscription_id)
-                print(f'[DEBUG] Stripeサブスクリプション取得: {subscription.id}')
+                print(f'[DEBUG] 統一処理: Stripeサブスクリプション取得: {subscription.id}')
                 
                 # サブスクリプションアイテムを詳細にログ出力
-                print(f"[DEBUG] サブスクリプションアイテム数: {len(subscription['items']['data'])}")
+                print(f"[DEBUG] 統一処理: サブスクリプションアイテム数: {len(subscription['items']['data'])}")
                 for i, item in enumerate(subscription['items']['data']):
-                    print(f'[DEBUG] アイテム{i}: ID={item.id}, Price={item.price.id}, Nickname={item.price.nickname}, Quantity={item.quantity}')
+                    print(f'[DEBUG] 統一処理: アイテム{i}: ID={item.id}, Price={item.price.id}, Nickname={item.price.nickname}, Quantity={item.quantity}')
                 
-                # 追加料金の請求項目を更新（複数の条件で検索）
-                updated = False
+                # 既存の追加料金アイテムを全て削除（重複を防ぐため）
+                items_to_delete = []
                 for item in subscription['items']['data']:
                     price_nickname = item.price.nickname or ""
                     price_id = item.price.id
                     
-                    # 複数の条件で追加料金アイテムを特定
+                    # 追加料金アイテムを特定
                     if (("追加" in price_nickname) or 
                         ("additional" in price_nickname.lower()) or
                         ("metered" in price_nickname.lower()) or
-                        (price_id == 'price_1Rog1nIxg6C5hAVdnqB5MJiT')):  # 既知のPrice ID
+                        (price_id == 'price_1Rog1nIxg6C5hAVdnqB5MJiT')):
                         
-                        print(f'[DEBUG] 追加料金アイテム発見: {item.id}, Price={price_id}, Nickname={price_nickname}')
-                        print(f'[DEBUG] Stripe請求項目を更新: {item.id}, 数量={additional_content_count}')
-                        
-                        # 数量を更新
-                        stripe.SubscriptionItem.modify(
-                            item.id,
-                            quantity=additional_content_count
-                        )
-                        print(f'[DEBUG] Stripe請求項目更新完了: {item.id}')
-                        updated = True
-                        break
+                        print(f'[DEBUG] 統一処理: 削除対象アイテム発見: {item.id}, Price={price_id}, Nickname={price_nickname}')
+                        items_to_delete.append(item.id)
                 
-                if not updated:
-                    print(f'[WARN] 追加料金アイテムが見つかりませんでした。新しい追加料金アイテムを作成します。')
-                    print(f'[DEBUG] 利用可能なアイテム:')
-                    for item in subscription['items']['data']:
-                        print(f'  - ID: {item.id}, Price: {item.price.id}, Nickname: {item.price.nickname}')
-                    
-                    # 追加料金用の価格アイテムを作成
+                # 既存の追加料金アイテムを削除
+                for item_id in items_to_delete:
+                    try:
+                        stripe.SubscriptionItem.delete(item_id)
+                        print(f'[DEBUG] 統一処理: 追加料金アイテム削除完了: {item_id}')
+                    except Exception as delete_error:
+                        print(f'[WARN] 統一処理: アイテム削除エラー: {delete_error}')
+                
+                # 追加料金が必要な場合のみ新しいアイテムを作成
+                if additional_content_count > 0:
                     try:
                         # 追加料金用の価格を作成（月額1,500円）
                         additional_price_obj = stripe.Price.create(
@@ -2429,7 +2449,7 @@ def handle_content_confirmation_company(company_id, content_type):
                             },
                             nickname='追加コンテンツ料金'
                         )
-                        print(f'[DEBUG] 追加料金用価格を作成: {additional_price_obj.id}')
+                        print(f'[DEBUG] 統一処理: 追加料金用価格を作成: {additional_price_obj.id}')
                         
                         # サブスクリプションに追加料金アイテムを追加
                         additional_item = stripe.SubscriptionItem.create(
@@ -2437,16 +2457,17 @@ def handle_content_confirmation_company(company_id, content_type):
                             price=additional_price_obj.id,
                             quantity=additional_content_count
                         )
-                        print(f'[DEBUG] 追加料金アイテムを作成: {additional_item.id}, 数量={additional_content_count}')
-                        updated = True
+                        print(f'[DEBUG] 統一処理: 追加料金アイテムを作成: {additional_item.id}, 数量={additional_content_count}')
                         
                     except Exception as create_error:
-                        print(f'[ERROR] 追加料金アイテム作成エラー: {create_error}')
+                        print(f'[ERROR] 統一処理: 追加料金アイテム作成エラー: {create_error}')
                         import traceback
                         traceback.print_exc()
+                else:
+                    print(f'[DEBUG] 統一処理: 追加料金対象なし（数量=0）のためアイテム作成スキップ')
                         
             except Exception as e:
-                print(f'[ERROR] Stripe請求項目更新エラー: {e}')
+                print(f'[ERROR] 統一処理: Stripe請求項目更新エラー: {e}')
                 import traceback
                 traceback.print_exc()
                 # Stripeエラーが発生しても処理を続行

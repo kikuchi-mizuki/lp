@@ -1513,6 +1513,97 @@ def force_stripe_update():
     except Exception as e:
         return jsonify({"error": str(e)})
 
+@app.route('/debug/cleanup_duplicate_items')
+def cleanup_duplicate_items():
+    """重複した追加料金アイテムをクリーンアップ"""
+    try:
+        import stripe
+        stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+        
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 最新の企業IDを取得
+        c.execute('SELECT id, stripe_subscription_id FROM companies ORDER BY id DESC LIMIT 1')
+        company_result = c.fetchone()
+        
+        if not company_result:
+            return jsonify({"error": "企業情報が見つかりません"})
+        
+        company_id, stripe_subscription_id = company_result
+        
+        if not stripe_subscription_id:
+            return jsonify({"error": "StripeサブスクリプションIDがありません"})
+        
+        # Stripeサブスクリプションを取得
+        subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+        
+        # 追加料金アイテムを特定して削除
+        items_to_delete = []
+        for item in subscription['items']['data']:
+            price_nickname = item.price.nickname or ""
+            price_id = item.price.id
+            
+            # 追加料金アイテムを特定
+            if (("追加" in price_nickname) or 
+                ("additional" in price_nickname.lower()) or
+                ("metered" in price_nickname.lower()) or
+                (price_id == 'price_1Rog1nIxg6C5hAVdnqB5MJiT')):
+                
+                items_to_delete.append({
+                    'id': item.id,
+                    'price_id': price_id,
+                    'nickname': price_nickname,
+                    'quantity': item.quantity
+                })
+        
+        # 重複アイテムを削除（最初の1つ以外）
+        deleted_items = []
+        for i, item in enumerate(items_to_delete):
+            if i > 0:  # 最初の1つ以外を削除
+                try:
+                    stripe.SubscriptionItem.delete(item['id'])
+                    deleted_items.append(item)
+                    print(f'[DEBUG] 重複アイテム削除: {item["id"]}')
+                except Exception as e:
+                    print(f'[ERROR] アイテム削除エラー: {e}')
+        
+        # 現在のアクティブコンテンツ数を取得
+        c.execute('''
+            SELECT COUNT(*) 
+            FROM company_line_accounts 
+            WHERE company_id = %s AND status = 'active'
+        ''', (company_id,))
+        
+        total_content_count = c.fetchone()[0]
+        additional_content_count = max(0, total_content_count - 1)  # 1個目は無料なので-1
+        
+        # 残ったアイテムの数量を更新
+        if items_to_delete and additional_content_count > 0:
+            try:
+                remaining_item_id = items_to_delete[0]['id']
+                stripe.SubscriptionItem.modify(
+                    remaining_item_id,
+                    quantity=additional_content_count
+                )
+                print(f'[DEBUG] 残ったアイテムの数量を更新: {remaining_item_id} → {additional_content_count}')
+            except Exception as e:
+                print(f'[ERROR] 数量更新エラー: {e}')
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': f'重複アイテムのクリーンアップ完了',
+            'deleted_items': deleted_items,
+            'remaining_items': items_to_delete[:1] if items_to_delete else [],
+            'total_content_count': total_content_count,
+            'additional_content_count': additional_content_count
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
 @app.route('/debug/check_stripe_status')
 def check_stripe_status():
     """Stripeの詳細状況を確認"""
