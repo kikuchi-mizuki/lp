@@ -1179,10 +1179,6 @@ def handle_add_content_company(reply_token, company_id, stripe_subscription_id):
         lines = []
         lines.append("追加するコンテンツを選択")
         lines.append("")
-        lines.append(f"現在の利用状況：")
-        lines.append(f"• サブスクリプション：{total_subscription_count}件")
-        lines.append(f"• LINEアカウント：{total_line_account_count}件")
-        lines.append("")
         lines.append("追加したいコンテンツの番号を送信してください：")
         for i, content in enumerate(available_contents, 1):
             lines.append(f"{i}. {content['name']}")
