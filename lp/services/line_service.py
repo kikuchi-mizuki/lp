@@ -1228,6 +1228,16 @@ def handle_status_check_company(reply_token, company_id):
         
         monthly_subscription = c.fetchone()
         
+        # トライアル期間情報を取得
+        c.execute(f'''
+            SELECT trial_end
+            FROM companies 
+            WHERE id = {placeholder}
+        ''', (company_id,))
+        
+        trial_result = c.fetchone()
+        trial_end = trial_result[0] if trial_result else None
+        
         # 実際のLINEアカウント利用状況を取得
         c.execute(f'''
             SELECT content_type, status, created_at
@@ -1243,10 +1253,38 @@ def handle_status_check_company(reply_token, company_id):
         status_message = f"📊 利用状況\n\n"
         status_message += f"🏢 企業名: {company_name}\n\n"
         
+        # トライアル期間情報を表示
+        is_trial_active = False
+        trial_days_remaining = 0
+        
+        if trial_end:
+            from datetime import datetime, timezone, timedelta
+            jst = timezone(timedelta(hours=9))
+            current_time = datetime.now(jst)
+            
+            # タイムゾーン情報を統一（trial_endをawareに変換）
+            if trial_end.tzinfo is None:
+                trial_end = trial_end.replace(tzinfo=jst)
+            
+            if current_time < trial_end:
+                is_trial_active = True
+                trial_days_remaining = (trial_end - current_time).days
+                status_message += f"🎉 トライアル期間中（残り{trial_days_remaining}日間）\n"
+                status_message += f"📅 トライアル終了日: {trial_end.strftime('%Y年%m月%d日')}\n\n"
+        
         # 月額基本サブスクリプション情報
         if monthly_subscription:
             subscription_status, monthly_base_price, current_period_end = monthly_subscription
-            status_message += f"💳 月額基本料金: {monthly_base_price:,}円/月\n"
+            
+            # トライアル期間中は料金を0円で表示
+            if is_trial_active or subscription_status == 'trialing':
+                display_price = 0
+                price_note = "（トライアル期間中は無料）"
+            else:
+                display_price = monthly_base_price
+                price_note = ""
+            
+            status_message += f"💳 月額基本料金: {display_price:,}円/月{price_note}\n"
             
             if current_period_end:
                 period_end = current_period_end.strftime('%Y年%m月%d日')
@@ -1290,11 +1328,24 @@ def handle_status_check_company(reply_token, company_id):
                 if account[1] == "active":  # statusがactive
                     active_count += 1
                     if active_count > 1:  # 2個目以降のみ課金
-                        total_additional_price += 1500
+                        # トライアル期間中は追加料金も無料
+                        if is_trial_active or subscription_status == 'trialing':
+                            total_additional_price += 0
+                        else:
+                            total_additional_price += 1500
             
-            total_monthly_price = monthly_base_price + total_additional_price
-            status_message += f"\n💰 合計料金: {total_monthly_price:,}円/月"
-            status_message += f"\n  └ 基本料金: {monthly_base_price:,}円"
+            # トライアル期間中は基本料金も無料
+            if is_trial_active or subscription_status == 'trialing':
+                display_base_price = 0
+                display_total_price = 0
+                price_note = "（トライアル期間中は無料）"
+            else:
+                display_base_price = monthly_base_price
+                display_total_price = monthly_base_price + total_additional_price
+                price_note = ""
+            
+            status_message += f"\n💰 合計料金: {display_total_price:,}円/月{price_note}"
+            status_message += f"\n  └ 基本料金: {display_base_price:,}円"
             status_message += f"\n  └ 追加料金: {total_additional_price:,}円"
         else:
             status_message += f"\n💰 合計料金: 0円/月（サブスクリプションなし）"
