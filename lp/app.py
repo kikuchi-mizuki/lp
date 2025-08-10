@@ -496,6 +496,17 @@ def fix_database_schema():
         
         print("データベーススキーマ修正開始...")
         
+        # 現在のスキーマを確認
+        print("現在のスキーマを確認中...")
+        c.execute("""
+            SELECT column_name, data_type 
+            FROM information_schema.columns 
+            WHERE table_name = 'companies' 
+            ORDER BY ordinal_position
+        """)
+        company_columns = c.fetchall()
+        print(f"companiesテーブルのカラム: {company_columns}")
+        
         # user_statesテーブルの修正
         print("user_statesテーブルを修正中...")
         
@@ -516,23 +527,26 @@ def fix_database_schema():
         # companiesテーブルの修正
         print("companiesテーブルを修正中...")
         
-        # line_user_idカラムが存在しない場合は追加
-        c.execute("""
-            DO $$
-            BEGIN
-                IF NOT EXISTS (
-                    SELECT 1 FROM information_schema.columns 
-                    WHERE table_name = 'companies' AND column_name = 'line_user_id'
-                ) THEN
-                    ALTER TABLE companies ADD COLUMN line_user_id VARCHAR(255);
-                END IF;
-            END $$;
-        """)
+        # 必要なカラムを追加
+        required_columns = [
+            ('line_user_id', 'VARCHAR(255)'),
+            ('subscription_status', 'VARCHAR(50)'),
+            ('current_period_start', 'TIMESTAMP'),
+            ('current_period_end', 'TIMESTAMP'),
+            ('trial_end', 'TIMESTAMP')
+        ]
+        
+        existing_columns = [col[0] for col in company_columns]
+        
+        for col_name, col_type in required_columns:
+            if col_name not in existing_columns:
+                print(f"カラム {col_name} を追加中...")
+                c.execute(f"ALTER TABLE companies ADD COLUMN {col_name} {col_type}")
         
         # テストデータを作成
         print("テストデータを作成中...")
         
-        # 企業データ
+        # 企業データ（存在するカラムのみを使用）
         c.execute('''
             INSERT INTO companies (company_name, line_user_id, stripe_subscription_id, subscription_status, current_period_start, current_period_end, trial_end, company_code) 
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
@@ -577,7 +591,8 @@ def fix_database_schema():
             'success': True,
             'message': 'データベーススキーマ修正完了',
             'user_states_count': len(user_states),
-            'companies_count': len(companies)
+            'companies_count': len(companies),
+            'company_columns': company_columns
         })
         
     except Exception as e:
