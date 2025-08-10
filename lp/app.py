@@ -913,9 +913,12 @@ def fix_stripe_billing_period():
         jst = timezone(timedelta(hours=9))
         
         # 正しい課金期間を設定
-        # 8月23日 00:00:00 JST - 9月22日 23:59:59 JST
+        # トライアル期間: 8月9日 - 8月22日（14日間）
+        # 課金期間: 8月23日 00:00:00 JST - 9月22日 23:59:59 JST
+        # 次回更新日: 9月23日
         correct_start = datetime(2025, 8, 23, 0, 0, 0, tzinfo=jst)
         correct_end = datetime(2025, 9, 22, 23, 59, 59, tzinfo=jst)
+        next_billing_date = datetime(2025, 9, 23, 0, 0, 0, tzinfo=jst)
         
         # UTCに変換
         correct_start_utc = correct_start.astimezone(timezone.utc)
@@ -957,7 +960,7 @@ def fix_stripe_billing_period():
                     UPDATE company_monthly_subscriptions 
                     SET current_period_start = %s, current_period_end = %s
                     WHERE company_id = %s
-                ''', (correct_start, correct_end, company_id))
+                ''', (correct_start, next_billing_date, company_id))
                 
                 fix_results.append({
                     'company_id': company_id,
@@ -968,7 +971,8 @@ def fix_stripe_billing_period():
                     'new_period_start': correct_start_epoch,
                     'new_period_end': correct_end_epoch,
                     'trial_end': correct_start.strftime('%Y-%m-%d %H:%M:%S JST'),
-                    'billing_period': f'{correct_start.strftime("%Y/%m/%d")} - {correct_end.strftime("%Y/%m/%d")}'
+                    'billing_period': f'{correct_start.strftime("%Y/%m/%d")} - {correct_end.strftime("%Y/%m/%d")}',
+                    'next_billing_date': next_billing_date.strftime('%Y-%m-%d %H:%M:%S JST')
                 })
                 
             except Exception as e:
@@ -984,8 +988,10 @@ def fix_stripe_billing_period():
         
         return jsonify({
             'success': True,
-            'message': 'Stripeの課金期間を正しい期間（8月23日-9月22日）に修正しました',
-            'correct_period': f'{correct_start.strftime("%Y/%m/%d")} - {correct_end.strftime("%Y/%m/%d")}',
+            'message': 'Stripeの課金期間を正しい期間（8月23日-9月22日、次回更新日9月23日）に修正しました',
+            'trial_period': '8月9日 - 8月22日（14日間）',
+            'billing_period': f'{correct_start.strftime("%Y/%m/%d")} - {correct_end.strftime("%Y/%m/%d")}',
+            'next_billing_date': next_billing_date.strftime('%Y/%m/%d'),
             'fix_results': fix_results
         })
         
