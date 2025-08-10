@@ -1488,12 +1488,18 @@ def force_stripe_update():
                 
                 print(f'[DEBUG] 強制更新: アイテム{item.id}, 数量: {item.quantity} → {additional_content_count}')
                 
-                # 数量を更新
-                stripe.SubscriptionItem.modify(
-                    item.id,
-                    quantity=additional_content_count
-                )
-                updated = True
+                if additional_content_count > 0:
+                    # 数量が0より大きい場合は更新
+                    stripe.SubscriptionItem.modify(
+                        item.id,
+                        quantity=additional_content_count
+                    )
+                    updated = True
+                else:
+                    # 数量が0の場合はアイテムを削除
+                    stripe.SubscriptionItem.delete(item.id)
+                    print(f'[DEBUG] 強制更新: 数量0のためアイテム削除: {item.id}')
+                    updated = True
                 break
         
         if not updated:
@@ -1579,14 +1585,20 @@ def cleanup_duplicate_items():
         additional_content_count = max(0, total_content_count - 1)  # 1個目は無料なので-1
         
         # 残ったアイテムの数量を更新
-        if items_to_delete and additional_content_count > 0:
+        if items_to_delete:
             try:
                 remaining_item_id = items_to_delete[0]['id']
-                stripe.SubscriptionItem.modify(
-                    remaining_item_id,
-                    quantity=additional_content_count
-                )
-                print(f'[DEBUG] 残ったアイテムの数量を更新: {remaining_item_id} → {additional_content_count}')
+                if additional_content_count > 0:
+                    # 数量が0より大きい場合は更新
+                    stripe.SubscriptionItem.modify(
+                        remaining_item_id,
+                        quantity=additional_content_count
+                    )
+                    print(f'[DEBUG] 残ったアイテムの数量を更新: {remaining_item_id} → {additional_content_count}')
+                else:
+                    # 数量が0の場合はアイテムを削除
+                    stripe.SubscriptionItem.delete(remaining_item_id)
+                    print(f'[DEBUG] 数量0のためアイテムを削除: {remaining_item_id}')
             except Exception as e:
                 print(f'[ERROR] 数量更新エラー: {e}')
         

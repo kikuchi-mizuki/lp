@@ -2465,6 +2465,22 @@ def handle_content_confirmation_company(company_id, content_type):
                         traceback.print_exc()
                 else:
                     print(f'[DEBUG] 統一処理: 追加料金対象なし（数量=0）のためアイテム作成スキップ')
+                    # 数量が0の場合は既存の追加料金アイテムも削除
+                    for item in subscription['items']['data']:
+                        price_nickname = item.price.nickname or ""
+                        price_id = item.price.id
+                        
+                        if (("追加" in price_nickname) or 
+                            ("additional" in price_nickname.lower()) or
+                            ("metered" in price_nickname.lower()) or
+                            (price_id == 'price_1Rog1nIxg6C5hAVdnqB5MJiT')):
+                            
+                            try:
+                                stripe.SubscriptionItem.delete(item.id)
+                                print(f'[DEBUG] 統一処理: 数量0のため追加料金アイテム削除: {item.id}')
+                            except Exception as delete_error:
+                                print(f'[WARN] 統一処理: アイテム削除エラー: {delete_error}')
+                            break
                         
             except Exception as e:
                 print(f'[ERROR] 統一処理: Stripe請求項目更新エラー: {e}')
