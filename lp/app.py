@@ -972,7 +972,8 @@ def fix_stripe_billing_period():
                     'new_period_end': correct_end_epoch,
                     'trial_end': correct_start.strftime('%Y-%m-%d %H:%M:%S JST'),
                     'billing_period': f'{correct_start.strftime("%Y/%m/%d")} - {correct_end.strftime("%Y/%m/%d")}',
-                    'next_billing_date': next_billing_date.strftime('%Y-%m-%d %H:%M:%S JST')
+                    'next_billing_date': next_billing_date.strftime('%Y/%m/%d'),
+                    'trial_period': '8月9日 - 8月22日（14日間）'
                 })
                 
             except Exception as e:
@@ -997,6 +998,124 @@ def fix_stripe_billing_period():
         
     except Exception as e:
         print(f'[ERROR] 期間修正エラー: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
+@app.route('/debug/fix_stripe_start_date')
+def fix_stripe_start_date():
+    """Stripeのサブスクリプション開始日を正しい日付（8月9日）に修正"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 企業のStripeサブスクリプション情報を取得
+        c.execute('''
+            SELECT id, company_name, stripe_subscription_id 
+            FROM companies 
+            WHERE stripe_subscription_id IS NOT NULL
+        ''')
+        companies = c.fetchall()
+        
+        import stripe
+        stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+        
+        from datetime import datetime, timezone, timedelta
+        jst = timezone(timedelta(hours=9))
+        
+        # 正しい期間を設定
+        # 開始日: 8月9日 00:00:00 JST
+        # トライアル終了: 8月22日 23:59:59 JST
+        # 課金開始: 8月23日 00:00:00 JST
+        # 次回更新: 9月23日 00:00:00 JST
+        correct_start = datetime(2025, 8, 9, 0, 0, 0, tzinfo=jst)
+        trial_end = datetime(2025, 8, 22, 23, 59, 59, tzinfo=jst)
+        billing_start = datetime(2025, 8, 23, 0, 0, 0, tzinfo=jst)
+        next_billing = datetime(2025, 9, 23, 0, 0, 0, tzinfo=jst)
+        
+        # UTCに変換
+        correct_start_utc = correct_start.astimezone(timezone.utc)
+        trial_end_utc = trial_end.astimezone(timezone.utc)
+        billing_start_utc = billing_start.astimezone(timezone.utc)
+        next_billing_utc = next_billing.astimezone(timezone.utc)
+        
+        # エポックタイムスタンプに変換
+        correct_start_epoch = int(correct_start_utc.timestamp())
+        trial_end_epoch = int(trial_end_utc.timestamp())
+        billing_start_epoch = int(billing_start_utc.timestamp())
+        next_billing_epoch = int(next_billing_utc.timestamp())
+        
+        fix_results = []
+        
+        for company in companies:
+            company_id, company_name, stripe_subscription_id = company
+            
+            try:
+                # Stripeサブスクリプションを取得
+                subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+                
+                print(f'[DEBUG] 現在のサブスクリプション: {subscription.current_period_start} - {subscription.current_period_end}')
+                print(f'[DEBUG] 修正後の期間: {correct_start_epoch} - {next_billing_epoch}')
+                
+                # サブスクリプションの期間を修正
+                updated_subscription = stripe.Subscription.modify(
+                    stripe_subscription_id,
+                    trial_end=trial_end_epoch,  # トライアル終了を8月22日23:59:59に設定
+                    proration_behavior='none'
+                )
+                
+                print(f'[DEBUG] サブスクリプション期間修正完了: {updated_subscription.id}')
+                
+                # データベースも更新
+                c.execute('''
+                    UPDATE companies 
+                    SET trial_end = %s 
+                    WHERE id = %s
+                ''', (billing_start, company_id))  # トライアル終了日は8月23日
+                
+                c.execute('''
+                    UPDATE company_monthly_subscriptions 
+                    SET current_period_start = %s, current_period_end = %s
+                    WHERE company_id = %s
+                ''', (billing_start, next_billing, company_id))
+                
+                fix_results.append({
+                    'company_id': company_id,
+                    'company_name': company_name,
+                    'stripe_subscription_id': stripe_subscription_id,
+                    'trial_start': correct_start.strftime('%Y-%m-%d %H:%M:%S JST'),
+                    'trial_end': billing_start.strftime('%Y-%m-%d %H:%M:%S JST'),
+                    'billing_start': billing_start.strftime('%Y-%m-%d %H:%M:%S JST'),
+                    'next_billing': next_billing.strftime('%Y-%m-%d %H:%M:%S JST'),
+                    'trial_period': '8月9日 - 8月22日（14日間）',
+                    'billing_period': f'{billing_start.strftime("%Y/%m/%d")} - {next_billing.strftime("%Y/%m/%d")}'
+                })
+                
+            except Exception as e:
+                print(f'[ERROR] 企業{company_id}の期間修正エラー: {e}')
+                fix_results.append({
+                    'company_id': company_id,
+                    'company_name': company_name,
+                    'error': str(e)
+                })
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Stripeのサブスクリプション開始日を正しい日付（8月9日）に修正しました',
+            'trial_period': '8月9日 - 8月22日（14日間）',
+            'billing_period': f'{billing_start.strftime("%Y/%m/%d")} - {next_billing.strftime("%Y/%m/%d")}',
+            'next_billing_date': next_billing.strftime('%Y/%m/%d'),
+            'fix_results': fix_results
+        })
+        
+    except Exception as e:
+        print(f'[ERROR] 開始日修正エラー: {e}')
         import traceback
         traceback.print_exc()
         return jsonify({
