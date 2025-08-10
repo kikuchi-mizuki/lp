@@ -1355,7 +1355,11 @@ def handle_status_check_company(reply_token, company_id):
         print(f'[ERROR] 企業利用状況確認エラー: {e}')
         import traceback
         traceback.print_exc()
-        send_line_message(reply_token, [{"type": "text", "text": "❌ エラーが発生しました。しばらく時間をおいて再度お試しください。"}])
+        from utils.message_templates import get_menu_navigation_hint
+        send_line_message(reply_token, [
+            {"type": "text", "text": "❌ エラーが発生しました。しばらく時間をおいて再度お試しください。"},
+            get_menu_navigation_hint()
+        ])
 
 def handle_cancel_menu_company(reply_token, company_id, stripe_subscription_id):
     """企業ユーザー専用：解約メニュー表示"""
@@ -1384,7 +1388,11 @@ def handle_cancel_menu_company(reply_token, company_id, stripe_subscription_id):
         print(f'[DEBUG] 解約メニューエラー: {e}')
         import traceback
         traceback.print_exc()
-        send_line_message(reply_token, [{"type": "text", "text": "解約メニューでエラーが発生しました。"}])
+        from utils.message_templates import get_menu_navigation_hint
+        send_line_message(reply_token, [
+            {"type": "text", "text": "解約メニューでエラーが発生しました。"},
+            get_menu_navigation_hint()
+        ])
 
 def handle_cancel_request_company(reply_token, company_id, stripe_subscription_id):
     """企業ユーザー専用：個別コンテンツ解約メニュー表示"""
@@ -1408,7 +1416,11 @@ def handle_cancel_request_company(reply_token, company_id, stripe_subscription_i
         print(f'[DEBUG] 企業解約対象コンテンツ取得: company_id={company_id}, count={len(active_contents)}')
         
         if not active_contents:
-            send_line_message(reply_token, [{"type": "text", "text": "解約可能なコンテンツが見つかりませんでした。"}])
+            from utils.message_templates import get_menu_navigation_hint
+            send_line_message(reply_token, [
+                {"type": "text", "text": "解約可能なコンテンツが見つかりませんでした。"},
+                get_menu_navigation_hint()
+            ])
             conn.close()
             return
         
@@ -1432,7 +1444,11 @@ def handle_cancel_request_company(reply_token, company_id, stripe_subscription_i
         print(f'[DEBUG] コンテンツ解約メニューエラー: {e}')
         import traceback
         traceback.print_exc()
-        send_line_message(reply_token, [{"type": "text", "text": "コンテンツ解約メニューでエラーが発生しました。"}])
+        from utils.message_templates import get_menu_navigation_hint
+        send_line_message(reply_token, [
+            {"type": "text", "text": "コンテンツ解約メニューでエラーが発生しました。"},
+            get_menu_navigation_hint()
+        ])
     finally:
         if conn:
             conn.close()
@@ -1585,7 +1601,11 @@ def handle_cancel_selection_company(reply_token, company_id, stripe_subscription
         print(f'[ERROR] 企業解約選択処理エラー: {e}')
         import traceback
         traceback.print_exc()
-        send_line_message(reply_token, [{"type": "text", "text": "❌ 解約処理に失敗しました。しばらく時間をおいて再度お試しください。"}])
+        from utils.message_templates import get_menu_navigation_hint
+        send_line_message(reply_token, [
+            {"type": "text", "text": "❌ 解約処理に失敗しました。しばらく時間をおいて再度お試しください。"},
+            get_menu_navigation_hint()
+        ])
     finally:
         if conn:
             conn.close()
@@ -1862,16 +1882,28 @@ def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscript
             # 解約完了メッセージを送信
             cancelled_text = '\n'.join([f'• {content}' for content in cancelled])
             success_message = f'✅ 以下のコンテンツの解約が完了しました：\n\n{cancelled_text}\n\n次回請求から追加料金が反映されます。{billing_period_info}'
-            send_line_message(reply_token, [{"type": "text", "text": success_message}])
+            from utils.message_templates import get_menu_navigation_hint
+            send_line_message(reply_token, [
+                {"type": "text", "text": success_message},
+                get_menu_navigation_hint()
+            ])
         else:
             # 解約対象がない場合
-            send_line_message(reply_token, [{"type": "text", "text": "解約対象のコンテンツが見つかりませんでした。"}])
+            from utils.message_templates import get_menu_navigation_hint
+            send_line_message(reply_token, [
+                {"type": "text", "text": "解約対象のコンテンツが見つかりませんでした。"},
+                get_menu_navigation_hint()
+            ])
     
     except Exception as e:
         print(f'[ERROR] 企業解約確認処理エラー: {e}')
         import traceback
         traceback.print_exc()
-        send_line_message(reply_token, [{"type": "text", "text": "❌ 解約処理に失敗しました。しばらく時間をおいて再度お試しください。"}])
+        from utils.message_templates import get_menu_navigation_hint
+        send_line_message(reply_token, [
+            {"type": "text", "text": "❌ 解約処理に失敗しました。しばらく時間をおいて再度お試しください。"},
+            get_menu_navigation_hint()
+        ])
     finally:
         if conn:
             conn.close()
@@ -1976,14 +2008,22 @@ def handle_subscription_cancel_company(reply_token, company_id, stripe_subscript
             }
         }
         
-        send_line_message(reply_token, [cancel_message])
+        from utils.message_templates import get_menu_navigation_hint
+        send_line_message(reply_token, [
+            cancel_message,
+            get_menu_navigation_hint()
+        ])
         print(f'[DEBUG] 月額基本サブスクリプション解約処理完了')
         
     except Exception as e:
         print(f'[ERROR] 月額基本サブスクリプション解約処理エラー: {e}')
         import traceback
         traceback.print_exc()
-        send_line_message(reply_token, [{"type": "text", "text": "❌ 解約処理に失敗しました。しばらく時間をおいて再度お試しください。"}])
+        from utils.message_templates import get_menu_navigation_hint
+        send_line_message(reply_token, [
+            {"type": "text", "text": "❌ 解約処理に失敗しました。しばらく時間をおいて再度お試しください。"},
+            get_menu_navigation_hint()
+        ])
 
 def get_welcome_message():
     return "ようこそ！LINE連携が完了しました。"

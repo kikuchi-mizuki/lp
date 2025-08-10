@@ -711,17 +711,29 @@ def handle_text_message(event):
                         print(f'[DEBUG] 企業向け案内メッセージ送信完了(push): user_id={user_id}')
                     else:
                         print(f'[WARN] push送信に失敗。replyでフォールバック: user_id={user_id}')
-                        send_line_message(event['replyToken'], [{"type": "text", "text": f"✅ 企業データとの紐付けが完了しました！\n\n企業名: {company_name}\nメールアドレス: {email}\n\n『メニュー』と入力して始めてください。"}])
+                        from utils.message_templates import get_menu_navigation_hint
+                        send_line_message(event['replyToken'], [
+                            {"type": "text", "text": f"✅ 企業データとの紐付けが完了しました！\n\n企業名: {company_name}\nメールアドレス: {email}\n\n『メニュー』と入力して始めてください。"},
+                            get_menu_navigation_hint()
+                        ])
                 except Exception as e:
                     print(f'[DEBUG] 企業向け案内メッセージ送信エラー: {e}')
                     import traceback
                     traceback.print_exc()
                     # 例外時もreplyでフォールバック
-                    send_line_message(event['replyToken'], [{"type": "text", "text": f"✅ 企業データとの紐付けが完了しました！\n\n企業名: {company_name}\nメールアドレス: {email}\n\n『メニュー』と入力して始めてください。"}])
+                    from utils.message_templates import get_menu_navigation_hint
+                    send_line_message(event['replyToken'], [
+                        {"type": "text", "text": f"✅ 企業データとの紐付けが完了しました！\n\n企業名: {company_name}\nメールアドレス: {email}\n\n『メニュー』と入力して始めてください。"},
+                        get_menu_navigation_hint()
+                    ])
                     
             else:
                 print(f'[DEBUG] 企業データが見つかりません: email={normalized_email}')
-                send_line_message(event['replyToken'], [{"type": "text", "text": "企業データが見つかりません。決済が完了しているかご確認ください。"}])
+                from utils.message_templates import get_menu_navigation_hint
+                send_line_message(event['replyToken'], [
+                    {"type": "text", "text": "企業データが見つかりません。決済が完了しているかご確認ください。"},
+                    get_menu_navigation_hint()
+                ])
             
             conn.close()
             print(f'[DEBUG] メールアドレス連携処理完了')
@@ -967,16 +979,28 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
                     # テキストメッセージで追加完了を通知
                     content_url = result.get('url', 'https://lp-production-9e2c.up.railway.app')
                     success_message = f"🎉 {content_name}を追加しました\n\nアクセスはこちら\n{content_url}"
-                    send_line_message(event['replyToken'], [{"type": "text", "text": success_message}])
+                    from utils.message_templates import get_menu_navigation_hint
+                    send_line_message(event['replyToken'], [
+                        {"type": "text", "text": success_message},
+                        get_menu_navigation_hint()
+                    ])
                 else:
                     error_message = result.get('error', f"❌ {content_name}の追加に失敗しました。")
-                    send_line_message(event['replyToken'], [{"type": "text", "text": error_message}])
+                    from utils.message_templates import get_menu_navigation_hint
+                    send_line_message(event['replyToken'], [
+                        {"type": "text", "text": error_message},
+                        get_menu_navigation_hint()
+                    ])
                 return
             except Exception as e:
                 print(f"[ERROR] add_confirm 処理エラー: {e}")
                 import traceback; traceback.print_exc()
                 set_user_state(user_id, 'welcome_sent')
-                send_line_message(event['replyToken'], [{"type": "text", "text": "❌ 追加処理でエラーが発生しました。"}])
+                from utils.message_templates import get_menu_navigation_hint
+                send_line_message(event['replyToken'], [
+                    {"type": "text", "text": "❌ 追加処理でエラーが発生しました。"},
+                    get_menu_navigation_hint()
+                ])
                 return
         elif normalized in no_words:
             set_user_state(user_id, 'welcome_sent')
@@ -1007,7 +1031,11 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
             except Exception as e:
                 print(f'[ERROR] 解約選択委譲エラー: {e}')
                 import traceback; traceback.print_exc()
-                send_line_message(event['replyToken'], [{"type": "text", "text": "解約処理に失敗しました。もう一度お試しください。"}])
+                from utils.message_templates import get_menu_navigation_hint
+                send_line_message(event['replyToken'], [
+                    {"type": "text", "text": "解約処理に失敗しました。もう一度お試しください。"},
+                    get_menu_navigation_hint()
+                ])
                 return
 
         # 「メニュー」コマンドの場合は状態をリセットしてメニューを表示
@@ -1042,7 +1070,11 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
                 print(f'[ERROR] 解約確認処理エラー: {e}')
                 import traceback
                 traceback.print_exc()
-                send_line_message(event['replyToken'], [{"type": "text", "text": "解約処理中にエラーが発生しました。もう一度お試しください。"}])
+                from utils.message_templates import get_menu_navigation_hint
+                send_line_message(event['replyToken'], [
+                    {"type": "text", "text": "解約処理中にエラーが発生しました。もう一度お試しください。"},
+                    get_menu_navigation_hint()
+                ])
                 return
                 
         # 「メニュー」コマンドの場合は状態をリセットしてメニューを表示
