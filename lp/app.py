@@ -599,19 +599,30 @@ def fix_database_schema():
         available_columns = [col[0] for col in monthly_subscription_columns]
         
         if 'company_id' in available_columns and 'stripe_subscription_id' in available_columns:
-            # 基本的なカラムのみを使用
-            c.execute('''
-                INSERT INTO company_monthly_subscriptions (company_id, stripe_subscription_id, subscription_status, monthly_base_price, current_period_start, current_period_end, trial_end) 
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-            ''', (
-                company_id,
-                'sub_1RuM84Ixg6C5hAVdp1EIGCrm',
-                'trialing',
-                3900,
-                '2025-08-23 00:00:00',  # 日本時間
-                '2025-09-22 23:59:59',  # 日本時間
-                '2025-09-22 23:59:59'   # 日本時間
-            ))
+            # 基本的なカラムのみを使用（trial_endは除外）
+            if 'current_period_start' in available_columns and 'current_period_end' in available_columns:
+                c.execute('''
+                    INSERT INTO company_monthly_subscriptions (company_id, stripe_subscription_id, subscription_status, monthly_base_price, current_period_start, current_period_end) 
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                ''', (
+                    company_id,
+                    'sub_1RuM84Ixg6C5hAVdp1EIGCrm',
+                    'trialing',
+                    3900,
+                    '2025-08-23 00:00:00',  # 日本時間
+                    '2025-09-22 23:59:59'   # 日本時間
+                ))
+            else:
+                # 期間カラムがない場合は基本的なカラムのみ
+                c.execute('''
+                    INSERT INTO company_monthly_subscriptions (company_id, stripe_subscription_id, subscription_status, monthly_base_price) 
+                    VALUES (%s, %s, %s, %s)
+                ''', (
+                    company_id,
+                    'sub_1RuM84Ixg6C5hAVdp1EIGCrm',
+                    'trialing',
+                    3900
+                ))
         else:
             print("company_monthly_subscriptionsテーブルに必要なカラムが存在しません")
         
