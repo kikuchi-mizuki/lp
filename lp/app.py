@@ -658,9 +658,9 @@ def fix_stripe_subscription():
         print(f"現在のサブスクリプション: {subscription.id}")
         print(f"現在の期間: {subscription.current_period_start} - {subscription.current_period_end}")
         
-        # 正しい期間に修正（2025年8月23日から9月23日）
+        # 正しい期間に修正（2025年8月23日から9月22日）
         correct_start = 1755991488  # 2025-08-23 00:00:00 UTC
-        correct_end = 1758583488    # 2025-09-23 00:00:00 UTC
+        correct_end = 1758497280    # 2025-09-22 23:59:59 UTC
         
         # サブスクリプションの期間を更新
         updated_subscription = stripe.Subscription.modify(
