@@ -1534,9 +1534,9 @@ def handle_cancel_selection_company(reply_token, company_id, stripe_subscription
         total_additional_price = sum(content['additional_price'] for content in selected_contents)
         
         if total_additional_price > 0:
-            price_info = f"\n💰 削除される追加料金: {total_additional_price:,}円/月"
+            price_info = f"\n💰 削除される料金: {total_additional_price:,}円/月"
         else:
-            price_info = "\n💰 追加料金なし（基本料金に含まれる）"
+            price_info = "\n💰 料金なし（基本料金に含まれる）"
         
         # 請求期間情報を取得
         billing_period_info = ""
@@ -1547,9 +1547,22 @@ def handle_cancel_selection_company(reply_token, company_id, stripe_subscription
                 period_info = billing_sync_service.get_subscription_billing_period(stripe_subscription_id)
                 
                 if period_info:
-                    from datetime import datetime
+                    from datetime import datetime, timezone, timedelta
                     period_end = period_info['period_end']
-                    billing_period_info = f"\n📅 次回請求日: {period_end.strftime('%Y年%m月%d日')}"
+                    # 現在の日付を取得（JST）
+                    jst = timezone(timedelta(hours=9))
+                    now = datetime.now(jst)
+                    
+                    # 次回請求日が過去の場合は、現在の日付から1ヶ月後を計算
+                    if period_end < now:
+                        # 現在の日付から1ヶ月後の同じ日を計算
+                        if now.month == 12:
+                            next_month = datetime(now.year + 1, 1, now.day, tzinfo=jst)
+                        else:
+                            next_month = datetime(now.year, now.month + 1, now.day, tzinfo=jst)
+                        billing_period_info = f"\n📅 次回請求日: {next_month.strftime('%Y年%m月%d日')}"
+                    else:
+                        billing_period_info = f"\n📅 次回請求日: {period_end.strftime('%Y年%m月%d日')}"
                     
             except Exception as e:
                 print(f'[DEBUG] 請求期間情報取得エラー: {e}')
@@ -1871,9 +1884,22 @@ def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscript
                     period_info = billing_sync_service.get_subscription_billing_period(stripe_subscription_id)
                     
                     if period_info:
-                        from datetime import datetime
+                        from datetime import datetime, timezone, timedelta
                         period_end = period_info['period_end']
-                        billing_period_info = f"\n📅 次回請求日: {period_end.strftime('%Y年%m月%d日')}"
+                        # 現在の日付を取得（JST）
+                        jst = timezone(timedelta(hours=9))
+                        now = datetime.now(jst)
+                        
+                        # 次回請求日が過去の場合は、現在の日付から1ヶ月後を計算
+                        if period_end < now:
+                            # 現在の日付から1ヶ月後の同じ日を計算
+                            if now.month == 12:
+                                next_month = datetime(now.year + 1, 1, now.day, tzinfo=jst)
+                            else:
+                                next_month = datetime(now.year, now.month + 1, now.day, tzinfo=jst)
+                            billing_period_info = f"\n📅 次回請求日: {next_month.strftime('%Y年%m月%d日')}"
+                        else:
+                            billing_period_info = f"\n📅 次回請求日: {period_end.strftime('%Y年%m月%d日')}"
                         
                 except Exception as e:
                     print(f'[DEBUG] 請求期間情報取得エラー: {e}')
@@ -1881,7 +1907,7 @@ def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscript
             
             # 解約完了メッセージを送信
             cancelled_text = '\n'.join([f'• {content}' for content in cancelled])
-            success_message = f'✅ 以下のコンテンツの解約が完了しました：\n\n{cancelled_text}\n\n次回請求から追加料金が反映されます。{billing_period_info}'
+            success_message = f'✅ 以下のコンテンツの解約が完了しました：\n\n{cancelled_text}\n\n次回請求から料金が反映されます。{billing_period_info}'
             from utils.message_templates import get_menu_navigation_hint
             send_line_message(reply_token, [
                 {"type": "text", "text": success_message},
