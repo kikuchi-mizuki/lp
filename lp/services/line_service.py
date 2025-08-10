@@ -1272,15 +1272,8 @@ def handle_status_check_company(reply_token, company_id):
         if monthly_subscription:
             subscription_status, monthly_base_price, current_period_end = monthly_subscription
             
-            # トライアル期間中は料金を0円で表示
-            if is_trial_active or subscription_status == 'trialing':
-                display_price = 0
-                price_note = "（トライアル期間中は無料）"
-            else:
-                display_price = monthly_base_price
-                price_note = ""
-            
-            status_message += f"💳 月額基本料金: {display_price:,}円/月{price_note}\n"
+            # 料金体系を明確に表示
+            status_message += f"💳 月額基本料金: {monthly_base_price:,}円/月（トライアル期間中は無料）\n"
             
             if current_period_end:
                 period_end = current_period_end.strftime('%Y年%m月%d日')
@@ -1330,19 +1323,10 @@ def handle_status_check_company(reply_token, company_id):
                         else:
                             total_additional_price += 1500
             
-            # トライアル期間中は基本料金も無料
-            if is_trial_active or subscription_status == 'trialing':
-                display_base_price = 0
-                display_total_price = 0
-                price_note = "（トライアル期間中は無料）"
-            else:
-                display_base_price = monthly_base_price
-                display_total_price = monthly_base_price + total_additional_price
-                price_note = ""
-            
-            status_message += f"\n💰 合計料金: {display_total_price:,}円/月{price_note}"
-            status_message += f"\n  └ 基本料金: {display_base_price:,}円"
-            status_message += f"\n  └ 追加料金: {total_additional_price:,}円"
+            # 料金体系を明確に表示
+            status_message += f"\n💰 合計料金: {monthly_base_price + total_additional_price:,}円/月（トライアル期間中は無料）"
+            status_message += f"\n  └ 基本料金: {monthly_base_price:,}円（トライアル期間中は無料）"
+            status_message += f"\n  └ 追加料金: {total_additional_price:,}円（トライアル期間中は無料）"
         else:
             status_message += f"\n💰 合計料金: 0円/月（サブスクリプションなし）"
         
