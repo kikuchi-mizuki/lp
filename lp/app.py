@@ -641,6 +641,77 @@ def fix_database_schema():
             'error': str(e)
         })
 
+@app.route('/debug/fix_stripe_subscription')
+def fix_stripe_subscription():
+    """Stripeサブスクリプション修正エンドポイント"""
+    try:
+        import stripe
+        stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+        
+        # テスト用のサブスクリプションID
+        subscription_id = 'sub_1RuM84Ixg6C5hAVdp1EIGCrm'
+        
+        print(f"Stripeサブスクリプション修正開始: {subscription_id}")
+        
+        # サブスクリプションを取得
+        subscription = stripe.Subscription.retrieve(subscription_id)
+        print(f"現在のサブスクリプション: {subscription.id}")
+        print(f"現在の期間: {subscription.current_period_start} - {subscription.current_period_end}")
+        
+        # 正しい期間に修正（2025年1月10日から2月10日）
+        correct_start = 1736467200  # 2025-01-10 00:00:00 UTC
+        correct_end = 1739059200    # 2025-02-10 00:00:00 UTC
+        
+        # サブスクリプションの期間を更新
+        updated_subscription = stripe.Subscription.modify(
+            subscription_id,
+            billing_cycle_anchor=correct_start,
+            proration_behavior='none'
+        )
+        
+        print(f"修正後のサブスクリプション: {updated_subscription.id}")
+        print(f"修正後の期間: {updated_subscription.current_period_start} - {updated_subscription.current_period_end}")
+        
+        # 追加料金アイテムを作成
+        try:
+            # 追加料金用の価格を作成
+            additional_price = stripe.Price.create(
+                unit_amount=1500,
+                currency='jpy',
+                recurring={'interval': 'month'},
+                product_data={'name': 'コンテンツ追加料金'},
+                nickname='追加コンテンツ料金'
+            )
+            print(f"追加料金価格作成: {additional_price.id}")
+            
+            # サブスクリプションに追加料金アイテムを追加
+            additional_item = stripe.SubscriptionItem.create(
+                subscription=subscription_id,
+                price=additional_price.id,
+                quantity=1  # 1つのコンテンツを追加
+            )
+            print(f"追加料金アイテム作成: {additional_item.id}")
+            
+        except Exception as e:
+            print(f"追加料金アイテム作成エラー: {e}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Stripeサブスクリプション修正完了',
+            'subscription_id': subscription_id,
+            'period_start': updated_subscription.current_period_start,
+            'period_end': updated_subscription.current_period_end
+        })
+        
+    except Exception as e:
+        print(f"Stripeサブスクリプション修正エラー: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
 # アプリケーション初期化完了の確認
 logger.info("✅ アプリケーション初期化完了")
 
