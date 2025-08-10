@@ -730,6 +730,61 @@ def fix_stripe_subscription():
             'error': str(e)
         })
 
+@app.route('/debug/fix_trial_period')
+def fix_trial_period():
+    """トライアル期間を2週間（14日間）に修正"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 現在のトライアル期間設定を確認
+        c.execute('SELECT id, company_name, trial_end FROM companies WHERE trial_end IS NOT NULL')
+        companies = c.fetchall()
+        
+        from datetime import datetime, timezone, timedelta
+        jst = timezone(timedelta(hours=9))
+        current_time = datetime.now(jst)
+        
+        # 2週間後の日時を計算
+        trial_end_date = current_time + timedelta(days=14)
+        
+        # 各企業のトライアル期間を2週間に修正
+        updated_count = 0
+        for company in companies:
+            company_id, company_name, current_trial_end = company
+            
+            # トライアル期間を2週間に設定
+            c.execute('UPDATE companies SET trial_end = %s WHERE id = %s', (trial_end_date, company_id))
+            updated_count += 1
+            print(f'[DEBUG] トライアル期間修正: company_id={company_id}, company_name={company_name}, trial_end={trial_end_date}')
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': f'トライアル期間を2週間（14日間）に修正しました',
+            'updated_count': updated_count,
+            'trial_end_date': trial_end_date.strftime('%Y-%m-%d %H:%M:%S JST'),
+            'companies': [
+                {
+                    'id': company[0],
+                    'name': company[1],
+                    'trial_end': trial_end_date.strftime('%Y-%m-%d %H:%M:%S JST')
+                }
+                for company in companies
+            ]
+        })
+        
+    except Exception as e:
+        print(f'[ERROR] トライアル期間修正エラー: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
 # アプリケーション初期化完了の確認
 logger.info("✅ アプリケーション初期化完了")
 
