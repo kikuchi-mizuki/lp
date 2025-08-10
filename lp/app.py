@@ -1490,16 +1490,24 @@ def force_stripe_update():
                 
                 if additional_content_count > 0:
                     # 数量が0より大きい場合は更新
-                    stripe.SubscriptionItem.modify(
-                        item.id,
-                        quantity=additional_content_count
-                    )
-                    updated = True
+                    try:
+                        stripe.SubscriptionItem.modify(
+                            item.id,
+                            quantity=additional_content_count
+                        )
+                        updated = True
+                    except Exception as modify_error:
+                        print(f'[ERROR] 数量更新エラー: {modify_error}')
+                        # エラーが発生しても処理を続行
                 else:
                     # 数量が0の場合はアイテムを削除
-                    stripe.SubscriptionItem.delete(item.id)
-                    print(f'[DEBUG] 強制更新: 数量0のためアイテム削除: {item.id}')
-                    updated = True
+                    try:
+                        stripe.SubscriptionItem.delete(item.id)
+                        print(f'[DEBUG] 強制更新: 数量0のためアイテム削除: {item.id}')
+                        updated = True
+                    except Exception as delete_error:
+                        print(f'[WARN] アイテム削除エラー（無視）: {delete_error}')
+                        updated = True
                 break
         
         if not updated:
@@ -1590,17 +1598,21 @@ def cleanup_duplicate_items():
                 remaining_item_id = items_to_delete[0]['id']
                 if additional_content_count > 0:
                     # 数量が0より大きい場合は更新
-                    stripe.SubscriptionItem.modify(
-                        remaining_item_id,
-                        quantity=additional_content_count
-                    )
-                    print(f'[DEBUG] 残ったアイテムの数量を更新: {remaining_item_id} → {additional_content_count}')
+                    try:
+                        stripe.SubscriptionItem.modify(
+                            remaining_item_id,
+                            quantity=additional_content_count
+                        )
+                        print(f'[DEBUG] 残ったアイテムの数量を更新: {remaining_item_id} → {additional_content_count}')
+                    except Exception as modify_error:
+                        print(f'[ERROR] 数量更新エラー: {modify_error}')
+                        # エラーが発生しても処理を続行
                 else:
-                    # 数量が0の場合はアイテムを削除
-                    stripe.SubscriptionItem.delete(remaining_item_id)
-                    print(f'[DEBUG] 数量0のためアイテムを削除: {remaining_item_id}')
+                    # 数量が0の場合は何もしない（アイテムを残す）
+                    print(f'[DEBUG] 数量0のためアイテムをそのまま残す: {remaining_item_id}')
             except Exception as e:
                 print(f'[ERROR] 数量更新エラー: {e}')
+                # エラーが発生しても処理を続行
         
         conn.close()
         

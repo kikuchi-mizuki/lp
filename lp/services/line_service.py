@@ -2479,7 +2479,7 @@ def handle_content_confirmation_company(company_id, content_type):
                                 stripe.SubscriptionItem.delete(item.id)
                                 print(f'[DEBUG] 統一処理: 数量0のため追加料金アイテム削除: {item.id}')
                             except Exception as delete_error:
-                                print(f'[WARN] 統一処理: アイテム削除エラー: {delete_error}')
+                                print(f'[WARN] 統一処理: アイテム削除エラー（無視）: {delete_error}')
                             break
                         
             except Exception as e:
