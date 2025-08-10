@@ -915,8 +915,21 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
                 content_name = selected.get('name', f'コンテンツ{selection_index}')
                 description = selected.get('description') or 'このコンテンツを追加しますか？'
                 description = ' '.join(str(description).split())
-                price = selected.get('price')
-                price_short = f" 料金:{price:,}円/月" if isinstance(price, int) else ""
+                
+                # 既存のコンテンツ数を確認して料金を決定
+                from utils.db import get_db_connection
+                conn = get_db_connection()
+                c = conn.cursor()
+                c.execute('SELECT COUNT(*) FROM company_line_accounts WHERE company_id = %s AND status = %s', (company_id, 'active'))
+                existing_count = c.fetchone()[0]
+                conn.close()
+                
+                # 1個目は無料、2個目以降は有料
+                if existing_count == 0:
+                    price_short = " 料金:無料（初回コンテンツ）"
+                else:
+                    price = selected.get('price')
+                    price_short = f" 料金:{price:,}円/月" if isinstance(price, int) else ""
 
                 # 確認は大きいテンプレートボタン（はい/いいえ）
                 confirm_text = f"{description}{price_short}\n\n追加しますか？"
