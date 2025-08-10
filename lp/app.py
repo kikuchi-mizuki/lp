@@ -1591,6 +1591,7 @@ def cleanup_duplicate_items():
                     print(f'[DEBUG] 重複アイテム削除: {item["id"]}')
                 except Exception as e:
                     print(f'[ERROR] アイテム削除エラー: {e}')
+                    # エラーが発生しても処理を続行
         
         # 残ったアイテムの数量を更新（数量が0より大きい場合のみ）
         if additional_items and additional_content_count > 0:
@@ -1603,6 +1604,7 @@ def cleanup_duplicate_items():
                 print(f'[DEBUG] 残ったアイテムの数量を更新: {remaining_item_id} → {additional_content_count}')
             except Exception as e:
                 print(f'[ERROR] 数量更新エラー: {e}')
+                # エラーが発生しても処理を続行
         elif additional_items and additional_content_count == 0:
             print(f'[DEBUG] 数量0のためアイテムをそのまま残す: {additional_items[0]["id"]}')
         else:
