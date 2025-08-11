@@ -1818,13 +1818,19 @@ def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscript
                 # 追加料金が必要な場合のみ新しいアイテムを作成
                 if new_billing_count > 0:
                     try:
+                        # スプレッドシートから価格を取得（未設定時は1500円）
+                        # 解約処理では、残りのコンテンツの価格を取得する必要がある
+                        # ここではデフォルト価格を使用（実際の運用では、残りコンテンツの価格を動的に取得すべき）
+                        additional_price_value = 1500  # デフォルト価格
+                        print(f'[DEBUG] 解約処理後統一更新: デフォルト価格を使用: {additional_price_value}円')
+                        
                         # 新しいlicensedタイプのPriceを作成
                         new_price = stripe.Price.create(
-                            unit_amount=1500,
+                            unit_amount=additional_price_value,
                             currency='jpy',
                             recurring={'interval': 'month', 'usage_type': 'licensed'},
                             product_data={'name': 'コンテンツ追加料金'},
-                            nickname='追加コンテンツ料金(licensed)'
+                            nickname=f'追加コンテンツ料金(licensed, {additional_price_value}円)'
                         )
                         
                         # 新しいアイテムを作成
@@ -1834,7 +1840,7 @@ def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscript
                             quantity=new_billing_count
                         )
                         
-                        print(f'[DEBUG] 解約処理後統一更新: 追加料金アイテム作成完了: new_item={new_item.id}, quantity={new_billing_count}')
+                        print(f'[DEBUG] 解約処理後統一更新: 追加料金アイテム作成完了: new_item={new_item.id}, quantity={new_billing_count}, 総額={additional_price_value * new_billing_count}円')
                         
                     except Exception as create_error:
                         print(f'[ERROR] 解約処理後統一更新: 追加料金アイテム作成エラー: {create_error}')
@@ -2334,17 +2340,21 @@ def handle_content_confirmation_company(company_id, content_type):
                 # 追加料金が必要な場合のみ新しいアイテムを作成
                 if additional_content_count > 0:
                     try:
-                        # 追加料金用の価格を作成（月額1,500円）
+                        # スプレッドシートから価格を取得（未設定時は1500円）
+                        additional_price_value = int(spreadsheet_content.get('price', 1500))
+                        print(f'[DEBUG] 統一処理: スプレッドシート価格を使用: {additional_price_value}円')
+                        
+                        # 追加料金用の価格を作成（スプレッドシートの価格を使用）
                         additional_price_obj = stripe.Price.create(
-                            unit_amount=1500,  # 1,500円（最小単位）
+                            unit_amount=additional_price_value,  # スプレッドシートの価格を使用
                             currency='jpy',
                             recurring={'interval': 'month'},
                             product_data={
                                 'name': 'コンテンツ追加料金',
                             },
-                            nickname='追加コンテンツ料金'
+                            nickname=f'追加コンテンツ料金({additional_price_value}円)'
                         )
-                        print(f'[DEBUG] 統一処理: 追加料金用価格を作成: {additional_price_obj.id}')
+                        print(f'[DEBUG] 統一処理: 追加料金用価格を作成: {additional_price_obj.id}, 単価={additional_price_value}円')
                         
                         # サブスクリプションに追加料金アイテムを追加
                         additional_item = stripe.SubscriptionItem.create(
@@ -2352,7 +2362,7 @@ def handle_content_confirmation_company(company_id, content_type):
                             price=additional_price_obj.id,
                             quantity=additional_content_count
                         )
-                        print(f'[DEBUG] 統一処理: 追加料金アイテムを作成: {additional_item.id}, 数量={additional_content_count}')
+                        print(f'[DEBUG] 統一処理: 追加料金アイテムを作成: {additional_item.id}, 数量={additional_content_count}, 総額={additional_price_value * additional_content_count}円')
                         
                     except Exception as create_error:
                         print(f'[ERROR] 統一処理: 追加料金アイテム作成エラー: {create_error}')
