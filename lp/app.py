@@ -1598,10 +1598,10 @@ def cleanup_duplicate_items():
         for i, item in enumerate(additional_items):
             if i > 0:  # 最初の1つ以外を削除
                 try:
-                    # 一時的にStripe操作を無効化してデバッグ
-                    # stripe.SubscriptionItem.delete(item['id'])
+                    # Stripe操作を有効化
+                    stripe.SubscriptionItem.delete(item['id'])
                     deleted_items.append(item)
-                    print(f'[DEBUG] 重複アイテム削除（スキップ）: {item["id"]}')
+                    print(f'[DEBUG] 重複アイテム削除完了: {item["id"]}')
                 except Exception as e:
                     print(f'[ERROR] アイテム削除エラー: {e}')
                     # エラーが発生しても処理を続行
