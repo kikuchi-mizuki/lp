@@ -1626,7 +1626,10 @@ def cleanup_duplicate_items():
         })
         
     except Exception as e:
-        return jsonify({"error": str(e)})
+        print(f'[ERROR] cleanup_duplicate_items エラー詳細: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e), "error_type": type(e).__name__})
 
 @app.route('/debug/check_stripe_status')
 def check_stripe_status():

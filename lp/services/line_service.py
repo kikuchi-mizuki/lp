@@ -2560,7 +2560,7 @@ def handle_content_confirmation_company(company_id, content_type):
         print(f'[ERROR] 企業コンテンツ確認処理エラー: {e}')
         import traceback
         traceback.print_exc()
-        return {'success': False, 'error': str(e)}
+        return {'success': False, 'error': str(e), 'error_type': type(e).__name__}
     finally:
         if conn:
             conn.close()
