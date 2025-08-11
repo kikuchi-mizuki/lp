@@ -2534,6 +2534,45 @@ def fix_stripe_billing_correct():
         traceback.print_exc()
         return jsonify({"error": str(e)})
 
+@app.route('/debug/test_new_subscription')
+def test_new_subscription():
+    """新しいサブスクリプション作成のテスト（billing_cycle_anchor確認）"""
+    try:
+        # 2週間後の請求開始日を計算（日本時間）
+        from datetime import datetime, timezone, timedelta
+        jst = timezone(timedelta(hours=9))
+        now = datetime.now(jst)
+        billing_start_date = now + timedelta(days=14)  # 2週間後
+        billing_start_epoch = int(billing_start_date.timestamp())
+        
+        # 計算結果を確認
+        current_time = now.strftime('%Y-%m-%d %H:%M:%S JST')
+        billing_time = billing_start_date.strftime('%Y-%m-%d %H:%M:%S JST')
+        
+        return jsonify({
+            'success': True,
+            'test_info': {
+                'current_time': current_time,
+                'billing_start_time': billing_time,
+                'billing_start_epoch': billing_start_epoch,
+                'days_difference': 14
+            },
+            'stripe_config': {
+                'trial_period_days': 14,
+                'billing_cycle_anchor': billing_start_epoch,
+                'proration_behavior': 'none'
+            },
+            'expected_result': {
+                'trial_start': current_time,
+                'trial_end': billing_time,
+                'billing_start': billing_time,
+                'next_billing': (billing_start_date + timedelta(days=30)).strftime('%Y-%m-%d %H:%M:%S JST')
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
 # アプリケーション初期化完了の確認
 logger.info("✅ アプリケーション初期化完了")
 
