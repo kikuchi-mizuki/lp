@@ -47,7 +47,7 @@ try:
     from routes.security import security_bp
     from routes.dashboard_ui import dashboard_ui_bp
     from routes.automation import automation_bp
-    from routes.company_line_accounts import company_line_accounts_bp
+    from routes.company_contents import company_contents_bp
     from routes.company_registration import company_registration_bp
     from routes.ai_schedule_webhook import ai_schedule_webhook_bp
     from routes.ai_schedule_webhook_simple import ai_schedule_webhook_simple_bp
@@ -71,7 +71,7 @@ try:
         (security_bp, 'security'),
         (dashboard_ui_bp, 'dashboard_ui'),
         (automation_bp, 'automation'),
-        (company_line_accounts_bp, 'company_line_accounts'),
+        (company_contents_bp, 'company_contents'),
         (company_registration_bp, 'company_registration'),
         (ai_schedule_webhook_bp, 'ai_schedule_webhook'),
         (ai_schedule_webhook_simple_bp, 'ai_schedule_webhook_simple'),
@@ -605,7 +605,7 @@ def fix_database_schema():
         c.execute("DELETE FROM company_subscriptions WHERE company_id IN (SELECT id FROM companies WHERE line_user_id = %s)", ('U1b9d0d75b0c770dc1107dde349d572f7',))
         c.execute("DELETE FROM company_monthly_subscriptions WHERE company_id IN (SELECT id FROM companies WHERE line_user_id = %s)", ('U1b9d0d75b0c770dc1107dde349d572f7',))
         c.execute("DELETE FROM usage_logs WHERE company_id IN (SELECT id FROM companies WHERE line_user_id = %s)", ('U1b9d0d75b0c770dc1107dde349d572f7',))
-        c.execute("DELETE FROM company_line_accounts WHERE company_id IN (SELECT id FROM companies WHERE line_user_id = %s)", ('U1b9d0d75b0c770dc1107dde349d572f7',))
+        c.execute("DELETE FROM company_contents WHERE company_id IN (SELECT id FROM companies WHERE line_user_id = %s)", ('U1b9d0d75b0c770dc1107dde349d572f7',))
         c.execute("DELETE FROM company_content_additions WHERE company_id IN (SELECT id FROM companies WHERE line_user_id = %s)", ('U1b9d0d75b0c770dc1107dde349d572f7',))
         c.execute("DELETE FROM company_contents WHERE company_id IN (SELECT id FROM companies WHERE line_user_id = %s)", ('U1b9d0d75b0c770dc1107dde349d572f7',))
         c.execute("DELETE FROM company_cancellations WHERE company_id IN (SELECT id FROM companies WHERE line_user_id = %s)", ('U1b9d0d75b0c770dc1107dde349d572f7',))
@@ -1501,7 +1501,7 @@ def force_fix_stripe():
         c = conn.cursor()
         
         # 最新の企業IDを取得
-        c.execute('SELECT id, stripe_subscription_id FROM companies ORDER BY id DESC LIMIT 1')
+        c.execute('SELECT c.id, cms.stripe_subscription_id FROM companies c LEFT JOIN company_monthly_subscriptions cms ON c.id = cms.company_id WHERE cms.stripe_subscription_id IS NOT NULL ORDER BY c.id DESC LIMIT 1')
         company_result = c.fetchone()
         
         if not company_result:
@@ -1639,7 +1639,7 @@ def fix_correct_periods_2025():
         c = conn.cursor()
         
         # 最新の企業IDを取得
-        c.execute('SELECT id, stripe_subscription_id FROM companies ORDER BY id DESC LIMIT 1')
+        c.execute('SELECT c.id, cms.stripe_subscription_id FROM companies c LEFT JOIN company_monthly_subscriptions cms ON c.id = cms.company_id WHERE cms.stripe_subscription_id IS NOT NULL ORDER BY c.id DESC LIMIT 1')
         company_result = c.fetchone()
         
         if not company_result:
@@ -1773,7 +1773,7 @@ def fix_stripe_direct_2025():
         c = conn.cursor()
         
         # 最新の企業IDを取得
-        c.execute('SELECT id, stripe_subscription_id FROM companies ORDER BY id DESC LIMIT 1')
+        c.execute('SELECT c.id, cms.stripe_subscription_id FROM companies c LEFT JOIN company_monthly_subscriptions cms ON c.id = cms.company_id WHERE cms.stripe_subscription_id IS NOT NULL ORDER BY c.id DESC LIMIT 1')
         company_result = c.fetchone()
         
         if not company_result:
@@ -1828,7 +1828,13 @@ def fix_additional_price():
         c = conn.cursor()
         
         # 最新の企業IDを取得
-        c.execute('SELECT id, stripe_subscription_id FROM companies ORDER BY id DESC LIMIT 1')
+        c.execute('''
+            SELECT c.id, cms.stripe_subscription_id 
+            FROM companies c
+            LEFT JOIN company_monthly_subscriptions cms ON c.id = cms.company_id
+            WHERE cms.stripe_subscription_id IS NOT NULL 
+            ORDER BY c.id DESC LIMIT 1
+        ''')
         company_result = c.fetchone()
         
         if not company_result:
@@ -1842,7 +1848,7 @@ def fix_additional_price():
         # 現在のアクティブコンテンツ数を取得
         c.execute('''
             SELECT COUNT(*) 
-            FROM company_line_accounts 
+            FROM company_contents 
             WHERE company_id = %s AND status = 'active'
         ''', (company_id,))
         
@@ -1854,33 +1860,35 @@ def fix_additional_price():
         # Stripeサブスクリプションを取得
         subscription = stripe.Subscription.retrieve(stripe_subscription_id)
         
-        # 追加料金アイテムを修正
+        # 既存の追加料金アイテムを削除
         for item in subscription['items']['data']:
             price_id = item.price.id
             if price_id == 'price_1Rog1nIxg6C5hAVdnqB5MJiT':  # 追加料金のPrice ID
-                print(f'[DEBUG] 追加料金アイテム発見: {item.id}')
-                
-                # 新しいlicensedタイプのPriceを作成
-                new_price = stripe.Price.create(
-                    unit_amount=1500,
-                    currency='jpy',
-                    recurring={'interval': 'month', 'usage_type': 'licensed'},
-                    product_data={'name': 'コンテンツ追加料金'},
-                    nickname='追加コンテンツ料金(licensed)'
-                )
-                
-                # 新しいアイテムを作成
-                new_item = stripe.SubscriptionItem.create(
-                    subscription=stripe_subscription_id,
-                    price=new_price.id,
-                    quantity=additional_content_count
-                )
-                
-                # 古いアイテムを削除
+                print(f'[DEBUG] 既存の追加料金アイテム削除: {item.id}')
                 stripe.SubscriptionItem.delete(item.id)
-                
-                print(f'[DEBUG] 追加料金アイテム修正完了: old_item={item.id}, new_item={new_item.id}, quantity={additional_content_count}')
                 break
+        
+        # 追加料金が必要な場合のみ新しいアイテムを作成
+        if additional_content_count > 0:
+            # 新しいlicensedタイプのPriceを作成
+            new_price = stripe.Price.create(
+                unit_amount=1500,
+                currency='jpy',
+                recurring={'interval': 'month', 'usage_type': 'licensed'},
+                product_data={'name': 'コンテンツ追加料金'},
+                nickname='追加コンテンツ料金(licensed)'
+            )
+            
+            # 新しいアイテムを作成
+            new_item = stripe.SubscriptionItem.create(
+                subscription=stripe_subscription_id,
+                price=new_price.id,
+                quantity=additional_content_count
+            )
+            
+            print(f'[DEBUG] 追加料金アイテム作成完了: new_item={new_item.id}, quantity={additional_content_count}')
+        else:
+            print(f'[DEBUG] 追加料金対象なし（数量=0）のためアイテム作成スキップ')
         
         conn.close()
         
@@ -1907,7 +1915,7 @@ def fix_metered_to_licensed():
         c = conn.cursor()
         
         # 最新の企業IDを取得
-        c.execute('SELECT id, stripe_subscription_id FROM companies ORDER BY id DESC LIMIT 1')
+        c.execute('SELECT c.id, cms.stripe_subscription_id FROM companies c LEFT JOIN company_monthly_subscriptions cms ON c.id = cms.company_id WHERE cms.stripe_subscription_id IS NOT NULL ORDER BY c.id DESC LIMIT 1')
         company_result = c.fetchone()
         
         if not company_result:
@@ -1921,7 +1929,7 @@ def fix_metered_to_licensed():
         # 現在のアクティブコンテンツ数を取得
         c.execute('''
             SELECT COUNT(*) 
-            FROM company_line_accounts 
+            FROM company_contents 
             WHERE company_id = %s AND status = 'active'
         ''', (company_id,))
         
@@ -1987,7 +1995,13 @@ def check_stripe_periods():
         c = conn.cursor()
         
         # 最新の企業のサブスクリプションIDを取得
-        c.execute('SELECT id, company_name, stripe_subscription_id FROM companies WHERE stripe_subscription_id IS NOT NULL ORDER BY id DESC LIMIT 1')
+        c.execute('''
+            SELECT c.id, c.company_name, cms.stripe_subscription_id 
+            FROM companies c
+            LEFT JOIN company_monthly_subscriptions cms ON c.id = cms.company_id
+            WHERE cms.stripe_subscription_id IS NOT NULL 
+            ORDER BY c.id DESC LIMIT 1
+        ''')
         result = c.fetchone()
         conn.close()
         
@@ -2068,7 +2082,7 @@ def fix_stripe_billing_correct():
         c = conn.cursor()
         
         # 最新の企業IDを取得
-        c.execute('SELECT id, stripe_subscription_id FROM companies ORDER BY id DESC LIMIT 1')
+        c.execute('SELECT c.id, cms.stripe_subscription_id FROM companies c LEFT JOIN company_monthly_subscriptions cms ON c.id = cms.company_id WHERE cms.stripe_subscription_id IS NOT NULL ORDER BY c.id DESC LIMIT 1')
         company_result = c.fetchone()
         
         if not company_result:
@@ -2187,6 +2201,73 @@ def test_new_subscription():
         
     except Exception as e:
         return jsonify({"error": str(e)})
+
+@app.route('/debug/company_contents')
+def debug_company_contents():
+    """企業LINEアカウントの確認"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 企業LINEアカウント一覧を取得
+        c.execute('''
+            SELECT cla.id, cla.company_id, cla.status, cla.created_at,
+                   c.company_name
+            FROM company_contents cla
+            LEFT JOIN companies c ON cla.company_id = c.id
+            ORDER BY cla.created_at DESC
+        ''')
+        
+        accounts = []
+        for row in c.fetchall():
+            accounts.append({
+                'id': row[0],
+                'company_id': row[1],
+                'status': row[2],
+                'created_at': row[3].isoformat() if row[3] else None,
+                'company_name': row[4]
+            })
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'accounts': accounts,
+            'total_count': len(accounts)
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
+@app.route('/debug/add_test_content')
+def add_test_content():
+    """テスト用コンテンツを追加"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # テスト用コンテンツを追加
+        c.execute('''
+            INSERT INTO company_contents (company_id, content_name, content_type, status, created_at)
+            VALUES (%s, %s, %s, %s, NOW())
+        ''', (2, 'テストコンテンツ1', 'line', 'active'))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': 'テスト用コンテンツを追加しました'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
 
 @app.route('/debug/test_jst_timezone')
 def test_jst_timezone():

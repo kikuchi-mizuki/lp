@@ -2447,13 +2447,10 @@ def handle_content_confirmation_company(company_id, content_type):
                 # サブスクリプションアイテムを詳細にログ出力
                 print(f"[DEBUG] 統一処理: サブスクリプションアイテム数: {len(subscription['items']['data'])}")
                 for i, item in enumerate(subscription['items']['data']):
-                    # item.quantityが存在するかチェック
-                    quantity = getattr(item, 'quantity', None)
-                    if quantity is None:
-                        print(f'[WARN] アイテム {item.id} にquantity属性がありません')
-                        quantity = 0
-                    
-                    print(f'[DEBUG] 統一処理: アイテム{i}: ID={item.id}, Price={item.price.id}, Nickname={item.price.nickname}, Quantity={quantity}')
+                    price_nickname = item.price.nickname or ""
+                    price_id = item.price.id
+                    quantity = getattr(item, 'quantity', 0)
+                    print(f'[DEBUG] 統一処理: アイテム{i+1}: ID={item.id}, Price={price_id}, Nickname={price_nickname}, Quantity={quantity}')
                 
                 # 既存の追加料金アイテムを全て削除（重複を防ぐため）
                 items_to_delete = []
@@ -2473,9 +2470,8 @@ def handle_content_confirmation_company(company_id, content_type):
                 # 既存の追加料金アイテムを削除
                 for item_id in items_to_delete:
                     try:
-                        # 一時的に削除処理を無効化してデバッグ
-                        # stripe.SubscriptionItem.delete(item_id)
-                        print(f'[DEBUG] 統一処理: 追加料金アイテム削除（スキップ）: {item_id}')
+                        stripe.SubscriptionItem.delete(item_id)
+                        print(f'[DEBUG] 統一処理: 追加料金アイテム削除完了: {item_id}')
                     except Exception as delete_error:
                         print(f'[WARN] 統一処理: アイテム削除エラー: {delete_error}')
                 
@@ -2508,22 +2504,6 @@ def handle_content_confirmation_company(company_id, content_type):
                         traceback.print_exc()
                 else:
                     print(f'[DEBUG] 統一処理: 追加料金対象なし（数量=0）のためアイテム作成スキップ')
-                    # 数量が0の場合は既存の追加料金アイテムも削除
-                    for item in subscription['items']['data']:
-                        price_nickname = item.price.nickname or ""
-                        price_id = item.price.id
-                        
-                        if (("追加" in price_nickname) or 
-                            ("additional" in price_nickname.lower()) or
-                            ("metered" in price_nickname.lower()) or
-                            (price_id == 'price_1Rog1nIxg6C5hAVdnqB5MJiT')):
-                            
-                            try:
-                                # 数量0の場合はアイテムを削除せずにそのまま残す
-                                print(f'[DEBUG] 統一処理: 数量0のため追加料金アイテムをそのまま残す: {item.id}')
-                            except Exception as delete_error:
-                                print(f'[WARN] 統一処理: アイテム処理エラー（無視）: {delete_error}')
-                            break
                         
             except Exception as e:
                 print(f'[ERROR] 統一処理: Stripe請求項目更新エラー: {e}')
