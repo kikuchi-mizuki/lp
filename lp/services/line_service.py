@@ -2305,7 +2305,7 @@ def handle_content_confirmation_company(company_id, content_type):
                         'error': '❌ Stripe設定エラー: 環境変数が設定されていません'
                     }
                 
-                # 現在のアクティブコンテンツ数を取得（1個目は無料なので-1）
+                # 現在のアクティブコンテンツ数を取得（新しく追加されたコンテンツも含む）
                 c.execute(f'''
                     SELECT COUNT(*) 
                     FROM company_contents 
@@ -2315,6 +2315,19 @@ def handle_content_confirmation_company(company_id, content_type):
                 total_content_count = c.fetchone()[0]
                 additional_content_count = max(0, total_content_count - 1)  # 1個目は無料なので-1
                 print(f'[DEBUG] 統一処理: 総コンテンツ数: {total_content_count}, 追加料金対象: {additional_content_count}')
+                
+                # デバッグ用：実際のコンテンツ一覧を表示
+                c.execute(f'''
+                    SELECT content_type, content_name, created_at
+                    FROM company_contents 
+                    WHERE company_id = {placeholder} AND status = 'active'
+                    ORDER BY created_at
+                ''', (company_id,))
+                
+                contents = c.fetchall()
+                print(f'[DEBUG] 統一処理: アクティブコンテンツ一覧:')
+                for i, content in enumerate(contents, 1):
+                    print(f'  {i}. {content[1]} ({content[0]}) - {content[2]}')
                 
                 # Stripeサブスクリプションを取得
                 subscription = stripe.Subscription.retrieve(stripe_subscription_id)
@@ -2390,6 +2403,8 @@ def handle_content_confirmation_company(company_id, content_type):
                 import traceback
                 traceback.print_exc()
                 # Stripeエラーが発生しても処理を続行
+                # ただし、エラー内容をログに記録
+                print(f'[ERROR] Stripe更新処理でエラーが発生しましたが、処理を続行します: {e}')
         
         # Stripeの請求期間を正しく同期
         if stripe_subscription_id:

@@ -494,11 +494,11 @@ def debug_companies():
                 c.id,
                 c.company_name,
                 c.stripe_subscription_id,
-                COUNT(cla.id) as total_contents,
-                COUNT(CASE WHEN cla.status = 'active' THEN 1 END) as active_contents,
-                GREATEST(0, COUNT(CASE WHEN cla.status = 'active' THEN 1 END) - 1) as billing_target
+                COUNT(cc.id) as total_contents,
+                COUNT(CASE WHEN cc.status = 'active' THEN 1 END) as active_contents,
+                GREATEST(0, COUNT(CASE WHEN cc.status = 'active' THEN 1 END) - 1) as billing_target
             FROM companies c
-            LEFT JOIN company_line_accounts cla ON c.id = cla.company_id
+            LEFT JOIN company_contents cc ON c.id = cc.company_id
             WHERE c.stripe_subscription_id IS NOT NULL
             GROUP BY c.id, c.company_name, c.stripe_subscription_id
             ORDER BY c.id DESC
@@ -550,8 +550,8 @@ def debug_company_contents(company_id):
         
         # コンテンツ詳細を取得
         c.execute('''
-            SELECT content_type, status, created_at, line_channel_id
-            FROM company_line_accounts 
+            SELECT content_type, status, created_at, content_name
+            FROM company_contents 
             WHERE company_id = %s
             ORDER BY created_at
         ''', (company_id,))
@@ -563,7 +563,7 @@ def debug_company_contents(company_id):
                 'content_type': row[0],
                 'status': row[1],
                 'created_at': str(row[2]),
-                'line_channel_id': row[3],
+                'content_name': row[3],
                 'is_free': i == 1 and row[1] == 'active',
                 'billing_price': 0 if (i == 1 and row[1] == 'active') else (1500 if row[1] == 'active' else 0)
             })
@@ -616,7 +616,7 @@ def debug_stripe_check(company_id):
             return jsonify({'success': False, 'error': 'No Stripe subscription'}), 404
         
         # アクティブコンテンツ数を取得
-        c.execute('SELECT COUNT(*) FROM company_line_accounts WHERE company_id = %s AND status = %s', (company_id, 'active'))
+        c.execute('SELECT COUNT(*) FROM company_contents WHERE company_id = %s AND status = %s', (company_id, 'active'))
         active_count = c.fetchone()[0]
         expected_billing = max(0, active_count - 1)
         
