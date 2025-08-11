@@ -7,6 +7,7 @@ Google Sheets APIを使用してコンテンツ情報を動的に管理
 import os
 import json
 import time
+import threading
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 import gspread
@@ -19,10 +20,29 @@ class SpreadsheetContentService:
     def __init__(self):
         self.spreadsheet_id = os.getenv('CONTENT_SPREADSHEET_ID')
         self.credentials_file = os.getenv('GOOGLE_CREDENTIALS_FILE', 'credentials.json')
-        self.cache_duration = 300  # 5分間キャッシュ
+        self.cache_duration = 60  # 1分間キャッシュ（5分から短縮）
         self.last_cache_update = 0
         self.cached_contents = {}
+        self.auto_refresh_enabled = True
+        self.auto_refresh_interval = 300  # 5分ごとに自動更新
+        self._start_auto_refresh()
         
+    def _start_auto_refresh(self):
+        """自動更新スレッドを開始"""
+        if self.auto_refresh_enabled:
+            def auto_refresh_worker():
+                while self.auto_refresh_enabled:
+                    try:
+                        time.sleep(self.auto_refresh_interval)
+                        self.refresh_cache()
+                        print(f"[AUTO_REFRESH] スプレッドシートの自動更新を実行しました: {datetime.now()}")
+                    except Exception as e:
+                        print(f"[AUTO_REFRESH_ERROR] 自動更新エラー: {e}")
+            
+            refresh_thread = threading.Thread(target=auto_refresh_worker, daemon=True)
+            refresh_thread.start()
+            print(f"[AUTO_REFRESH] 自動更新スレッドを開始しました（{self.auto_refresh_interval}秒間隔）")
+    
     def _get_google_sheets_client(self):
         """Google Sheets APIクライアントを取得"""
         try:

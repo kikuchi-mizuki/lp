@@ -390,6 +390,50 @@ def debug_spreadsheet():
     result = spreadsheet_content_service.get_available_contents(force_refresh=True)
     return jsonify(result)
 
+# スプレッドシートの手動更新
+@app.route('/api/v1/spreadsheet/refresh', methods=['POST'])
+def manual_spreadsheet_refresh():
+    """スプレッドシートの内容を手動で強制更新"""
+    try:
+        result = spreadsheet_content_service.refresh_cache()
+        return jsonify({
+            'success': True,
+            'message': 'スプレッドシートの内容を強制更新しました',
+            'timestamp': datetime.now().isoformat(),
+            'result': result
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+# スプレッドシートの自動更新設定
+@app.route('/api/v1/spreadsheet/auto-refresh', methods=['GET', 'POST'])
+def spreadsheet_auto_refresh_settings():
+    """自動更新の設定を取得・変更"""
+    if request.method == 'GET':
+        return jsonify({
+            'auto_refresh_enabled': spreadsheet_content_service.auto_refresh_enabled,
+            'auto_refresh_interval': spreadsheet_content_service.auto_refresh_interval,
+            'cache_duration': spreadsheet_content_service.cache_duration,
+            'last_update': spreadsheet_content_service.last_cache_update
+        })
+    else:
+        # POST: 設定を更新
+        data = request.get_json()
+        if data.get('auto_refresh_enabled') is not None:
+            spreadsheet_content_service.auto_refresh_enabled = data['auto_refresh_enabled']
+        if data.get('auto_refresh_interval'):
+            spreadsheet_content_service.auto_refresh_interval = data['auto_refresh_interval']
+        if data.get('cache_duration'):
+            spreadsheet_content_service.cache_duration = data['cache_duration']
+        
+        return jsonify({
+            'success': True,
+            'message': '自動更新設定を更新しました'
+        })
+
 # システム総合チェック（自動）
 @app.route('/debug/system-check')
 def system_check():
