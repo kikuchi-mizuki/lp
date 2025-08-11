@@ -1505,10 +1505,19 @@ def handle_cancel_selection_company(reply_token, company_id, stripe_subscription
         
         # 選択されたコンテンツを特定
         selected_contents = []
-        for i, (content_id, content_type, created_at) in enumerate(active_contents, 1):
+        for i, (content_id, content_name, content_type, created_at) in enumerate(active_contents, 1):
             if i in selected_indices:
-                # ai_scheduleをAI予定秘書に変換
-                display_name = 'AI予定秘書' if content_type == 'ai_schedule' else content_type
+                # content_nameを使用、なければ適切な表示名に変換
+                if content_name:
+                    display_name = content_name
+                elif content_type == 'ai_schedule':
+                    display_name = 'AI予定秘書'
+                elif content_type == 'ai_accounting':
+                    display_name = 'AI経理秘書'
+                elif content_type == 'ai_task':
+                    display_name = 'AIタスクコンシェルジュ'
+                else:
+                    display_name = content_type
                 # 1個目は無料、2個目以降は有料
                 additional_price = 0 if i == 1 else 1500
                 selected_contents.append({
@@ -1581,10 +1590,10 @@ def handle_cancel_selection_company(reply_token, company_id, stripe_subscription
 
         message_template = {
             "type": "template",
-            "altText": "解約確認",
+            "altText": "コンテンツ解約確認",
             "template": {
                 "type": "buttons",
-                "title": "解約確認",
+                "title": "コンテンツ解約確認",
                 "text": short_text,
                 "actions": actions
             }
@@ -1634,7 +1643,7 @@ def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscript
         
         # 企業のアクティブなコンテンツを取得
         c.execute(f'''
-            SELECT id, content_type, created_at 
+            SELECT id, content_name, content_type, created_at 
             FROM company_contents 
             WHERE company_id = {placeholder} AND status = 'active'
             ORDER BY created_at DESC
@@ -1645,7 +1654,7 @@ def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscript
         cancelled = []
         
         # 選択されたコンテンツを解約
-        for i, (content_id, content_type, created_at) in enumerate(active_contents, 1):
+        for i, (content_id, content_name, content_type, created_at) in enumerate(active_contents, 1):
             if i in selected_indices:
                 print(f'[DEBUG] 解約処理開始: content_type={content_type}, content_id={content_id}')
                 
@@ -1830,8 +1839,17 @@ def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscript
                         print(f'[DEBUG] 解約時Stripe請求期間同期エラー: {e}')
                         # 同期エラーが発生しても処理を続行
                 
-                # ai_scheduleをAI予定秘書に変換
-                display_name = 'AI予定秘書' if content_type == 'ai_schedule' else content_type
+                # content_nameを使用、なければ適切な表示名に変換
+                if content_name:
+                    display_name = content_name
+                elif content_type == 'ai_schedule':
+                    display_name = 'AI予定秘書'
+                elif content_type == 'ai_accounting':
+                    display_name = 'AI経理秘書'
+                elif content_type == 'ai_task':
+                    display_name = 'AIタスクコンシェルジュ'
+                else:
+                    display_name = content_type
                 cancelled.append(display_name)
                 print(f'[DEBUG] 企業コンテンツ解約処理完了: content_type={content_type}, content_id={content_id}')
         
