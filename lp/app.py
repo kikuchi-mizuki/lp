@@ -1491,433 +1491,6 @@ def fix_trial_end_only():
         return jsonify({"error": str(e)})
 
 @app.route('/debug/force_stripe_update')
-def force_stripe_update():
-    """Stripeの請求書プレビューを強制更新"""
-    try:
-        import stripe
-        stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
-        
-        conn = get_db_connection()
-        c = conn.cursor()
-        
-        # 最新の企業IDを取得
-        c.execute('SELECT id, stripe_subscription_id FROM companies ORDER BY id DESC LIMIT 1')
-        company_result = c.fetchone()
-        
-        if not company_result:
-            return jsonify({"error": "企業情報が見つかりません"})
-        
-        company_id, stripe_subscription_id = company_result
-        
-        if not stripe_subscription_id:
-            return jsonify({"error": "StripeサブスクリプションIDがありません"})
-        
-        # 現在のアクティブコンテンツ数を取得
-        c.execute('''
-            SELECT COUNT(*) 
-            FROM company_line_accounts 
-            WHERE company_id = %s AND status = 'active'
-        ''', (company_id,))
-        
-        total_content_count = c.fetchone()[0]
-        additional_content_count = max(0, total_content_count - 1)  # 1個目は無料なので-1
-        
-        print(f'[DEBUG] 強制更新: 総数={total_content_count}, 課金対象={additional_content_count}')
-        
-        # Stripeサブスクリプションを取得
-        subscription = stripe.Subscription.retrieve(stripe_subscription_id)
-        
-        # 追加料金アイテムを更新（数量が0より大きい場合のみ）
-        updated = False
-        for item in subscription['items']['data']:
-            price_nickname = item.price.nickname or ""
-            price_id = item.price.id
-            
-            if (("追加" in price_nickname) or 
-                ("additional" in price_nickname.lower()) or
-                ("metered" in price_nickname.lower()) or
-                (price_id == 'price_1Rog1nIxg6C5hAVdnqB5MJiT')):
-                
-                # item.quantityが存在するかチェック
-                current_quantity = getattr(item, 'quantity', None)
-                if current_quantity is None:
-                    print(f'[WARN] アイテム {item.id} にquantity属性がありません')
-                    current_quantity = 0
-                
-                print(f'[DEBUG] 強制更新: アイテム{item.id}, 数量: {current_quantity} → {additional_content_count}')
-                
-                if additional_content_count > 0:
-                    # 数量が0より大きい場合は更新
-                    try:
-                        stripe.SubscriptionItem.modify(
-                            item.id,
-                            quantity=additional_content_count
-                        )
-                        updated = True
-                        print(f'[DEBUG] 強制更新: 数量更新完了: {item.id}')
-                    except Exception as modify_error:
-                        print(f'[ERROR] 数量更新エラー: {modify_error}')
-                        # エラーが発生しても処理を続行
-                else:
-                    # 数量が0の場合は何もしない（アイテムを残す）
-                    print(f'[DEBUG] 強制更新: 数量0のためアイテムをそのまま残す: {item.id}')
-                    updated = True
-                break
-        
-        if not updated:
-            return jsonify({"error": "追加料金アイテムが見つかりませんでした"})
-        
-        conn.close()
-        
-        return jsonify({
-            'success': True,
-            'message': f'Stripeの請求書プレビューを強制更新しました',
-            'company_id': company_id,
-            'total_content_count': total_content_count,
-            'additional_content_count': additional_content_count,
-            'stripe_subscription_id': stripe_subscription_id
-        })
-        
-    except Exception as e:
-        return jsonify({"error": str(e)})
-
-@app.route('/debug/cleanup_duplicate_items')
-def cleanup_duplicate_items():
-    """重複した追加料金アイテムをクリーンアップ"""
-    try:
-        import stripe
-        stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
-        
-        conn = get_db_connection()
-        c = conn.cursor()
-        
-        # 最新の企業IDを取得
-        c.execute('SELECT id, stripe_subscription_id FROM companies ORDER BY id DESC LIMIT 1')
-        company_result = c.fetchone()
-        
-        if not company_result:
-            return jsonify({"error": "企業情報が見つかりません"})
-        
-        company_id, stripe_subscription_id = company_result
-        
-        if not stripe_subscription_id:
-            return jsonify({"error": "StripeサブスクリプションIDがありません"})
-        
-        # Stripeサブスクリプションを取得
-        subscription = stripe.Subscription.retrieve(stripe_subscription_id)
-        
-        # 現在のアクティブコンテンツ数を取得
-        c.execute('''
-            SELECT COUNT(*) 
-            FROM company_line_accounts 
-            WHERE company_id = %s AND status = 'active'
-        ''', (company_id,))
-        
-        total_content_count = c.fetchone()[0]
-        additional_content_count = max(0, total_content_count - 1)  # 1個目は無料なので-1
-        
-        print(f'[DEBUG] クリーンアップ: 総コンテンツ数={total_content_count}, 追加料金対象={additional_content_count}')
-        
-        # 追加料金アイテムを特定
-        additional_items = []
-        for item in subscription['items']['data']:
-            price_nickname = item.price.nickname or ""
-            price_id = item.price.id
-            
-            # 追加料金アイテムを特定
-            if (("追加" in price_nickname) or 
-                ("additional" in price_nickname.lower()) or
-                ("metered" in price_nickname.lower()) or
-                (price_id == 'price_1Rog1nIxg6C5hAVdnqB5MJiT')):
-                
-                # item.quantityが存在するかチェック
-                quantity = getattr(item, 'quantity', None)
-                if quantity is None:
-                    print(f'[WARN] アイテム {item.id} にquantity属性がありません')
-                    quantity = 0
-                
-                additional_items.append({
-                    'id': item.id,
-                    'price_id': price_id,
-                    'nickname': price_nickname,
-                    'quantity': quantity
-                })
-        
-        print(f'[DEBUG] クリーンアップ: 追加料金アイテム数={len(additional_items)}')
-        
-        # 重複アイテムを削除（最初の1つ以外）
-        deleted_items = []
-        for i, item in enumerate(additional_items):
-            if i > 0:  # 最初の1つ以外を削除
-                try:
-                    # Stripe操作を有効化
-                    stripe.SubscriptionItem.delete(item['id'])
-                    deleted_items.append(item)
-                    print(f'[DEBUG] 重複アイテム削除完了: {item["id"]}')
-                except Exception as e:
-                    print(f'[ERROR] アイテム削除エラー: {e}')
-                    # エラーが発生しても処理を続行
-        
-        # 残ったアイテムの数量を更新（数量が0より大きい場合のみ）
-        print(f'[DEBUG] 数量更新処理開始: additional_items={len(additional_items)}, additional_content_count={additional_content_count}')
-        if additional_items and additional_content_count > 0:
-            try:
-                remaining_item_id = additional_items[0]['id']
-                print(f'[DEBUG] 数量更新実行: {remaining_item_id} → {additional_content_count}')
-                # Stripe操作を有効化
-                stripe.SubscriptionItem.modify(
-                    remaining_item_id,
-                    quantity=additional_content_count
-                )
-                print(f'[DEBUG] 残ったアイテムの数量を更新完了: {remaining_item_id} → {additional_content_count}')
-            except Exception as e:
-                print(f'[ERROR] 数量更新エラー: {e}')
-                # エラーが発生しても処理を続行
-        elif additional_items and additional_content_count == 0:
-            print(f'[DEBUG] 数量0のためアイテムをそのまま残す: {additional_items[0]["id"]}')
-        else:
-            print(f'[DEBUG] 追加料金アイテムなし')
-        
-        conn.close()
-        
-        return jsonify({
-            'success': True,
-            'message': f'重複アイテムのクリーンアップ完了',
-            'deleted_items': deleted_items,
-            'remaining_items': additional_items[:1] if additional_items else [],
-            'total_content_count': total_content_count,
-            'additional_content_count': additional_content_count
-        })
-        
-    except Exception as e:
-        print(f'[ERROR] cleanup_duplicate_items エラー詳細: {e}')
-        import traceback
-        traceback.print_exc()
-        return jsonify({"error": str(e), "error_type": type(e).__name__})
-
-@app.route('/debug/check_stripe_status')
-def check_stripe_status():
-    """Stripeの詳細状況を確認"""
-    try:
-        import stripe
-        stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
-        
-        conn = get_db_connection()
-        c = conn.cursor()
-        
-        # 最新の企業IDを取得
-        c.execute('SELECT id, stripe_subscription_id FROM companies ORDER BY id DESC LIMIT 1')
-        company_result = c.fetchone()
-        
-        if not company_result:
-            return jsonify({"error": "企業情報が見つかりません"})
-        
-        company_id, stripe_subscription_id = company_result
-        
-        if not stripe_subscription_id:
-            return jsonify({"error": "StripeサブスクリプションIDがありません"})
-        
-        # 現在のアクティブコンテンツ数を取得
-        c.execute('''
-            SELECT content_type, status, created_at 
-            FROM company_line_accounts 
-            WHERE company_id = %s 
-            ORDER BY created_at
-        ''', (company_id,))
-        
-        accounts = c.fetchall()
-        active_count = len([acc for acc in accounts if acc[1] == 'active'])
-        
-        # Stripeサブスクリプションを取得
-        subscription = stripe.Subscription.retrieve(stripe_subscription_id)
-        
-        # サブスクリプションアイテムの詳細
-        items_info = []
-        for item in subscription['items']['data']:
-            # item.quantityが存在するかチェック
-            quantity = getattr(item, 'quantity', None)
-            if quantity is None:
-                print(f'[WARN] アイテム {item.id} にquantity属性がありません')
-                quantity = 0
-            
-            items_info.append({
-                'id': item.id,
-                'price_id': item.price.id,
-                'price_nickname': item.price.nickname,
-                'quantity': quantity,
-                'amount': item.price.unit_amount,
-                'currency': item.price.currency
-            })
-        
-        conn.close()
-        
-        return jsonify({
-            'success': True,
-            'company_id': company_id,
-            'stripe_subscription_id': stripe_subscription_id,
-            'active_content_count': active_count,
-            'expected_billing_count': max(0, active_count - 1),  # 1個目は無料
-            'all_accounts': [
-                {
-                    'content_type': acc[0],
-                    'status': acc[1],
-                    'created_at': str(acc[2])
-                } for acc in accounts
-            ],
-            'stripe_items': items_info,
-            'subscription_status': subscription.status,
-            'trial_end': subscription.trial_end,
-            'current_period_start': subscription.current_period_start,
-            'current_period_end': subscription.current_period_end
-        })
-        
-    except Exception as e:
-        return jsonify({"error": str(e)})
-
-@app.route('/debug/check_raw_db')
-def check_raw_db():
-    """データベースの生の値を確認"""
-    try:
-        conn = get_db_connection()
-        c = conn.cursor()
-        
-        # 最新の企業IDを取得
-        c.execute('SELECT id FROM companies ORDER BY id DESC LIMIT 1')
-        company_id = c.fetchone()[0]
-        
-        # companiesテーブルの値を確認
-        c.execute('SELECT trial_end FROM companies WHERE id = %s', (company_id,))
-        company_trial_end = c.fetchone()[0]
-        
-        # company_monthly_subscriptionsテーブルの値を確認
-        c.execute('''
-            SELECT current_period_start, current_period_end 
-            FROM company_monthly_subscriptions 
-            WHERE company_id = %s
-        ''', (company_id,))
-        subscription_result = c.fetchone()
-        
-        conn.close()
-        
-        return jsonify({
-            'success': True,
-            'company_id': company_id,
-            'raw_values': {
-                'companies_trial_end': str(company_trial_end) if company_trial_end else None,
-                'subscription_period_start': str(subscription_result[0]) if subscription_result and subscription_result[0] else None,
-                'subscription_period_end': str(subscription_result[1]) if subscription_result and subscription_result[1] else None
-            }
-        })
-        
-    except Exception as e:
-        return jsonify({"error": str(e)})
-
-@app.route('/debug/fix_stripe_periods_direct')
-def fix_stripe_periods_direct():
-    """Stripeの期間を直接修正"""
-    try:
-        import stripe
-        stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
-        
-        conn = get_db_connection()
-        c = conn.cursor()
-        
-        # 最新の企業IDを取得
-        c.execute('SELECT id, stripe_subscription_id FROM companies ORDER BY id DESC LIMIT 1')
-        company_result = c.fetchone()
-        
-        if not company_result:
-            return jsonify({"error": "企業情報が見つかりません"})
-        
-        company_id, stripe_subscription_id = company_result
-        
-        if not stripe_subscription_id:
-            return jsonify({"error": "StripeサブスクリプションIDがありません"})
-        
-        # Stripeサブスクリプションを取得
-        subscription = stripe.Subscription.retrieve(stripe_subscription_id)
-        
-        # 正しい期間を設定（JST）
-        correct_trial_end = 1755991488  # 2025-08-23 00:00:00 JST
-        correct_period_start = 1755991488  # 2025-08-23 00:00:00 JST
-        correct_period_end = 1758587888  # 2025-09-23 00:00:00 JST
-        
-        # Stripeサブスクリプションを更新
-        updated_subscription = stripe.Subscription.modify(
-            stripe_subscription_id,
-            trial_end=correct_trial_end,
-            billing_cycle_anchor=correct_period_start
-        )
-        
-        conn.close()
-        
-        return jsonify({
-            'success': True,
-            'message': 'Stripeの期間を直接修正しました',
-            'company_id': company_id,
-            'stripe_subscription_id': stripe_subscription_id,
-            'updated_periods': {
-                'trial_end': '2025-08-23 00:00:00 JST',
-                'period_start': '2025-08-23 00:00:00 JST',
-                'period_end': '2025-09-23 00:00:00 JST'
-            }
-        })
-        
-    except Exception as e:
-        return jsonify({"error": str(e)})
-
-@app.route('/debug/fix_stripe_direct')
-def fix_stripe_direct():
-    """Stripeの期間を直接修正"""
-    try:
-        import stripe
-        stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
-        
-        conn = get_db_connection()
-        c = conn.cursor()
-        
-        # 最新の企業IDを取得
-        c.execute('SELECT id, stripe_subscription_id FROM companies ORDER BY id DESC LIMIT 1')
-        company_result = c.fetchone()
-        
-        if not company_result:
-            return jsonify({"error": "企業情報が見つかりません"})
-        
-        company_id, stripe_subscription_id = company_result
-        
-        if not stripe_subscription_id:
-            return jsonify({"error": "StripeサブスクリプションIDがありません"})
-        
-        # 正しい期間を設定（JST）
-        correct_trial_end = 1755991488  # 2025-08-23 00:00:00 JST
-        correct_period_start = 1755991488  # 2025-08-23 00:00:00 JST
-        correct_period_end = 1758587888  # 2025-09-23 00:00:00 JST
-        
-        # Stripeサブスクリプションを更新
-        updated_subscription = stripe.Subscription.modify(
-            stripe_subscription_id,
-            trial_end=correct_trial_end,
-            billing_cycle_anchor=correct_period_start
-        )
-        
-        conn.close()
-        
-        return jsonify({
-            'success': True,
-            'message': 'Stripeの期間を直接修正しました',
-            'company_id': company_id,
-            'stripe_subscription_id': stripe_subscription_id,
-            'updated_periods': {
-                'trial_end': '2025-08-23 00:00:00 JST',
-                'period_start': '2025-08-23 00:00:00 JST',
-                'period_end': '2025-09-23 00:00:00 JST'
-            }
-        })
-        
-    except Exception as e:
-        return jsonify({"error": str(e)})
-
-@app.route('/debug/force_fix_stripe')
 def force_fix_stripe():
     """Stripeの期間を強制的に修正"""
     try:
@@ -2601,15 +2174,73 @@ def test_new_subscription():
                 'days_difference': 14
             },
             'stripe_config': {
-                'trial_period_days': 14,
-                'billing_cycle_anchor': billing_start_epoch,
-                'proration_behavior': 'none'
+                'trial_period_days': 14
             },
             'expected_result': {
                 'trial_start': current_time,
                 'trial_end': billing_time,
                 'billing_start': billing_time,
-                'next_billing': (billing_start_date + timedelta(days=30)).strftime('%Y-%m-%d %H:%M:%S JST')
+                'next_billing': (billing_start_date + timedelta(days=30)).strftime('%Y-%m-%d %H:%M:%S JST'),
+                'note': 'Stripeが自動的にtrial_period_days: 14を適用して期間を計算'
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+@app.route('/debug/test_jst_timezone')
+def test_jst_timezone():
+    """日本時間の処理をテスト"""
+    try:
+        from datetime import datetime, timezone, timedelta
+        import stripe
+        
+        # 現在時刻の取得
+        jst = timezone(timedelta(hours=9))
+        utc_now = datetime.now(timezone.utc)
+        jst_now = datetime.now(jst)
+        
+        # 2週間後の計算
+        trial_end_jst = jst_now + timedelta(days=14)
+        trial_end_epoch = int(trial_end_jst.timestamp())
+        
+        # エポックからJSTへの変換テスト
+        test_epoch = trial_end_epoch
+        test_utc = datetime.fromtimestamp(test_epoch, tz=timezone.utc)
+        test_jst = test_utc.astimezone(jst)
+        
+        # Stripeの設定値
+        stripe_config = {
+            'trial_period_days': 14,
+            'expected_trial_start': jst_now.strftime('%Y-%m-%d %H:%M:%S JST'),
+            'expected_trial_end': trial_end_jst.strftime('%Y-%m-%d %H:%M:%S JST'),
+            'trial_end_epoch': trial_end_epoch
+        }
+        
+        return jsonify({
+            'success': True,
+            'current_time': {
+                'utc': utc_now.strftime('%Y-%m-%d %H:%M:%S UTC'),
+                'jst': jst_now.strftime('%Y-%m-%d %H:%M:%S JST'),
+                'timezone_offset': '+09:00'
+            },
+            'trial_period': {
+                'start_jst': jst_now.strftime('%Y-%m-%d %H:%M:%S JST'),
+                'end_jst': trial_end_jst.strftime('%Y-%m-%d %H:%M:%S JST'),
+                'duration_days': 14
+            },
+            'epoch_conversion_test': {
+                'epoch': test_epoch,
+                'utc_from_epoch': test_utc.strftime('%Y-%m-%d %H:%M:%S UTC'),
+                'jst_from_epoch': test_jst.strftime('%Y-%m-%d %H:%M:%S JST'),
+                'conversion_success': test_jst.strftime('%Y-%m-%d %H:%M:%S JST') == trial_end_jst.strftime('%Y-%m-%d %H:%M:%S JST')
+            },
+            'stripe_config': stripe_config,
+            'expected_stripe_behavior': {
+                'trial_start': 'Stripeが自動で現在時刻を設定',
+                'trial_end': 'Stripeが自動で14日後を設定',
+                'billing_start': 'trial_endと同じ時刻',
+                'next_billing': 'billing_start + 30日'
             }
         })
         
