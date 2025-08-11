@@ -1225,6 +1225,12 @@ def handle_status_check_company(reply_token, company_id):
         
         monthly_subscription = c.fetchone()
         
+        # サブスクリプションが解約されている場合はLP誘導メッセージを表示
+        if monthly_subscription and monthly_subscription[0] == 'canceled':
+            lp_message = "❌ 月額基本サブスクリプションが解約されています。\n\n💳 コンテンツを利用するには、再度月額基本料金の決済を完了してください。\n\n🔗 LPからご登録ください：\nhttps://lp-production-9e2c.up.railway.app"
+            send_line_message(reply_token, [{"type": "text", "text": lp_message}])
+            return
+        
         # トライアル期間情報を取得
         c.execute(f'''
             SELECT trial_end
@@ -2045,7 +2051,7 @@ def get_welcome_message():
     return "ようこそ！LINE連携が完了しました。"
 
 def get_not_registered_message():
-    return "ご登録情報が見つかりません。LPからご登録ください。"
+    return "ご登録情報が見つかりません。\n\n💳 まず月額基本料金の決済を完了してください。\n\n🔗 LPからご登録ください：\nhttps://lp-production-9e2c.up.railway.app"
 
 def handle_content_confirmation_company(company_id, content_type):
     """企業ユーザー専用：コンテンツ追加確認処理（月額基本料金システム対応・Stripe請求期間同期）"""
@@ -2075,6 +2081,14 @@ def handle_content_confirmation_company(company_id, content_type):
             }
         
         subscription_status, stripe_subscription_id, current_period_end = monthly_subscription
+        
+        # サブスクリプションが解約されている場合はLP誘導メッセージを表示
+        if subscription_status == 'canceled':
+            return {
+                'success': False, 
+                'error': '❌ 月額基本サブスクリプションが解約されています。\n\n💳 コンテンツを利用するには、再度月額基本料金の決済を完了してください。\n\n🔗 LPからご登録ください：\nhttps://lp-production-9e2c.up.railway.app'
+            }
+        
         # trialing も有効扱いにする
         if subscription_status not in ('active', 'trialing'):
             return {
