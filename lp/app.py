@@ -1486,7 +1486,13 @@ def force_stripe_update():
                 ("metered" in price_nickname.lower()) or
                 (price_id == 'price_1Rog1nIxg6C5hAVdnqB5MJiT')):
                 
-                print(f'[DEBUG] 強制更新: アイテム{item.id}, 数量: {item.quantity} → {additional_content_count}')
+                # item.quantityが存在するかチェック
+                current_quantity = getattr(item, 'quantity', None)
+                if current_quantity is None:
+                    print(f'[WARN] アイテム {item.id} にquantity属性がありません')
+                    current_quantity = 0
+                
+                print(f'[DEBUG] 強制更新: アイテム{item.id}, 数量: {current_quantity} → {additional_content_count}')
                 
                 if additional_content_count > 0:
                     # 数量が0より大きい場合は更新
@@ -1572,11 +1578,17 @@ def cleanup_duplicate_items():
                 ("metered" in price_nickname.lower()) or
                 (price_id == 'price_1Rog1nIxg6C5hAVdnqB5MJiT')):
                 
+                # item.quantityが存在するかチェック
+                quantity = getattr(item, 'quantity', None)
+                if quantity is None:
+                    print(f'[WARN] アイテム {item.id} にquantity属性がありません')
+                    quantity = 0
+                
                 additional_items.append({
                     'id': item.id,
                     'price_id': price_id,
                     'nickname': price_nickname,
-                    'quantity': item.quantity
+                    'quantity': quantity
                 })
         
         print(f'[DEBUG] クリーンアップ: 追加料金アイテム数={len(additional_items)}')

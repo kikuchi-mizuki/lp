@@ -1758,7 +1758,13 @@ def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscript
                         if additional_price_id_env:
                             for item in subscription['items']['data']:
                                 if item.price.id == additional_price_id_env:
-                                    print(f'[DEBUG] 追加料金アイテム(ENV)更新: {item.id}, 数量: {item.quantity} → {new_billing_count}')
+                                    # item.quantityが存在するかチェック
+                                    current_quantity = getattr(item, 'quantity', None)
+                                    if current_quantity is None:
+                                        print(f'[WARN] アイテム {item.id} にquantity属性がありません')
+                                        current_quantity = 0
+                                    
+                                    print(f'[DEBUG] 追加料金アイテム(ENV)更新: {item.id}, 数量: {current_quantity} → {new_billing_count}')
                                     if new_billing_count > 0:
                                         # 一時的にStripe操作を無効化してデバッグ
                                         # stripe.SubscriptionItem.modify(item.id, quantity=new_billing_count)
@@ -1776,7 +1782,13 @@ def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscript
                                     ("additional" in price_nickname.lower()) or
                                     ("metered" in price_nickname.lower()) or
                                     (price_id == 'price_1Rog1nIxg6C5hAVdnqB5MJiT')):
-                                    print(f'[DEBUG] 追加料金アイテム(推定)更新: {item.id}, 数量: {item.quantity} → {new_billing_count}')
+                                    # item.quantityが存在するかチェック
+                                    current_quantity = getattr(item, 'quantity', None)
+                                    if current_quantity is None:
+                                        print(f'[WARN] アイテム {item.id} にquantity属性がありません')
+                                        current_quantity = 0
+                                    
+                                    print(f'[DEBUG] 追加料金アイテム(推定)更新: {item.id}, 数量: {current_quantity} → {new_billing_count}')
                                     if new_billing_count > 0:
                                         # 一時的にStripe操作を無効化してデバッグ
                                         # stripe.SubscriptionItem.modify(item.id, quantity=new_billing_count)
@@ -2031,7 +2043,7 @@ def handle_subscription_cancel_company(reply_token, company_id, stripe_subscript
         traceback.print_exc()
         from utils.message_templates import get_menu_navigation_hint
         send_line_message(reply_token, [
-            {"type": "text", "text": "❌ 解約処理に失敗しました。しばらく時間をおいて再度お試しください。"},
+            {"type": "text", "text": f"❌ 解約処理に失敗しました。エラー: {type(e).__name__}"},
             get_menu_navigation_hint()
         ])
 
@@ -2435,7 +2447,13 @@ def handle_content_confirmation_company(company_id, content_type):
                 # サブスクリプションアイテムを詳細にログ出力
                 print(f"[DEBUG] 統一処理: サブスクリプションアイテム数: {len(subscription['items']['data'])}")
                 for i, item in enumerate(subscription['items']['data']):
-                    print(f'[DEBUG] 統一処理: アイテム{i}: ID={item.id}, Price={item.price.id}, Nickname={item.price.nickname}, Quantity={item.quantity}')
+                    # item.quantityが存在するかチェック
+                    quantity = getattr(item, 'quantity', None)
+                    if quantity is None:
+                        print(f'[WARN] アイテム {item.id} にquantity属性がありません')
+                        quantity = 0
+                    
+                    print(f'[DEBUG] 統一処理: アイテム{i}: ID={item.id}, Price={item.price.id}, Nickname={item.price.nickname}, Quantity={quantity}')
                 
                 # 既存の追加料金アイテムを全て削除（重複を防ぐため）
                 items_to_delete = []
