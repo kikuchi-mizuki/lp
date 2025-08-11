@@ -1235,15 +1235,15 @@ def handle_status_check_company(reply_token, company_id):
         trial_result = c.fetchone()
         trial_end = trial_result[0] if trial_result else None
         
-        # 実際のLINEアカウント利用状況を取得
+        # 実際のコンテンツ利用状況を取得
         c.execute(f'''
             SELECT content_type, status, created_at
-            FROM company_line_accounts 
+            FROM company_contents 
             WHERE company_id = {placeholder} AND status = 'active'
             ORDER BY created_at DESC
         ''', (company_id,))
         
-        line_accounts = c.fetchall()
+        contents = c.fetchall()
         conn.close()
         
         # メッセージを構築
@@ -1298,13 +1298,13 @@ def handle_status_check_company(reply_token, company_id):
         else:
             status_message += "❌ 月額基本サブスクリプションが見つかりません\n\n"
         
-        # アクティブなLINEアカウント利用状況のみ表示
-        if line_accounts:
+        # アクティブなコンテンツ利用状況のみ表示
+        if contents:
             status_message += "📋 利用コンテンツ:\n"
             
             active_content_count = 0
-            for account in line_accounts:
-                content_type, status, created_at = account
+            for content in contents:
+                content_type, status, created_at = content
                 created_date = created_at.strftime('%Y年%m月%d日') if created_at else '不明'
                 
                 # アクティブなコンテンツの順番を管理
@@ -1328,8 +1328,8 @@ def handle_status_check_company(reply_token, company_id):
             
             # アクティブなコンテンツの追加料金を計算（1個目は無料、2個目以降は有料）
             active_count = 0
-            for account in line_accounts:
-                if account[1] == "active":  # statusがactive
+            for content in contents:
+                if content[1] == "active":  # statusがactive
                     active_count += 1
                     if active_count > 1:  # 2個目以降のみ課金
                         # トライアル期間中は追加料金も無料
@@ -1472,31 +1472,31 @@ def handle_cancel_selection_company(reply_token, company_id, stripe_subscription
         c = conn.cursor()
         print(f'[DEBUG] データベース接続成功')
         
-        # 企業のアクティブなLINEアカウントを取得
+        # 企業のアクティブなコンテンツを取得
         print(f'[DEBUG] SQLクエリ実行開始: company_id={company_id}')
         c.execute(f'''
             SELECT id, content_type, created_at 
-            FROM company_line_accounts 
+            FROM company_contents 
             WHERE company_id = {placeholder} AND status = 'active'
             ORDER BY created_at DESC
         ''', (company_id,))
         
         print(f'[DEBUG] SQLクエリ実行完了、結果取得開始')
-        active_accounts = c.fetchall()
-        print(f'[DEBUG] アクティブアカウント取得結果: {active_accounts}')
+        active_contents = c.fetchall()
+        print(f'[DEBUG] アクティブコンテンツ取得結果: {active_contents}')
         
         # 選択された番号を解析
         numbers = smart_number_extraction(selection_text)
-        valid_numbers, invalid_reasons, duplicates = validate_selection_numbers(numbers, len(active_accounts))
+        valid_numbers, invalid_reasons, duplicates = validate_selection_numbers(numbers, len(active_contents))
         selected_indices = valid_numbers
         
         print(f'[DEBUG] 選択テキスト: {selection_text}')
         print(f'[DEBUG] 抽出された数字: {numbers}')
         print(f'[DEBUG] 有効な選択インデックス: {selected_indices}')
-        print(f'[DEBUG] 最大選択可能数: {len(active_accounts)}')
-        print(f'[DEBUG] アクティブアカウント詳細:')
-        for i, account in enumerate(active_accounts, 1):
-            print(f'[DEBUG]   {i}. {account}')
+        print(f'[DEBUG] 最大選択可能数: {len(active_contents)}')
+        print(f'[DEBUG] アクティブコンテンツ詳細:')
+        for i, content in enumerate(active_contents, 1):
+            print(f'[DEBUG]   {i}. {content}')
         
         if invalid_reasons:
             print(f'[DEBUG] 無効な入力: {invalid_reasons}')
@@ -1505,14 +1505,14 @@ def handle_cancel_selection_company(reply_token, company_id, stripe_subscription
         
         # 選択されたコンテンツを特定
         selected_contents = []
-        for i, (account_id, content_type, created_at) in enumerate(active_accounts, 1):
+        for i, (content_id, content_type, created_at) in enumerate(active_contents, 1):
             if i in selected_indices:
                 # ai_scheduleをAI予定秘書に変換
                 display_name = 'AI予定秘書' if content_type == 'ai_schedule' else content_type
                 # 1個目は無料、2個目以降は有料
                 additional_price = 0 if i == 1 else 1500
                 selected_contents.append({
-                    'account_id': account_id,
+                    'content_id': content_id,
                     'content_type': content_type,
                     'display_name': display_name,
                     'additional_price': additional_price
@@ -1521,11 +1521,11 @@ def handle_cancel_selection_company(reply_token, company_id, stripe_subscription
         if not selected_contents:
             print(f'[DEBUG] selected_contents が空です')
             print(f'[DEBUG] 企業ID: {company_id}, 選択: {selection_text}')
-            print(f'[DEBUG] アクティブアカウント: {len(active_accounts)}件')
+            print(f'[DEBUG] アクティブコンテンツ: {len(active_contents)}件')
             print(f'[DEBUG] 抽出数字: {numbers}, 有効選択: {selected_indices}')
             
             # 簡潔なエラーメッセージ
-            error_message = f"❌ 解約対象が見つかりません\n\n企業ID: {company_id}\n選択: {selection_text}\nアクティブ: {len(active_accounts)}件\n\n「メニュー」でメイン画面に戻れます。"
+            error_message = f"❌ 解約対象が見つかりません\n\n企業ID: {company_id}\n選択: {selection_text}\nアクティブ: {len(active_contents)}件\n\n「メニュー」でメイン画面に戻れます。"
             send_line_message(reply_token, [{"type": "text", "text": error_message}])
             return
         
@@ -1632,43 +1632,43 @@ def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscript
         conn = get_db_connection()
         c = conn.cursor()
         
-        # 企業のアクティブなLINEアカウントを取得
+        # 企業のアクティブなコンテンツを取得
         c.execute(f'''
             SELECT id, content_type, created_at 
-            FROM company_line_accounts 
+            FROM company_contents 
             WHERE company_id = {placeholder} AND status = 'active'
             ORDER BY created_at DESC
         ''', (company_id,))
         
-        active_accounts = c.fetchall()
+        active_contents = c.fetchall()
         
         cancelled = []
         
         # 選択されたコンテンツを解約
-        for i, (account_id, content_type, created_at) in enumerate(active_accounts, 1):
+        for i, (content_id, content_type, created_at) in enumerate(active_contents, 1):
             if i in selected_indices:
-                print(f'[DEBUG] 解約処理開始: content_type={content_type}, account_id={account_id}')
+                print(f'[DEBUG] 解約処理開始: content_type={content_type}, content_id={content_id}')
                 
                 # 追加料金が必要なコンテンツかチェック（1個目は無料、2個目以降は有料）
                 additional_price = 0 if i == 1 else 1500
                 
                 # データベース更新処理
                 try:
-                    # LINEアカウントを非アクティブ化（IDで更新、RETURNINGで検証）
+                    # コンテンツを非アクティブ化（IDで更新、RETURNINGで検証）
                     c.execute(f'''
-                        UPDATE company_line_accounts 
+                        UPDATE company_contents 
                         SET status = 'inactive'
                         WHERE id = {placeholder} AND status <> 'inactive'
                         RETURNING id
-                    ''', (account_id,))
+                    ''', (content_id,))
                     result = c.fetchone()
                     affected = 1 if result else 0
-                    print(f'[DEBUG] company_line_accounts更新: account_id={account_id}, affected={affected}')
+                    print(f'[DEBUG] company_contents更新: content_id={content_id}, affected={affected}')
 
                     # もし更新0件なら、念のため company_id + content_type でも更新を試行
                     if affected == 0:
                         c.execute(f'''
-                            UPDATE company_line_accounts 
+                            UPDATE company_contents 
                             SET status = 'inactive'
                             WHERE company_id = {placeholder} AND content_type = {placeholder} AND status = 'active'
                             RETURNING id
@@ -1698,18 +1698,18 @@ def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscript
 
                     # 反映確認ログ
                     try:
-                        c.execute(f'SELECT status FROM company_line_accounts WHERE id = {placeholder}', (account_id,))
+                        c.execute(f'SELECT status FROM company_contents WHERE id = {placeholder}', (content_id,))
                         row = c.fetchone()
-                        print(f"[DEBUG] 反映確認 company_line_accounts.id={account_id} → status={row[0] if row else 'N/A'}")
+                        print(f"[DEBUG] 反映確認 company_contents.id={content_id} → status={row[0] if row else 'N/A'}")
                         if not row or row[0] != 'inactive':
                             # 最終フォールバック：company_id + content_type を強制inactive
                             c.execute(f'''
-                                UPDATE company_line_accounts
+                                UPDATE company_contents
                                 SET status = 'inactive'
                                 WHERE company_id = {placeholder} AND content_type = {placeholder}
                             ''', (company_id, content_type))
                             conn.commit()
-                            c.execute(f"SELECT count(*) FROM company_line_accounts WHERE company_id = {placeholder} AND content_type = {placeholder} AND status = 'inactive'", (company_id, content_type))
+                            c.execute(f"SELECT count(*) FROM company_contents WHERE company_id = {placeholder} AND content_type = {placeholder} AND status = 'inactive'", (company_id, content_type))
                             cnt = c.fetchone()[0]
                             print(f'[DEBUG] フォールバック更新実施: inactive count for {content_type} = {cnt}')
                     except Exception as _e:
@@ -1740,7 +1740,7 @@ def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscript
                         # 解約後の現在のアクティブコンテンツ数を取得
                         c.execute(f'''
                             SELECT COUNT(*) 
-                            FROM company_line_accounts 
+                            FROM company_contents 
                             WHERE company_id = {placeholder} AND status = 'active'
                         ''', (company_id,))
                         
@@ -1752,54 +1752,43 @@ def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscript
                         # Stripeサブスクリプションを取得
                         subscription = stripe.Subscription.retrieve(stripe_subscription_id)
                         
-                        # 追加料金の請求項目を更新（ENV優先→ヒューリスティック）
-                        updated = False
-                        # 1) ENVのPRICE IDがある場合はそれを優先
-                        if additional_price_id_env:
-                            for item in subscription['items']['data']:
-                                if item.price.id == additional_price_id_env:
-                                    # item.quantityが存在するかチェック
-                                    current_quantity = getattr(item, 'quantity', None)
-                                    if current_quantity is None:
-                                        print(f'[WARN] アイテム {item.id} にquantity属性がありません')
-                                        current_quantity = 0
-                                    
-                                    print(f'[DEBUG] 追加料金アイテム(ENV)更新: {item.id}, 数量: {current_quantity} → {new_billing_count}')
-                                    if new_billing_count > 0:
-                                        # Stripe操作を有効化
-                                        stripe.SubscriptionItem.modify(item.id, quantity=new_billing_count)
-                                        print(f'[DEBUG] 数量更新完了: {item.id} → {new_billing_count}')
-                                    else:
-                                        print(f'[DEBUG] 数量0のためアイテムをそのまま残す: {item.id}')
-                                    updated = True
-                                    break
-                        # 2) 既知ID/ニックネームで推定
-                        if not updated:
-                            for item in subscription['items']['data']:
-                                price_nickname = item.price.nickname or ""
-                                price_id = item.price.id
-                                if (("追加" in price_nickname) or 
-                                    ("additional" in price_nickname.lower()) or
-                                    ("metered" in price_nickname.lower()) or
-                                    (price_id == 'price_1Rog1nIxg6C5hAVdnqB5MJiT')):
-                                    # item.quantityが存在するかチェック
-                                    current_quantity = getattr(item, 'quantity', None)
-                                    if current_quantity is None:
-                                        print(f'[WARN] アイテム {item.id} にquantity属性がありません')
-                                        current_quantity = 0
-                                    
-                                    print(f'[DEBUG] 追加料金アイテム(推定)更新: {item.id}, 数量: {current_quantity} → {new_billing_count}')
-                                    if new_billing_count > 0:
-                                        # Stripe操作を有効化
-                                        stripe.SubscriptionItem.modify(item.id, quantity=new_billing_count)
-                                        print(f'[DEBUG] 数量更新完了: {item.id} → {new_billing_count}')
-                                    else:
-                                        print(f'[DEBUG] 数量0のためアイテムをそのまま残す: {item.id}')
-                                    updated = True
-                                    break
-                        # 3) 解約処理では新規作成はしない（数量更新のみ）
-                        if not updated:
-                            print(f'[WARN] 追加料金アイテムが見つかりませんでした（解約処理）。新規作成は行いません。')
+                        # 既存の追加料金アイテムを削除
+                        for item in subscription['items']['data']:
+                            price_nickname = item.price.nickname or ""
+                            price_id = item.price.id
+                            
+                            if (("追加" in price_nickname) or 
+                                ("additional" in price_nickname.lower()) or
+                                ("metered" in price_nickname.lower()) or
+                                (price_id == 'price_1Rog1nIxg6C5hAVdnqB5MJiT')):
+                                
+                                try:
+                                    stripe.SubscriptionItem.delete(item.id)
+                                    print(f'[DEBUG] 解約処理: 既存の追加料金アイテムを削除: {item.id}')
+                                except Exception as delete_error:
+                                    print(f'[WARN] 解約処理: アイテム削除エラー: {delete_error}')
+                        
+                        # 追加料金が必要な場合のみ新しいアイテムを作成
+                        if new_billing_count > 0:
+                            # 新しいlicensedタイプのPriceを作成
+                            new_price = stripe.Price.create(
+                                unit_amount=1500,
+                                currency='jpy',
+                                recurring={'interval': 'month', 'usage_type': 'licensed'},
+                                product_data={'name': 'コンテンツ追加料金'},
+                                nickname='追加コンテンツ料金(licensed)'
+                            )
+                            
+                            # 新しいアイテムを作成
+                            new_item = stripe.SubscriptionItem.create(
+                                subscription=stripe_subscription_id,
+                                price=new_price.id,
+                                quantity=new_billing_count
+                            )
+                            
+                            print(f'[DEBUG] 解約処理: 追加料金アイテム作成完了: new_item={new_item.id}, quantity={new_billing_count}')
+                        else:
+                            print(f'[DEBUG] 解約処理: 追加料金対象なし（数量=0）のためアイテム作成スキップ')
                                 
                     except Exception as e:
                         print(f'[DEBUG] Stripe請求項目更新エラー: {e}')
@@ -1844,7 +1833,7 @@ def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscript
                 # ai_scheduleをAI予定秘書に変換
                 display_name = 'AI予定秘書' if content_type == 'ai_schedule' else content_type
                 cancelled.append(display_name)
-                print(f'[DEBUG] 企業コンテンツ解約処理完了: content_type={content_type}, account_id={account_id}')
+                print(f'[DEBUG] 企業コンテンツ解約処理完了: content_type={content_type}, content_id={content_id}')
         
         print(f'[DEBUG] 解約対象コンテンツ数: {len(cancelled)}')
         print(f'[DEBUG] 解約対象: {cancelled}')
@@ -1993,9 +1982,9 @@ def handle_subscription_cancel_company(reply_token, company_id, stripe_subscript
                 WHERE company_id = {placeholder}
             ''', (company_id,))
             
-            # LINEアカウントも非アクティブ化
+            # コンテンツも非アクティブ化
             c.execute(f'''
-                UPDATE company_line_accounts 
+                UPDATE company_contents 
                 SET status = 'inactive'
                 WHERE company_id = {placeholder}
             ''', (company_id,))
@@ -2128,17 +2117,17 @@ def handle_content_confirmation_company(company_id, content_type):
                 'error': f'❌ 無効なコンテンツタイプ: {content_type}'
             }
 
-        # 既存のLINEアカウントをチェック
+        # 既存のコンテンツをチェック
         c.execute(f'''
             SELECT id, content_type, status
-            FROM company_line_accounts 
+            FROM company_contents 
             WHERE company_id = {placeholder} AND content_type = {placeholder}
         ''', (company_id, content_type))
         
-        existing_account = c.fetchone()
-        if existing_account:
-            account_id, existing_content_type, status = existing_account
-            print(f'[DEBUG] 既存LINEアカウント発見: account_id={account_id}, content_type={existing_content_type}, status={status}')
+        existing_content = c.fetchone()
+        if existing_content:
+            content_id, existing_content_type, status = existing_content
+            print(f'[DEBUG] 既存コンテンツ発見: content_id={content_id}, content_type={existing_content_type}, status={status}')
             
             if status == 'active':
                 return {
@@ -2148,12 +2137,12 @@ def handle_content_confirmation_company(company_id, content_type):
             elif status == 'inactive':
                 # 非アクティブの場合は再アクティブ化
                 c.execute(f'''
-                    UPDATE company_line_accounts 
+                    UPDATE company_contents 
                     SET status = 'active', created_at = CURRENT_TIMESTAMP
                     WHERE id = {placeholder}
-                ''', (account_id,))
+                ''', (content_id,))
                 conn.commit()
-                print(f'[DEBUG] 非アクティブLINEアカウントを再アクティブ化: account_id={account_id}')
+                print(f'[DEBUG] 非アクティブコンテンツを再アクティブ化: content_id={content_id}')
                 # 再アクティブ化時にも請求期間を保存
                 try:
                     from datetime import datetime as _dt
@@ -2161,25 +2150,25 @@ def handle_content_confirmation_company(company_id, content_type):
                     if billing_end_value:
                         if isinstance(billing_end_value, (int, float)):
                             # Stripeのepoch → 日本時間に変換して保存
-                            c.execute(f"UPDATE company_line_accounts SET current_period_end = (TO_TIMESTAMP({placeholder}) AT TIME ZONE 'UTC') + INTERVAL '9 hours' WHERE id = {placeholder}", (int(billing_end_value), account_id))
+                            c.execute(f"UPDATE company_contents SET current_period_end = (TO_TIMESTAMP({placeholder}) AT TIME ZONE 'UTC') + INTERVAL '9 hours' WHERE id = {placeholder}", (int(billing_end_value), content_id))
                         elif isinstance(billing_end_value, _dt):
                             # 既に日本時間の場合はそのまま保存
-                            c.execute(f"UPDATE company_line_accounts SET current_period_end = {placeholder} WHERE id = {placeholder}", (billing_end_value, account_id))
+                            c.execute(f"UPDATE company_contents SET current_period_end = {placeholder} WHERE id = {placeholder}", (billing_end_value, content_id))
                         else:
                             # 文字列の場合は日本時間として保存
                             try:
-                                c.execute(f"UPDATE company_line_accounts SET current_period_end = TO_TIMESTAMP({placeholder}) AT TIME ZONE 'JST' WHERE id = {placeholder}", (str(billing_end_value), account_id))
+                                c.execute(f"UPDATE company_contents SET current_period_end = TO_TIMESTAMP({placeholder}) AT TIME ZONE 'JST' WHERE id = {placeholder}", (str(billing_end_value), content_id))
                             except Exception:
                                 pass
                         conn.commit()
-                        print(f"[DEBUG] current_period_end 更新(reactivate): id={account_id}, end={billing_end_value}")
+                        print(f"[DEBUG] current_period_end 更新(reactivate): id={content_id}, end={billing_end_value}")
                 except Exception as _e:
                     print(f"[DEBUG] current_period_end更新スキップ(reactivate): {_e}")
                 
                 # 再アクティブ化後のアクティブコンテンツ数を取得（1個目は無料なので-1）
                 c.execute(f'''
                     SELECT COUNT(*) 
-                    FROM company_line_accounts 
+                    FROM company_contents 
                     WHERE company_id = {placeholder} AND status = 'active'
                 ''', (company_id,))
                 
@@ -2351,7 +2340,7 @@ def handle_content_confirmation_company(company_id, content_type):
         # 既存のアクティブコンテンツ数を取得
         c.execute(f'''
             SELECT COUNT(*) 
-            FROM company_line_accounts 
+            FROM company_contents 
             WHERE company_id = {placeholder} AND status = 'active'
         ''', (company_id,))
         
@@ -2379,22 +2368,22 @@ def handle_content_confirmation_company(company_id, content_type):
         else:
             print(f'[DEBUG] 請求期間同期: billing_end_date={billing_end_date}')
         
-        # 新しいLINEアカウントを登録
+        # 新しいコンテンツを登録
         c.execute(f'''
-            INSERT INTO company_line_accounts 
-            (company_id, content_type, line_channel_id, line_channel_access_token, status)
-            VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
-        ''', (company_id, content_type, f'U{company_id}_{int(time.time())}', 'temp_token', 'active'))
+            INSERT INTO company_contents 
+            (company_id, content_name, content_type, status, created_at)
+            VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, NOW())
+        ''', (company_id, content_type, content_type, 'active'))
         
         conn.commit()
-        print(f'[DEBUG] LINEアカウント登録完了: company_id={company_id}, content_type={content_type}')
+        print(f'[DEBUG] コンテンツ登録完了: company_id={company_id}, content_type={content_type}')
 
         # 新規追加後、Stripeの請求項目を更新（統一処理で実行されるため削除）
 
         # Stripeの請求期間終了をテーブルへ保存（列があれば）
         try:
             if billing_end_date:
-                c.execute(f"SELECT id FROM company_line_accounts WHERE company_id = {placeholder} AND content_type = {placeholder} ORDER BY id DESC LIMIT 1", (company_id, content_type))
+                c.execute(f"SELECT id FROM company_contents WHERE company_id = {placeholder} AND content_type = {placeholder} ORDER BY id DESC LIMIT 1", (company_id, content_type))
                 row = c.fetchone()
                 if row:
                     # billing_end_date の型に応じて更新
@@ -2402,13 +2391,13 @@ def handle_content_confirmation_company(company_id, content_type):
                     try:
                         if isinstance(billing_end_date, (int, float)):
                             # Stripeのepoch → 日本時間に変換して保存
-                            c.execute(f"UPDATE company_line_accounts SET current_period_end = (TO_TIMESTAMP({placeholder}) AT TIME ZONE 'UTC') + INTERVAL '9 hours' WHERE id = {placeholder}", (int(billing_end_date), row[0]))
+                            c.execute(f"UPDATE company_contents SET current_period_end = (TO_TIMESTAMP({placeholder}) AT TIME ZONE 'UTC') + INTERVAL '9 hours' WHERE id = {placeholder}", (int(billing_end_date), row[0]))
                         elif isinstance(billing_end_date, _dt):
                             # 既に日本時間の場合はそのまま保存
-                            c.execute(f"UPDATE company_line_accounts SET current_period_end = {placeholder} WHERE id = {placeholder}", (billing_end_date, row[0]))
+                            c.execute(f"UPDATE company_contents SET current_period_end = {placeholder} WHERE id = {placeholder}", (billing_end_date, row[0]))
                         else:
                             # 文字列の場合は日本時間として保存
-                            c.execute(f"UPDATE company_line_accounts SET current_period_end = TO_TIMESTAMP({placeholder}) AT TIME ZONE 'JST' WHERE id = {placeholder}", (str(billing_end_date), row[0]))
+                            c.execute(f"UPDATE company_contents SET current_period_end = TO_TIMESTAMP({placeholder}) AT TIME ZONE 'JST' WHERE id = {placeholder}", (str(billing_end_date), row[0]))
                         conn.commit()
                         print(f"[DEBUG] current_period_end 更新: id={row[0]}, end={billing_end_date}")
                     except Exception as _e:
@@ -2432,7 +2421,7 @@ def handle_content_confirmation_company(company_id, content_type):
                 # 現在のアクティブコンテンツ数を取得（1個目は無料なので-1）
                 c.execute(f'''
                     SELECT COUNT(*) 
-                    FROM company_line_accounts 
+                    FROM company_contents 
                     WHERE company_id = {placeholder} AND status = 'active'
                 ''', (company_id,))
                 
