@@ -458,6 +458,72 @@ main {
   line-height: 1.5;
 }
 
+/* Pricing Section */
+.pricing-section {
+  background: var(--background-light);
+  margin: 0 -2rem;
+  padding: 4rem 2rem;
+}
+
+.pricing-container {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.pricing-card {
+  background: var(--background-white);
+  border-radius: var(--radius-large);
+  padding: 3rem;
+  text-align: center;
+  box-shadow: var(--shadow-soft);
+  margin: 0 auto;
+}
+
+.pricing-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  margin-bottom: 1.5rem;
+}
+
+.pricing-price {
+  margin-bottom: 2rem;
+}
+
+.price-amount {
+  font-size: 3rem;
+  font-weight: 700;
+  color: var(--primary-color);
+}
+
+.price-period {
+  font-size: 1.2rem;
+  color: var(--text-gray);
+  margin-left: 0.5rem;
+}
+
+.pricing-features {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+}
+
+.pricing-features li {
+  padding: 0.5rem 0;
+  color: var(--text-dark);
+  position: relative;
+  padding-left: 1.5rem;
+}
+
+.pricing-features li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: var(--primary-color);
+  font-weight: bold;
+}
+
 /* CTA Section */
 .cta-section {
   text-align: center;
