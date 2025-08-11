@@ -2451,8 +2451,9 @@ def handle_content_confirmation_company(company_id, content_type):
                 # 既存の追加料金アイテムを削除
                 for item_id in items_to_delete:
                     try:
-                        stripe.SubscriptionItem.delete(item_id)
-                        print(f'[DEBUG] 統一処理: 追加料金アイテム削除完了: {item_id}')
+                        # 一時的に削除処理を無効化してデバッグ
+                        # stripe.SubscriptionItem.delete(item_id)
+                        print(f'[DEBUG] 統一処理: 追加料金アイテム削除（スキップ）: {item_id}')
                     except Exception as delete_error:
                         print(f'[WARN] 統一処理: アイテム削除エラー: {delete_error}')
                 
@@ -2496,10 +2497,10 @@ def handle_content_confirmation_company(company_id, content_type):
                             (price_id == 'price_1Rog1nIxg6C5hAVdnqB5MJiT')):
                             
                             try:
-                                stripe.SubscriptionItem.delete(item.id)
-                                print(f'[DEBUG] 統一処理: 数量0のため追加料金アイテム削除: {item.id}')
+                                # 数量0の場合はアイテムを削除せずにそのまま残す
+                                print(f'[DEBUG] 統一処理: 数量0のため追加料金アイテムをそのまま残す: {item.id}')
                             except Exception as delete_error:
-                                print(f'[WARN] 統一処理: アイテム削除エラー（無視）: {delete_error}')
+                                print(f'[WARN] 統一処理: アイテム処理エラー（無視）: {delete_error}')
                             break
                         
             except Exception as e:
