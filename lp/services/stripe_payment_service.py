@@ -112,7 +112,6 @@ class StripePaymentService:
                 customer=customer_id,
                 items=[{'price': price_id}],
                 trial_period_days=trial_days,
-                billing_cycle_anchor=billing_start_epoch,  # trial_days日後の請求開始日
                 proration_behavior='none',  # 按分計算なし
                 metadata={
                     'company_id': str(company_id),

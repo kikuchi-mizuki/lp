@@ -205,7 +205,6 @@ def company_registration():
             mode='subscription',
             subscription_data={
                 'trial_period_days': 14,  # 2週間無料トライアル
-                'billing_cycle_anchor': billing_start_epoch,  # 2週間後の請求開始日
                 'proration_behavior': 'none',  # 按分計算なし
             },
             success_url=url_for('company_registration_success', _external=True) + '?session_id={CHECKOUT_SESSION_ID}',
