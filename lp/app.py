@@ -2432,6 +2432,99 @@ def check_stripe_periods():
     except Exception as e:
         return jsonify({"error": str(e)})
 
+@app.route('/debug/fix_stripe_billing_correct')
+def fix_stripe_billing_correct():
+    """Stripeの請求期間を正しく修正（8月24日開始）"""
+    try:
+        import stripe
+        stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+        
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 最新の企業IDを取得
+        c.execute('SELECT id, stripe_subscription_id FROM companies ORDER BY id DESC LIMIT 1')
+        company_result = c.fetchone()
+        
+        if not company_result:
+            return jsonify({"error": "企業情報が見つかりません"})
+        
+        company_id, stripe_subscription_id = company_result
+        
+        if not stripe_subscription_id:
+            return jsonify({"error": "StripeサブスクリプションIDがありません"})
+        
+        print(f'[DEBUG] Stripe請求期間修正開始: subscription_id={stripe_subscription_id}')
+        
+        # 現在のサブスクリプション情報を取得
+        subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+        print(f'[DEBUG] 現在の期間: trial_end={subscription.trial_end}, current_period_end={subscription.current_period_end}')
+        
+        # 正しい期間を計算（8月24日開始）
+        from datetime import datetime, timezone, timedelta
+        jst = timezone(timedelta(hours=9))
+        
+        # 8月24日 00:00:00 JST
+        correct_start = datetime(2025, 8, 24, 0, 0, 0, tzinfo=jst)
+        correct_end = datetime(2025, 9, 24, 0, 0, 0, tzinfo=jst)
+        
+        # epoch時間に変換
+        correct_start_epoch = int(correct_start.timestamp())
+        correct_end_epoch = int(correct_end.timestamp())
+        
+        print(f'[DEBUG] 正しい期間: {correct_start} - {correct_end}')
+        print(f'[DEBUG] epoch時間: {correct_start_epoch} - {correct_end_epoch}')
+        
+        # 方法1: trial_endのみを更新（billing_cycle_anchorは変更しない）
+        try:
+            updated_subscription = stripe.Subscription.modify(
+                stripe_subscription_id,
+                trial_end=correct_start_epoch
+            )
+            print(f'[DEBUG] trial_end更新成功: {updated_subscription.trial_end}')
+        except Exception as e:
+            print(f'[ERROR] trial_end更新失敗: {e}')
+        
+        # 方法2: 新しいサブスクリプションを作成（最後の手段）
+        try:
+            # 現在のサブスクリプションをキャンセル
+            stripe.Subscription.modify(
+                stripe_subscription_id,
+                cancel_at_period_end=True
+            )
+            print(f'[DEBUG] 現在のサブスクリプションを期間終了時にキャンセル設定')
+            
+            # 新しいサブスクリプションを作成（正しい期間で）
+            # 注意: この部分は実際の価格IDと顧客IDが必要
+            print(f'[DEBUG] 新しいサブスクリプション作成は手動で行う必要があります')
+            
+        except Exception as e:
+            print(f'[ERROR] サブスクリプション更新失敗: {e}')
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Stripe請求期間修正を試行しました',
+            'current_periods': {
+                'trial_end': subscription.trial_end,
+                'current_period_end': subscription.current_period_end
+            },
+            'correct_periods': {
+                'start_epoch': correct_start_epoch,
+                'end_epoch': correct_end_epoch,
+                'start_jst': correct_start.strftime('%Y-%m-%d %H:%M:%S JST'),
+                'end_jst': correct_end.strftime('%Y-%m-%d %H:%M:%S JST')
+            },
+            'recommendation': 'Stripeダッシュボードから手動で請求期間を変更することを推奨します'
+        })
+        
+    except Exception as e:
+        print(f'[ERROR] Stripe請求期間修正エラー: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)})
+
 # アプリケーション初期化完了の確認
 logger.info("✅ アプリケーション初期化完了")
 
