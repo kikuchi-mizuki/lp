@@ -1594,9 +1594,11 @@ def cleanup_duplicate_items():
                     # エラーが発生しても処理を続行
         
         # 残ったアイテムの数量を更新（数量が0より大きい場合のみ）
+        print(f'[DEBUG] 数量更新処理開始: additional_items={len(additional_items)}, additional_content_count={additional_content_count}')
         if additional_items and additional_content_count > 0:
             try:
                 remaining_item_id = additional_items[0]['id']
+                print(f'[DEBUG] 数量更新実行: {remaining_item_id} → {additional_content_count}')
                 stripe.SubscriptionItem.modify(
                     remaining_item_id,
                     quantity=additional_content_count
@@ -1616,7 +1618,7 @@ def cleanup_duplicate_items():
             'success': True,
             'message': f'重複アイテムのクリーンアップ完了',
             'deleted_items': deleted_items,
-            'remaining_items': items_to_delete[:1] if items_to_delete else [],
+            'remaining_items': additional_items[:1] if additional_items else [],
             'total_content_count': total_content_count,
             'additional_content_count': additional_content_count
         })
