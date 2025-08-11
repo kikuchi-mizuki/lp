@@ -205,7 +205,6 @@ def company_registration():
             mode='subscription',
             subscription_data={
                 'trial_period_days': 14,  # 2週間無料トライアル
-                'proration_behavior': 'none',  # 按分計算なし
             },
             success_url=url_for('company_registration_success', _external=True) + '?session_id={CHECKOUT_SESSION_ID}',
             cancel_url=url_for('company_registration_cancel', _external=True),

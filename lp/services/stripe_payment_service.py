@@ -112,7 +112,6 @@ class StripePaymentService:
                 customer=customer_id,
                 items=[{'price': price_id}],
                 trial_period_days=trial_days,
-                proration_behavior='none',  # 按分計算なし
                 metadata={
                     'company_id': str(company_id),
                     'company_name': company_name

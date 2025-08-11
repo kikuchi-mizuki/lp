@@ -129,6 +129,11 @@ def save_company_subscription(company_id, stripe_subscription_id, content_type=N
         # Stripeのサブスクリプション詳細を取得してステータス/期間を反映
         subscription = stripe.Subscription.retrieve(stripe_subscription_id)
         status = subscription.get('status') or 'active'
+        
+        # 期間情報を取得（JST変換）
+        from datetime import timezone, timedelta
+        jst = timezone(timedelta(hours=9))
+        
         # トライアル中は trial_*、それ以外は current_period_* を保存
         if status == 'trialing':
             start_epoch = subscription.get('trial_start') or subscription.get('current_period_start')
@@ -137,9 +142,18 @@ def save_company_subscription(company_id, stripe_subscription_id, content_type=N
             start_epoch = subscription.get('current_period_start')
             end_epoch = subscription.get('current_period_end')
 
-        # エポック -> UTC datetime 変換（存在時のみ）
-        start_dt = dt.datetime.utcfromtimestamp(int(start_epoch)) if start_epoch else None
-        end_dt = dt.datetime.utcfromtimestamp(int(end_epoch)) if end_epoch else None
+        # エポック -> JST datetime 変換（存在時のみ）
+        if start_epoch:
+            start_utc = dt.datetime.fromtimestamp(int(start_epoch), tz=timezone.utc)
+            start_dt = start_utc.astimezone(jst)
+        else:
+            start_dt = None
+            
+        if end_epoch:
+            end_utc = dt.datetime.fromtimestamp(int(end_epoch), tz=timezone.utc)
+            end_dt = end_utc.astimezone(jst)
+        else:
+            end_dt = None
 
         # デフォルトの基本料金はスキーマ既定値を採用（明示する場合は3900）
         monthly_base_price = 3900
