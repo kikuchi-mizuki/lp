@@ -109,12 +109,19 @@ class SpreadsheetContentService:
 
                     # ステータスがinactiveのものは除外
                     if status and status.lower() not in ['inactive', 'disabled', 'off']:
+                        # 画像URLを判定（statusフィールドが画像URLの場合）
+                        image_url = None
+                        if status and (status.startswith('http') and any(ext in status.lower() for ext in ['.jpg', '.jpeg', '.png', '.gif', '.svg'])):
+                            image_url = status
+                            status = 'active'  # 画像URLの場合はステータスをactiveに設定
+                        
                         contents[content_id] = {
                             'name': name,
                             'description': description,
                             'url': url,
                             'price': price,
                             'status': status,
+                            'image': image_url,  # 画像URLを追加
                             'created_at': created_at,
                             'features': features,
                         }
@@ -175,6 +182,7 @@ class SpreadsheetContentService:
                 'url': 'https://lp-production-9e2c.up.railway.app/accounting',
                 'price': 1500,
                 'status': 'active',
+                'image': '/static/images/line_accounting_optimized.jpg',
                 'created_at': '2024-01-01',
                 'features': ['自動仕訳', '帳簿作成', '税務申告', '経営分析']
             },
@@ -184,6 +192,7 @@ class SpreadsheetContentService:
                 'url': 'https://lp-production-9e2c.up.railway.app/schedule',
                 'price': 1500,
                 'status': 'active',
+                'image': '/static/images/line_schedule_optimized.jpg',
                 'created_at': '2024-01-01',
                 'features': ['スケジュール管理', '会議調整', 'リマインダー', 'タスク管理']
             },
@@ -193,6 +202,7 @@ class SpreadsheetContentService:
                 'url': 'https://lp-production-9e2c.up.railway.app/task',
                 'price': 1500,
                 'status': 'active',
+                'image': '/static/images/line_task_optimized.jpg',
                 'created_at': '2024-01-01',
                 'features': ['タスク管理', 'プロジェクト管理', '進捗追跡', 'チーム連携']
             }
