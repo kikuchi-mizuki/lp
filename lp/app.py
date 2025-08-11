@@ -1682,11 +1682,17 @@ def check_stripe_status():
         # サブスクリプションアイテムの詳細
         items_info = []
         for item in subscription['items']['data']:
+            # item.quantityが存在するかチェック
+            quantity = getattr(item, 'quantity', None)
+            if quantity is None:
+                print(f'[WARN] アイテム {item.id} にquantity属性がありません')
+                quantity = 0
+            
             items_info.append({
                 'id': item.id,
                 'price_id': item.price.id,
                 'price_nickname': item.price.nickname,
-                'quantity': item.quantity,
+                'quantity': quantity,
                 'amount': item.price.unit_amount,
                 'currency': item.price.currency
             })
