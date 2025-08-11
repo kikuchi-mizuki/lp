@@ -1404,10 +1404,10 @@ def handle_cancel_request_company(reply_token, company_id, stripe_subscription_i
         conn = get_db_connection()
         c = conn.cursor()
         
-        # アクティブなコンテンツ（企業の有効なLINEアカウント＝追加済みコンテンツ）を取得
+        # アクティブなコンテンツ（企業の有効なコンテンツ）を取得
         c.execute(f'''
-            SELECT id, content_type, created_at
-            FROM company_line_accounts
+            SELECT id, content_name, content_type, created_at
+            FROM company_contents
             WHERE company_id = {placeholder} AND status = 'active'
             ORDER BY created_at DESC
         ''', (company_id,))
@@ -1429,9 +1429,19 @@ def handle_cancel_request_company(reply_token, company_id, stripe_subscription_i
         lines.append("解約するコンテンツを選択")
         lines.append("")
         lines.append("解約したいコンテンツの番号を送信してください：")
-        for i, (account_id, content_type, created_at) in enumerate(active_contents, 1):
-            display_name = 'AI予定秘書' if content_type == 'ai_schedule' else content_type
-            print(f'[DEBUG] コンテンツ: ({content_type}, {created_at})')
+        for i, (content_id, content_name, content_type, created_at) in enumerate(active_contents, 1):
+            # content_nameを使用、なければ適切な表示名に変換
+            if content_name:
+                display_name = content_name
+            elif content_type == 'ai_schedule':
+                display_name = 'AI予定秘書'
+            elif content_type == 'ai_accounting':
+                display_name = 'AI経理秘書'
+            elif content_type == 'ai_task':
+                display_name = 'AIタスクコンシェルジュ'
+            else:
+                display_name = content_type
+            print(f'[DEBUG] コンテンツ: ({content_name}, {content_type}, {created_at})')
             lines.append(f"{i}. {display_name}")
         lines.append("")
         lines.append("戻る場合は『メニュー』と送信してください。")
