@@ -103,17 +103,20 @@ class SpreadsheetContentService:
                     except Exception:
                         price = 0
 
-                    status = (row[5] or 'active').strip().lower() if len(row) > 5 else 'active'
+                    status_raw = (row[5] or 'active').strip() if len(row) > 5 else 'active'
                     created_at = row[6] if len(row) > 6 and row[6] else datetime.now().strftime('%Y-%m-%d')
                     features = self._parse_features(row[7]) if len(row) > 7 else []
 
                     # ステータスがinactiveのものは除外
-                    if status and status.lower() not in ['inactive', 'disabled', 'off']:
+                    if status_raw and status_raw.lower() not in ['inactive', 'disabled', 'off']:
                         # 画像URLを判定（statusフィールドが画像URLの場合）
                         image_url = None
-                        if status and (status.startswith('http') and any(ext in status.lower() for ext in ['.jpg', '.jpeg', '.png', '.gif', '.svg', '.PNG', '.JPG', '.JPEG', '.GIF', '.SVG'])):
-                            image_url = status
-                            status = 'active'  # 画像URLの場合はステータスをactiveに設定
+                        status = 'active'  # デフォルトでactiveに設定
+                        
+                        if status_raw and (status_raw.startswith('http') and any(ext in status_raw.lower() for ext in ['.jpg', '.jpeg', '.png', '.gif', '.svg', '.PNG', '.JPG', '.JPEG', '.GIF', '.SVG'])):
+                            image_url = status_raw
+                        elif status_raw.lower() != 'active':
+                            status = status_raw.lower()  # 画像URLでない場合は小文字に変換
                         
                         contents[content_id] = {
                             'name': name,
