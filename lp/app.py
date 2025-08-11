@@ -2209,9 +2209,9 @@ def debug_company_contents():
         conn = get_db_connection()
         c = conn.cursor()
         
-        # 企業LINEアカウント一覧を取得
+        # 企業コンテンツ一覧を取得
         c.execute('''
-            SELECT cla.id, cla.company_id, cla.status, cla.created_at,
+            SELECT cla.id, cla.company_id, cla.content_name, cla.content_type, cla.status, cla.created_at,
                    c.company_name
             FROM company_contents cla
             LEFT JOIN companies c ON cla.company_id = c.id
@@ -2223,9 +2223,11 @@ def debug_company_contents():
             accounts.append({
                 'id': row[0],
                 'company_id': row[1],
-                'status': row[2],
-                'created_at': row[3].isoformat() if row[3] else None,
-                'company_name': row[4]
+                'content_name': row[2],
+                'content_type': row[3],
+                'status': row[4],
+                'created_at': row[5].isoformat() if row[5] else None,
+                'company_name': row[6]
             })
         
         conn.close()
@@ -2234,6 +2236,29 @@ def debug_company_contents():
             'success': True,
             'accounts': accounts,
             'total_count': len(accounts)
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
+@app.route('/debug/clear_company_contents')
+def clear_company_contents():
+    """company_contentsテーブルをクリア"""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 既存のデータを削除
+        c.execute('DELETE FROM company_contents')
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': 'company_contentsテーブルをクリアしました'
         })
         
     except Exception as e:
@@ -2253,7 +2278,7 @@ def add_test_content():
         c.execute('''
             INSERT INTO company_contents (company_id, content_name, content_type, status, created_at)
             VALUES (%s, %s, %s, %s, NOW())
-        ''', (2, 'テストコンテンツ1', 'line', 'active'))
+        ''', (2, 'AI予定秘書', 'line', 'active'))
         
         conn.commit()
         conn.close()

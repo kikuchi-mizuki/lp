@@ -50,10 +50,9 @@ def init_db():
                 CREATE TABLE IF NOT EXISTS company_contents (
                     id SERIAL PRIMARY KEY,
                     company_id INTEGER NOT NULL,
+                    content_name VARCHAR(255) NOT NULL,
                     content_type VARCHAR(100) NOT NULL,
-                    content_status VARCHAR(50) DEFAULT 'active',
-                    stripe_price_id VARCHAR(255),
-                    monthly_price INTEGER DEFAULT 0,
+                    status VARCHAR(50) DEFAULT 'active',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (company_id) REFERENCES companies(id)
