@@ -66,7 +66,11 @@ def test_cancellation_fix():
         # 既存の追加料金アイテムを削除
         for item in additional_items:
             try:
-                stripe.SubscriptionItem.delete(item['id'])
+                # meteredタイプの場合はclear_usage=trueを設定
+                if item['price']['recurring']['usage_type'] == 'metered':
+                    stripe.SubscriptionItem.delete(item['id'], clear_usage=True)
+                else:
+                    stripe.SubscriptionItem.delete(item['id'])
                 logger.info(f"✅ 追加料金アイテムを削除: {item['id']}")
             except Exception as delete_error:
                 logger.error(f"❌ アイテム削除エラー: {delete_error}")
