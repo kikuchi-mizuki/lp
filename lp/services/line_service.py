@@ -1763,8 +1763,8 @@ def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscript
                         
                         # 既存の追加料金アイテムを削除
                         for item in subscription['items']['data']:
-                            price_nickname = item.price.nickname or ""
-                            price_id = item.price.id
+                            price_nickname = item['price'].get('nickname') or ""
+                            price_id = item['price']['id']
                             
                             if (("追加" in price_nickname) or 
                                 ("additional" in price_nickname.lower()) or
@@ -1772,8 +1772,12 @@ def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscript
                                 (price_id == 'price_1Rog1nIxg6C5hAVdnqB5MJiT')):
                                 
                                 try:
-                                    stripe.SubscriptionItem.delete(item.id)
-                                    print(f'[DEBUG] 解約処理: 既存の追加料金アイテムを削除: {item.id}')
+                                    # meteredタイプの場合はclear_usage=trueを設定
+                                    if item['price']['recurring']['usage_type'] == 'metered':
+                                        stripe.SubscriptionItem.delete(item['id'], clear_usage=True)
+                                    else:
+                                        stripe.SubscriptionItem.delete(item['id'])
+                                    print(f'[DEBUG] 解約処理: 既存の追加料金アイテムを削除: {item["id"]}')
                                 except Exception as delete_error:
                                     print(f'[WARN] 解約処理: アイテム削除エラー: {delete_error}')
                         
