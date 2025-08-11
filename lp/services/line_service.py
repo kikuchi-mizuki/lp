@@ -1475,7 +1475,7 @@ def handle_cancel_selection_company(reply_token, company_id, stripe_subscription
         # 企業のアクティブなコンテンツを取得
         print(f'[DEBUG] SQLクエリ実行開始: company_id={company_id}')
         c.execute(f'''
-            SELECT id, content_type, created_at 
+            SELECT id, content_name, content_type, created_at 
             FROM company_contents 
             WHERE company_id = {placeholder} AND status = 'active'
             ORDER BY created_at DESC
