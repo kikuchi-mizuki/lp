@@ -729,10 +729,9 @@ def handle_text_message(event):
                     
             else:
                 print(f'[DEBUG] 企業データが見つかりません: email={normalized_email}')
-                from utils.message_templates import get_menu_navigation_hint
+                lp_message = "❌ 企業データが見つかりません。\n\n💳 まず月額基本料金の決済を完了してください。\n\n🔗 LPからご登録ください：\nhttps://lp-production-9e2c.up.railway.app"
                 send_line_message(event['replyToken'], [
-                    {"type": "text", "text": "企業データが見つかりません。決済が完了しているかご確認ください。"},
-                    get_menu_navigation_hint()
+                    {"type": "text", "text": lp_message}
                 ])
             
             conn.close()
