@@ -111,7 +111,7 @@ class SpreadsheetContentService:
                     if status and status.lower() not in ['inactive', 'disabled', 'off']:
                         # 画像URLを判定（statusフィールドが画像URLの場合）
                         image_url = None
-                        if status and (status.startswith('http') and any(ext in status.lower() for ext in ['.jpg', '.jpeg', '.png', '.gif', '.svg'])):
+                        if status and (status.startswith('http') and any(ext in status.lower() for ext in ['.jpg', '.jpeg', '.png', '.gif', '.svg', '.PNG', '.JPG', '.JPEG', '.GIF', '.SVG'])):
                             image_url = status
                             status = 'active'  # 画像URLの場合はステータスをactiveに設定
                         
