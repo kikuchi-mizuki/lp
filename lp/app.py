@@ -1612,12 +1612,12 @@ def cleanup_duplicate_items():
             try:
                 remaining_item_id = additional_items[0]['id']
                 print(f'[DEBUG] 数量更新実行: {remaining_item_id} → {additional_content_count}')
-                # 一時的にStripe操作を無効化してデバッグ
-                # stripe.SubscriptionItem.modify(
-                #     remaining_item_id,
-                #     quantity=additional_content_count
-                # )
-                print(f'[DEBUG] 残ったアイテムの数量を更新（スキップ）: {remaining_item_id} → {additional_content_count}')
+                # Stripe操作を有効化
+                stripe.SubscriptionItem.modify(
+                    remaining_item_id,
+                    quantity=additional_content_count
+                )
+                print(f'[DEBUG] 残ったアイテムの数量を更新完了: {remaining_item_id} → {additional_content_count}')
             except Exception as e:
                 print(f'[ERROR] 数量更新エラー: {e}')
                 # エラーが発生しても処理を続行

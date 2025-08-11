@@ -1766,9 +1766,9 @@ def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscript
                                     
                                     print(f'[DEBUG] 追加料金アイテム(ENV)更新: {item.id}, 数量: {current_quantity} → {new_billing_count}')
                                     if new_billing_count > 0:
-                                        # 一時的にStripe操作を無効化してデバッグ
-                                        # stripe.SubscriptionItem.modify(item.id, quantity=new_billing_count)
-                                        print(f'[DEBUG] 数量更新（スキップ）: {item.id} → {new_billing_count}')
+                                        # Stripe操作を有効化
+                                        stripe.SubscriptionItem.modify(item.id, quantity=new_billing_count)
+                                        print(f'[DEBUG] 数量更新完了: {item.id} → {new_billing_count}')
                                     else:
                                         print(f'[DEBUG] 数量0のためアイテムをそのまま残す: {item.id}')
                                     updated = True
@@ -1790,9 +1790,9 @@ def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscript
                                     
                                     print(f'[DEBUG] 追加料金アイテム(推定)更新: {item.id}, 数量: {current_quantity} → {new_billing_count}')
                                     if new_billing_count > 0:
-                                        # 一時的にStripe操作を無効化してデバッグ
-                                        # stripe.SubscriptionItem.modify(item.id, quantity=new_billing_count)
-                                        print(f'[DEBUG] 数量更新（スキップ）: {item.id} → {new_billing_count}')
+                                        # Stripe操作を有効化
+                                        stripe.SubscriptionItem.modify(item.id, quantity=new_billing_count)
+                                        print(f'[DEBUG] 数量更新完了: {item.id} → {new_billing_count}')
                                     else:
                                         print(f'[DEBUG] 数量0のためアイテムをそのまま残す: {item.id}')
                                     updated = True
