@@ -1760,7 +1760,9 @@ def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscript
                                 if item.price.id == additional_price_id_env:
                                     print(f'[DEBUG] 追加料金アイテム(ENV)更新: {item.id}, 数量: {item.quantity} → {new_billing_count}')
                                     if new_billing_count > 0:
-                                        stripe.SubscriptionItem.modify(item.id, quantity=new_billing_count)
+                                        # 一時的にStripe操作を無効化してデバッグ
+                                        # stripe.SubscriptionItem.modify(item.id, quantity=new_billing_count)
+                                        print(f'[DEBUG] 数量更新（スキップ）: {item.id} → {new_billing_count}')
                                     else:
                                         print(f'[DEBUG] 数量0のためアイテムをそのまま残す: {item.id}')
                                     updated = True
@@ -1776,7 +1778,9 @@ def handle_cancel_confirmation_company(reply_token, company_id, stripe_subscript
                                     (price_id == 'price_1Rog1nIxg6C5hAVdnqB5MJiT')):
                                     print(f'[DEBUG] 追加料金アイテム(推定)更新: {item.id}, 数量: {item.quantity} → {new_billing_count}')
                                     if new_billing_count > 0:
-                                        stripe.SubscriptionItem.modify(item.id, quantity=new_billing_count)
+                                        # 一時的にStripe操作を無効化してデバッグ
+                                        # stripe.SubscriptionItem.modify(item.id, quantity=new_billing_count)
+                                        print(f'[DEBUG] 数量更新（スキップ）: {item.id} → {new_billing_count}')
                                     else:
                                         print(f'[DEBUG] 数量0のためアイテムをそのまま残す: {item.id}')
                                     updated = True
