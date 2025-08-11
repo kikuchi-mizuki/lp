@@ -188,6 +188,13 @@ def company_registration():
     
     # Stripeチェックアウトセッションを作成（2週間無料トライアル）
     try:
+        # 2週間後の請求開始日を計算（日本時間）
+        from datetime import datetime, timezone, timedelta
+        jst = timezone(timedelta(hours=9))
+        now = datetime.now(jst)
+        billing_start_date = now + timedelta(days=14)  # 2週間後
+        billing_start_epoch = int(billing_start_date.timestamp())
+        
         checkout_session = stripe.checkout.Session.create(
             payment_method_types=['card'],
             line_items=[{
@@ -197,6 +204,8 @@ def company_registration():
             mode='subscription',
             subscription_data={
                 'trial_period_days': 14,  # 2週間無料トライアル
+                'billing_cycle_anchor': billing_start_epoch,  # 2週間後の請求開始日
+                'proration_behavior': 'none',  # 按分計算なし
             },
             success_url=url_for('company_registration_success', _external=True) + '?session_id={CHECKOUT_SESSION_ID}',
             cancel_url=url_for('company_registration_cancel', _external=True),

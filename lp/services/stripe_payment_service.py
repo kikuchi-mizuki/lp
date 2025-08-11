@@ -101,10 +101,19 @@ class StripePaymentService:
             customer_id, company_name = result
             
             # Stripeサブスクリプションを作成
+            # 2週間後の請求開始日を計算（日本時間）
+            from datetime import datetime, timezone, timedelta
+            jst = timezone(timedelta(hours=9))
+            now = datetime.now(jst)
+            billing_start_date = now + timedelta(days=trial_days)  # trial_days日後
+            billing_start_epoch = int(billing_start_date.timestamp())
+            
             subscription = stripe.Subscription.create(
                 customer=customer_id,
                 items=[{'price': price_id}],
                 trial_period_days=trial_days,
+                billing_cycle_anchor=billing_start_epoch,  # trial_days日後の請求開始日
+                proration_behavior='none',  # 按分計算なし
                 metadata={
                     'company_id': str(company_id),
                     'company_name': company_name
