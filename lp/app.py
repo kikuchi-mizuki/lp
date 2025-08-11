@@ -1586,9 +1586,10 @@ def cleanup_duplicate_items():
         for i, item in enumerate(additional_items):
             if i > 0:  # 最初の1つ以外を削除
                 try:
-                    stripe.SubscriptionItem.delete(item['id'])
+                    # 一時的にStripe操作を無効化してデバッグ
+                    # stripe.SubscriptionItem.delete(item['id'])
                     deleted_items.append(item)
-                    print(f'[DEBUG] 重複アイテム削除: {item["id"]}')
+                    print(f'[DEBUG] 重複アイテム削除（スキップ）: {item["id"]}')
                 except Exception as e:
                     print(f'[ERROR] アイテム削除エラー: {e}')
                     # エラーが発生しても処理を続行
@@ -1599,11 +1600,12 @@ def cleanup_duplicate_items():
             try:
                 remaining_item_id = additional_items[0]['id']
                 print(f'[DEBUG] 数量更新実行: {remaining_item_id} → {additional_content_count}')
-                stripe.SubscriptionItem.modify(
-                    remaining_item_id,
-                    quantity=additional_content_count
-                )
-                print(f'[DEBUG] 残ったアイテムの数量を更新: {remaining_item_id} → {additional_content_count}')
+                # 一時的にStripe操作を無効化してデバッグ
+                # stripe.SubscriptionItem.modify(
+                #     remaining_item_id,
+                #     quantity=additional_content_count
+                # )
+                print(f'[DEBUG] 残ったアイテムの数量を更新（スキップ）: {remaining_item_id} → {additional_content_count}')
             except Exception as e:
                 print(f'[ERROR] 数量更新エラー: {e}')
                 # エラーが発生しても処理を続行
