@@ -1,6 +1,7 @@
 import os
 import sys
 import logging
+import time
 from datetime import datetime
 
 # Add the current directory to Python path for production deployment
@@ -25,6 +26,25 @@ MONTHLY_PRICE_ID = os.getenv('STRIPE_MONTHLY_PRICE_ID')
 
 # Flaskアプリケーションの作成
 app = Flask(__name__)
+_APP_START_TS = str(int(time.time()))
+
+# アセットバージョン取得（ENV優先、次にVERSIONファイル、最後に'dev'）
+def _get_asset_version():
+    version = os.getenv('APP_ASSET_VERSION') or os.getenv('RAILWAY_GIT_COMMIT_SHA') \
+        or os.getenv('RENDER_GIT_COMMIT') or os.getenv('VERCEL_GIT_COMMIT_SHA') \
+        or os.getenv('COMMIT_SHA')
+    if version:
+        return version[:12]
+    try:
+        version_file = os.path.join(current_dir, 'VERSION')
+        if os.path.exists(version_file):
+            with open(version_file, 'r', encoding='utf-8') as f:
+                v = f.read().strip()
+                return v[:12] if v else 'dev'
+    except Exception:
+        pass
+    # 最後のフォールバックはプロセス起動時刻（デプロイ/再起動で更新される）
+    return _APP_START_TS
 
 # アプリケーション初期化
 logger.info("🚀 アプリケーション起動中...")
@@ -110,12 +130,23 @@ def index():
     try:
         result = spreadsheet_content_service.get_available_contents()
         contents = result.get('contents', {})
-        cache_buster = os.getenv('APP_ASSET_VERSION') or os.getenv('RAILWAY_GIT_COMMIT_SHA') or os.getenv('RENDER_GIT_COMMIT') or os.getenv('VERCEL_GIT_COMMIT_SHA') or os.getenv('COMMIT_SHA') or 'dev'
+        cache_buster = _get_asset_version()
         return render_template('index.html', contents=contents, cache_buster=cache_buster)
     except Exception:
         # 失敗時でもテンプレートは表示
-        cache_buster = os.getenv('APP_ASSET_VERSION') or 'dev'
+        cache_buster = _get_asset_version()
         return render_template('index.html', contents={}, cache_buster=cache_buster)
+
+@app.route('/__version')
+def __version():
+    """デプロイ内容の確認用。アセットバージョンを返す。"""
+    try:
+        return jsonify({
+            'asset_version': _get_asset_version(),
+            'app': 'lp',
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/index')
 def redirect_to_main():
