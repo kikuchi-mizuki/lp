@@ -293,18 +293,24 @@ main {
 }
 
 /* Statement Section */
+.statement-section {
+  background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFF 50%, #FFFFFF 100%);
+  margin: 0 -2rem;
+  padding: 80px 2rem;
+}
+
 .statement-content {
-  max-width: 600px;
+  max-width: 700px;
   margin: 0 auto;
   text-align: center;
 }
 
 .statement-title {
-  font-size: 2rem;
-  font-weight: 700;
+  font-size: 2.8rem;
+  font-weight: 800;
   color: var(--text-dark);
-  margin-bottom: 2.5rem;
-  line-height: 1.5;
+  margin-bottom: 2rem;
+  line-height: 1.3;
   letter-spacing: 0.02em;
   position: relative;
 }
@@ -312,8 +318,8 @@ main {
 .statement-title::after {
   content: '';
   display: block;
-  width: 120px;
-  height: 4px;
+  width: 50px;
+  height: 3px;
   margin: 1.5rem auto 0;
   border-radius: 999px;
   background: linear-gradient(90deg, var(--primary-color), var(--accent-color));
@@ -321,25 +327,79 @@ main {
 
 /* マーカー付きタイトル */
 .statement-title-marker .marker {
-  background: linear-gradient(transparent 60%, var(--accent-light) 60%, var(--accent-light) 100%);
-  border-radius: 0.2em;
-  padding: 0 0.2em;
-  display: inline;
+  background: linear-gradient(90deg, var(--primary-color), var(--accent-color));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: 800;
+}
+
+.statement-subtitle {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 2rem;
+  line-height: 1.6;
+  text-align: center;
 }
 
 .statement-text {
-  font-size: 1.15rem;
-  color: var(--text-gray);
-  line-height: 2;
+  font-size: 1rem;
+  color: #555;
+  line-height: 1.8;
   text-align: left;
+  margin-bottom: 2rem;
 }
 
 .statement-text p {
-  margin-bottom: 1.8rem;
+  margin-bottom: 1rem;
+  position: relative;
+  padding-left: 1.5rem;
+}
+
+.statement-text p::before {
+  content: "✅";
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-size: 0.9rem;
 }
 
 .statement-text p:last-child {
   margin-bottom: 0;
+}
+
+.statement-quote {
+  background: #F0F6FF;
+  border-radius: var(--radius-medium);
+  padding: 2.5rem;
+  margin: 2.5rem 0;
+  text-align: center;
+  position: relative;
+  border-left: 4px solid var(--primary-color);
+}
+
+.statement-quote::before {
+  content: "💡";
+  position: absolute;
+  left: 1.5rem;
+  top: 1.5rem;
+  font-size: 1.5rem;
+}
+
+.statement-quote-text {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.statement-quote-subtext {
+  font-size: 0.95rem;
+  color: var(--text-gray);
+  margin-top: 0.5rem;
+  font-weight: 400;
 }
 
 /* Features Grid */
@@ -995,11 +1055,30 @@ footer {
   }
   
   .statement-title {
-    font-size: 1.8rem;
+    font-size: 2.2rem;
   }
   
   .statement-content {
     max-width: 100%;
+  }
+  
+  .statement-subtitle {
+    font-size: 1rem;
+  }
+  
+  .statement-text {
+    font-size: 0.95rem;
+  }
+  
+  .statement-quote {
+    padding: 2rem 1.5rem;
+    margin: 2rem 0;
+  }
+  
+  .statement-quote::before {
+    left: 1rem;
+    top: 1rem;
+    font-size: 1.2rem;
   }
   
   .features {
