@@ -338,13 +338,13 @@ main {
   font-size: 1.1rem;
   font-weight: 600;
   color: #333;
-  margin-bottom: 2rem;
+  margin-bottom: 2.5rem;
   line-height: 1.6;
   text-align: center;
 }
 
 .statement-text {
-  font-size: 1rem;
+  font-size: 0.95rem;
   color: #555;
   line-height: 1.8;
   text-align: left;
@@ -353,16 +353,6 @@ main {
 
 .statement-text p {
   margin-bottom: 1rem;
-  position: relative;
-  padding-left: 1.5rem;
-}
-
-.statement-text p::before {
-  content: "✅";
-  position: absolute;
-  left: 0;
-  top: 0;
-  font-size: 0.9rem;
 }
 
 .statement-text p:last-child {
@@ -373,10 +363,9 @@ main {
   background: #F0F6FF;
   border-radius: var(--radius-medium);
   padding: 2.5rem;
-  margin: 2.5rem 0;
+  margin: 3rem 0;
   text-align: center;
   position: relative;
-  border-left: 4px solid var(--primary-color);
 }
 
 .statement-quote::before {
@@ -389,7 +378,7 @@ main {
 
 .statement-quote-text {
   font-size: 1rem;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-dark);
   line-height: 1.6;
   margin: 0;
@@ -1072,7 +1061,7 @@ footer {
   
   .statement-quote {
     padding: 2rem 1.5rem;
-    margin: 2rem 0;
+    margin: 2.5rem 0;
   }
   
   .statement-quote::before {
