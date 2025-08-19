@@ -110,10 +110,12 @@ def index():
     try:
         result = spreadsheet_content_service.get_available_contents()
         contents = result.get('contents', {})
-        return render_template('index.html', contents=contents)
+        cache_buster = os.getenv('APP_ASSET_VERSION') or os.getenv('RAILWAY_GIT_COMMIT_SHA') or os.getenv('RENDER_GIT_COMMIT') or os.getenv('VERCEL_GIT_COMMIT_SHA') or os.getenv('COMMIT_SHA') or 'dev'
+        return render_template('index.html', contents=contents, cache_buster=cache_buster)
     except Exception:
         # 失敗時でもテンプレートは表示
-        return render_template('index.html', contents={})
+        cache_buster = os.getenv('APP_ASSET_VERSION') or 'dev'
+        return render_template('index.html', contents={}, cache_buster=cache_buster)
 
 @app.route('/index')
 def redirect_to_main():
