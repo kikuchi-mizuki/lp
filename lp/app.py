@@ -152,7 +152,20 @@ def simple_health_check():
 @app.route('/static/<path:filename>')
 def static_files(filename):
     """静的ファイルの配信"""
-    return app.send_static_file(filename)
+    response = app.send_static_file(filename)
+    # CSS/JS/画像などの更新を即時に反映させるため、キャッシュを弱める
+    try:
+        lower = filename.lower()
+        if lower.endswith(('.css', '.js', '.mjs', '.json')):
+            response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+            response.headers['Pragma'] = 'no-cache'
+            response.headers['Expires'] = '0'
+        elif lower.endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg')):
+            # 画像は短めのキャッシュ（必要に応じて無効化可能）
+            response.headers['Cache-Control'] = 'public, max-age=300'
+    except Exception:
+        pass
+    return response
 
 # 企業登録関連のルート
 @app.route('/company-registration', methods=['GET', 'POST'])
