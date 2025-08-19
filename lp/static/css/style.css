@@ -264,11 +264,12 @@ main {
 }
 
 .statement-title {
-  font-size: 1.8rem;
+  font-size: 2rem;
   font-weight: 700;
   color: var(--text-dark);
-  margin-bottom: 2rem;
-  line-height: 1.4;
+  margin-bottom: 2.5rem;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
 }
 
 /* マーカー付きタイトル */
@@ -280,10 +281,18 @@ main {
 }
 
 .statement-text {
-  font-size: 1.1rem;
+  font-size: 1.15rem;
   color: var(--text-gray);
-  line-height: 1.9;
+  line-height: 2;
   text-align: left;
+}
+
+.statement-text p {
+  margin-bottom: 1.8rem;
+}
+
+.statement-text p:last-child {
+  margin-bottom: 0;
 }
 
 /* Features Grid */
