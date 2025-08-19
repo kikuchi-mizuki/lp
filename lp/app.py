@@ -148,6 +148,48 @@ def __version():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/__lp_check')
+def __lp_check():
+    """LPのスタイル適用状況を自動チェックして返す。"""
+    try:
+        asset_version = _get_asset_version()
+        css_path = os.path.join(current_dir, 'static', 'css', 'style.css')
+        css_exists = os.path.exists(css_path)
+        css_size = os.path.getsize(css_path) if css_exists else 0
+        found_tokens = {}
+        css_hash = None
+        if css_exists:
+            with open(css_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            import hashlib
+            css_hash = hashlib.sha256(content.encode('utf-8')).hexdigest()[:16]
+            tokens = [
+                '--ring-color',
+                'aspect-ratio: 16 / 9',
+                '-webkit-background-clip: text'
+            ]
+            for t in tokens:
+                found_tokens[t] = (t in content)
+        css_url = url_for('static_files', filename='css/style.css') + f'?v={asset_version}'
+        return jsonify({
+            'asset_version': asset_version,
+            'css': {
+                'path': css_path,
+                'exists': css_exists,
+                'size': css_size,
+                'hash': css_hash,
+                'tokens_found': found_tokens,
+                'url_example': css_url
+            },
+            'routes': {
+                'main': url_for('index', _external=False),
+                'version': url_for('__version', _external=False),
+                'static_css': url_for('static_files', filename='css/style.css', _external=False)
+            }
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/index')
 def redirect_to_main():
     """/index から /main にリダイレクト"""
