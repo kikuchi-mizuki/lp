@@ -44,7 +44,7 @@ body {
   color: var(--text-dark);
   margin: 0;
   padding: 0;
-  line-height: 1.7;
+  line-height: 1.8;
   font-weight: 400;
 }
 
@@ -158,6 +158,7 @@ main {
   max-width: 720px;
   margin-left: auto;
   margin-right: auto;
+  line-height: 1.7;
 }
 
 .hero-form {
@@ -252,6 +253,7 @@ main {
   max-width: 600px;
   margin-left: auto;
   margin-right: auto;
+  line-height: 1.7;
 }
 
 /* Statement Section */
@@ -280,7 +282,7 @@ main {
 .statement-text {
   font-size: 1.1rem;
   color: var(--text-gray);
-  line-height: 1.8;
+  line-height: 1.9;
   text-align: left;
 }
 
@@ -849,8 +851,8 @@ footer {
 
 .step-content p {
   color: var(--text-gray);
-  line-height: 1.6;
-  margin-bottom: 1rem;
+  line-height: 1.8;
+  margin-bottom: 1.2rem;
 }
 
 .command-list {
@@ -877,11 +879,11 @@ footer {
 .tips-content {
   text-align: center;
   color: var(--text-gray);
-  line-height: 1.8;
+  line-height: 1.9;
 }
 
 .tips-content p {
-  margin-bottom: 1rem;
+  margin-bottom: 1.2rem;
 }
 
 /* Responsive adjustments for instructions */
