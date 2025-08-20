@@ -352,20 +352,20 @@ main {
 }
 
 .statement-text p {
-  margin-bottom: 1rem;
+  margin-bottom: 1.25rem;
 }
 
 
 
 .statement-text p:last-child {
   margin-bottom: 0;
-  margin-top: 2rem;
+  margin-top: 2.5rem;
 }
 
 .statement-quote {
   background: #F8FAFD;
   border-radius: 12px;
-  padding: 20px 24px;
+  padding: 15px 20px;
   margin: 40px 0;
   text-align: center;
   position: relative;
@@ -373,14 +373,14 @@ main {
 
 .statement-quote-text {
   font-size: 1rem;
-  font-weight: 600;
+  font-weight: 700;
   color: #1E293B;
   line-height: 1.6;
   margin: 0;
 }
 
 .statement-quote-subtext {
-  font-size: 0.9rem;
+  font-size: 0.875rem;
   color: #64748B;
   margin-top: 8px;
   font-weight: 400;
@@ -1055,7 +1055,7 @@ footer {
   }
   
   .statement-quote {
-    padding: 16px 20px;
+    padding: 14px 18px;
     margin: 40px 0;
   }
   
