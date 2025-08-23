@@ -1338,16 +1338,19 @@ def handle_status_check_company(reply_token, company_id):
                 if content[1] == "active":  # statusがactive
                     active_count += 1
                     if active_count > 1:  # 2個目以降のみ課金
-                        # トライアル期間中は追加料金も無料
-                        if is_trial_active or subscription_status == 'trialing':
-                            total_additional_price += 0
-                        else:
-                            total_additional_price += 1500
+                        total_additional_price += 1500
             
             # 料金体系を明確に表示
-            status_message += f"\n💰 合計料金: {monthly_base_price + total_additional_price:,}円/月（トライアル期間中は無料）"
-            status_message += f"\n  └ 基本料金: {monthly_base_price:,}円（トライアル期間中は無料）"
-            status_message += f"\n  └ 追加料金: {total_additional_price:,}円（トライアル期間中は無料）"
+            if is_trial_active or subscription_status == 'trialing':
+                # トライアル期間中は料金を0円で表示
+                status_message += f"\n💰 合計料金: 0円/月（トライアル期間中は無料）"
+                status_message += f"\n  └ 基本料金: 0円（トライアル期間中は無料）"
+                status_message += f"\n  └ 追加料金: 0円（トライアル期間中は無料）"
+            else:
+                # トライアル期間終了後は実際の料金を表示
+                status_message += f"\n💰 合計料金: {monthly_base_price + total_additional_price:,}円/月"
+                status_message += f"\n  └ 基本料金: {monthly_base_price:,}円"
+                status_message += f"\n  └ 追加料金: {total_additional_price:,}円"
         else:
             status_message += f"\n💰 合計料金: 0円/月（サブスクリプションなし）"
         
