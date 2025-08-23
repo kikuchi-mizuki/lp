@@ -919,7 +919,7 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
                 from utils.db import get_db_connection
                 conn = get_db_connection()
                 c = conn.cursor()
-                c.execute('SELECT COUNT(*) FROM company_line_accounts WHERE company_id = %s AND status = %s', (company_id, 'active'))
+                c.execute('SELECT COUNT(*) FROM company_contents WHERE company_id = %s AND status = %s', (company_id, 'active'))
                 existing_count = c.fetchone()[0]
                 conn.close()
                 
