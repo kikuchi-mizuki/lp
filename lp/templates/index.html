@@ -103,7 +103,14 @@
                                  {# YouTube動画は通常の動画プレイヤーとして表示 #}
                                  {% set embed_src = media_src | replace('https://youtu.be/', 'https://www.youtube.com/embed/') | replace('http://youtu.be/', 'https://www.youtube.com/embed/') | replace('https://www.youtube.com/watch?v=', 'https://www.youtube.com/embed/') | replace('http://www.youtube.com/watch?v=', 'https://www.youtube.com/embed/') | replace('https://youtube.com/watch?v=', 'https://www.youtube.com/embed/') | replace('http://youtube.com/watch?v=', 'https://www.youtube.com/embed/') %}
                                  <div class="feature-image-wrapper youtube-wrapper">
-                                     <iframe class="feature-image youtube-video" src="{{ embed_src }}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen loading="lazy"></iframe>
+                                     <iframe class="feature-image youtube-video" src="{{ embed_src }}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen loading="lazy" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"></iframe>
+                                     <div class="youtube-fallback" style="display: none;">
+                                         <div class="fallback-content">
+                                             <div class="fallback-icon">📺</div>
+                                             <p class="fallback-text">YouTube動画を表示できません</p>
+                                             <a href="{{ media_src }}" target="_blank" class="fallback-link">YouTubeで見る</a>
+                                         </div>
+                                     </div>
                                  </div>
                              {% else %}
                                  {# 画像・動画ファイルはスマートフォン風フレームで表示 #}
@@ -169,6 +176,31 @@
     </footer>
 
     <script>
+        // YouTube動画の読み込みエラー検出
+        document.addEventListener('DOMContentLoaded', function() {
+            const youtubeIframes = document.querySelectorAll('.youtube-video');
+            youtubeIframes.forEach(function(iframe) {
+                iframe.addEventListener('error', function() {
+                    this.style.display = 'none';
+                    const fallback = this.nextElementSibling;
+                    if (fallback && fallback.classList.contains('youtube-fallback')) {
+                        fallback.style.display = 'flex';
+                    }
+                });
+                
+                // タイムアウト処理（5秒後にフォールバック表示）
+                setTimeout(function() {
+                    if (iframe.offsetHeight === 0 || iframe.contentWindow === null) {
+                        iframe.style.display = 'none';
+                        const fallback = iframe.nextElementSibling;
+                        if (fallback && fallback.classList.contains('youtube-fallback')) {
+                            fallback.style.display = 'flex';
+                        }
+                    }
+                }, 5000);
+            });
+        });
+
         document.getElementById('subscription-form').addEventListener('submit', async function(e) {
             e.preventDefault();
             
