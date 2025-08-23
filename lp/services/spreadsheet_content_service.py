@@ -113,7 +113,10 @@ class SpreadsheetContentService:
                         image_url = None
                         status = 'active'  # デフォルトでactiveに設定
                         
-                        if status_raw and (status_raw.startswith('http') and any(ext in status_raw.lower() for ext in ['.jpg', '.jpeg', '.png', '.gif', '.svg', '.PNG', '.JPG', '.JPEG', '.GIF', '.SVG'])):
+                        if status_raw and (status_raw.startswith('http') and (
+                            any(ext in status_raw.lower() for ext in ['.jpg', '.jpeg', '.png', '.gif', '.svg', '.PNG', '.JPG', '.JPEG', '.GIF', '.SVG', '.mp4', '.webm', '.mov', '.MP4', '.WEBM', '.MOV']) or
+                            'youtube.com' in status_raw.lower() or 'youtu.be' in status_raw.lower()
+                        )):
                             image_url = status_raw
                         elif status_raw.lower() != 'active':
                             status = status_raw.lower()  # 画像URLでない場合は小文字に変換

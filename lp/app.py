@@ -72,6 +72,7 @@ try:
     from routes.ai_schedule_webhook import ai_schedule_webhook_bp
     from routes.ai_schedule_webhook_simple import ai_schedule_webhook_simple_bp
     from routes.debug import debug_bp
+    from routes.content_admin import content_admin_bp
 
     # Blueprint登録（デバッグ系はENVで有効化）
     blueprints = [
@@ -95,6 +96,7 @@ try:
         (company_registration_bp, 'company_registration'),
         (ai_schedule_webhook_bp, 'ai_schedule_webhook'),
         (ai_schedule_webhook_simple_bp, 'ai_schedule_webhook_simple'),
+        (content_admin_bp, 'content_admin'),
     ]
 
     # デバッグ系Blueprintは明示的に有効化された場合のみ登録

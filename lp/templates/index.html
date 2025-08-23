@@ -99,16 +99,22 @@
                                  {% set is_video = false %}
                              {% endif %}
 
-                             <div class="feature-image-wrapper">
-                                 {% if is_video %}
-                                     <video class="feature-image" src="{{ media_src }}" autoplay muted loop playsinline preload="metadata"></video>
-                                 {% elif is_youtube %}
-                                     {% set embed_src = media_src | replace('https://youtu.be/', 'https://www.youtube.com/embed/') | replace('http://youtu.be/', 'https://www.youtube.com/embed/') | replace('https://www.youtube.com/watch?v=', 'https://www.youtube.com/embed/') | replace('http://www.youtube.com/watch?v=', 'https://www.youtube.com/embed/') | replace('https://youtube.com/watch?v=', 'https://www.youtube.com/embed/') | replace('http://youtube.com/watch?v=', 'https://www.youtube.com/embed/') %}
-                                     <iframe class="feature-image" src="{{ embed_src }}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen loading="lazy"></iframe>
-                                 {% else %}
-                                     <img src="{{ media_src }}" alt="{{ item.name }}" class="feature-image" loading="lazy">
-                                 {% endif %}
-                             </div>
+                             {% if is_youtube %}
+                                 {# YouTube動画は通常の動画プレイヤーとして表示 #}
+                                 {% set embed_src = media_src | replace('https://youtu.be/', 'https://www.youtube.com/embed/') | replace('http://youtu.be/', 'https://www.youtube.com/embed/') | replace('https://www.youtube.com/watch?v=', 'https://www.youtube.com/embed/') | replace('http://www.youtube.com/watch?v=', 'https://www.youtube.com/embed/') | replace('https://youtube.com/watch?v=', 'https://www.youtube.com/embed/') | replace('http://youtube.com/watch?v=', 'https://www.youtube.com/embed/') %}
+                                 <div class="feature-image-wrapper youtube-wrapper">
+                                     <iframe class="feature-image youtube-video" src="{{ embed_src }}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen loading="lazy"></iframe>
+                                 </div>
+                             {% else %}
+                                 {# 画像・動画ファイルはスマートフォン風フレームで表示 #}
+                                 <div class="feature-image-wrapper">
+                                     {% if is_video %}
+                                         <video class="feature-image" src="{{ media_src }}" autoplay muted loop playsinline preload="metadata"></video>
+                                     {% else %}
+                                         <img src="{{ media_src }}" alt="{{ item.name }}" class="feature-image" loading="lazy">
+                                     {% endif %}
+                                 </div>
+                             {% endif %}
                             {% if item.features and item.features|length > 0 %}
                                 <ul>
                                     {% for f in item.features %}
