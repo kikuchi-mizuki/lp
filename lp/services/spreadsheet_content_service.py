@@ -144,6 +144,41 @@ class SpreadsheetContentService:
             return []
         return [f.strip() for f in features_str.split(',') if f.strip()]
     
+    def _get_fallback_contents(self) -> Dict:
+        """フォールバック用のデフォルトコンテンツを返す"""
+        return {
+            'ai_schedule': {
+                'name': 'AI予定秘書',
+                'description': 'スケジュール管理をAIがサポート',
+                'url': '',
+                'price': 1500,
+                'status': 'active',
+                'image': None,
+                'created_at': datetime.now().strftime('%Y-%m-%d'),
+                'features': ['自動スケジュール調整', 'Googleカレンダー連携', 'リマインダー機能']
+            },
+            'ai_accounting': {
+                'name': 'AI経理秘書',
+                'description': '経理作業をAIが効率化',
+                'url': '',
+                'price': 1500,
+                'status': 'active',
+                'image': None,
+                'created_at': datetime.now().strftime('%Y-%m-%d'),
+                'features': ['自動仕訳', 'レポート生成', '税務対応']
+            },
+            'ai_task': {
+                'name': 'AIタスクコンシェルジュ',
+                'description': 'タスク管理をAIが最適化',
+                'url': '',
+                'price': 1500,
+                'status': 'active',
+                'image': None,
+                'created_at': datetime.now().strftime('%Y-%m-%d'),
+                'features': ['優先度自動設定', '進捗管理', 'チーム連携']
+            }
+        }
+    
     def get_available_contents(self, force_refresh=False) -> Dict:
         """利用可能なコンテンツ一覧を取得（キャッシュ付き）"""
         current_time = time.time()
@@ -158,8 +193,13 @@ class SpreadsheetContentService:
                 'cached': True
             }
         
-        # スプレッドシートから最新データを取得
-        contents = self._fetch_contents_from_spreadsheet()
+        try:
+            # スプレッドシートから最新データを取得
+            contents = self._fetch_contents_from_spreadsheet()
+        except Exception as e:
+            print(f"スプレッドシート取得エラー: {e}")
+            # エラー時はフォールバックコンテンツを返す
+            contents = self._get_fallback_contents()
         
         if contents:
             self.cached_contents = contents

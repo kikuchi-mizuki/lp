@@ -135,7 +135,9 @@ def index():
         cache_buster = _get_asset_version()
         response = render_template('index.html', contents=contents, cache_buster=cache_buster)
         return response
-    except Exception:
+    except Exception as e:
+        # エラーログを出力
+        logger.error(f"メインページエラー: {e}")
         # 失敗時でもテンプレートは表示
         cache_buster = _get_asset_version()
         response = render_template('index.html', contents={}, cache_buster=cache_buster)
