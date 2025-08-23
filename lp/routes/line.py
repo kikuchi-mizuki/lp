@@ -931,7 +931,7 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
                     price_short = f" 料金:{price:,}円/月" if isinstance(price, int) else ""
 
                 # 確認は大きいテンプレートボタン（はい/いいえ）
-                confirm_text = f"{description}{price_short}\n\n追加しますか？"
+                confirm_text = f"{price_short}\n\n追加しますか？"
                 set_user_state(user_id, f'add_confirm_{selection_index}')
                 send_line_message(
                     event['replyToken'],
@@ -941,7 +941,7 @@ def handle_command(event, user_id, text, company_id, stripe_subscription_id):
                         "template": {
                             "type": "buttons",
                             "title": f"{content_name}を追加",
-                            "text": confirm_text[:120],
+                            "text": confirm_text,
                             "actions": [
                                 {"type": "message", "label": "はい", "text": "はい"},
                                 {"type": "message", "label": "いいえ", "text": "いいえ"}
