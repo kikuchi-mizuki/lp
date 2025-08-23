@@ -113,6 +113,28 @@
                                              sandbox="allow-same-origin allow-scripts allow-popups allow-forms">
                                      </iframe>
                                  </div>
+                             {% elif is_video %}
+                                 {# 自社動画ファイルを最適化表示 #}
+                                 <div class="feature-image-wrapper video-wrapper">
+                                     <video class="feature-image custom-video" 
+                                            src="{{ media_src }}" 
+                                            autoplay 
+                                            muted 
+                                            loop 
+                                            playsinline 
+                                            preload="metadata"
+                                            poster="{{ media_src }}?poster=1">
+                                         <source src="{{ media_src }}" type="video/mp4">
+                                         <source src="{{ media_src | replace('.mp4', '.webm') }}" type="video/webm">
+                                         お使いのブラウザは動画再生に対応していません。
+                                     </video>
+                                     <div class="video-controls">
+                                         <button class="play-pause-btn" onclick="toggleVideo(this)">▶</button>
+                                         <div class="video-progress">
+                                             <div class="progress-bar"></div>
+                                         </div>
+                                     </div>
+                                 </div>
                              {% else %}
                                  {# 画像・動画ファイルはスマートフォン風フレームで表示 #}
                                  <div class="feature-image-wrapper">
@@ -200,7 +222,50 @@
                     }
                 }, 5000);
             });
+            
+            // 自社動画の制御
+            const customVideos = document.querySelectorAll('.custom-video');
+            customVideos.forEach(function(video) {
+                const wrapper = video.closest('.video-wrapper');
+                const playBtn = wrapper.querySelector('.play-pause-btn');
+                const progressBar = wrapper.querySelector('.progress-bar');
+                
+                // 再生/一時停止ボタン
+                playBtn.addEventListener('click', function() {
+                    if (video.paused) {
+                        video.play();
+                        this.textContent = '⏸';
+                    } else {
+                        video.pause();
+                        this.textContent = '▶';
+                    }
+                });
+                
+                // プログレスバー更新
+                video.addEventListener('timeupdate', function() {
+                    const progress = (video.currentTime / video.duration) * 100;
+                    progressBar.style.width = progress + '%';
+                });
+                
+                // 動画終了時にループ
+                video.addEventListener('ended', function() {
+                    video.currentTime = 0;
+                    video.play();
+                });
+            });
         });
+        
+        // グローバル関数（HTMLから呼び出し用）
+        function toggleVideo(button) {
+            const video = button.closest('.video-wrapper').querySelector('.custom-video');
+            if (video.paused) {
+                video.play();
+                button.textContent = '⏸';
+            } else {
+                video.pause();
+                button.textContent = '▶';
+            }
+        }
 
         document.getElementById('subscription-form').addEventListener('submit', async function(e) {
             e.preventDefault();
