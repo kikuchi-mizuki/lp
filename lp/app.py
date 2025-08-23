@@ -134,14 +134,11 @@ def index():
         contents = result.get('contents', {})
         cache_buster = _get_asset_version()
         response = render_template('index.html', contents=contents, cache_buster=cache_buster)
-        # YouTube埋め込みを許可するCSPヘッダーを追加
-        response.headers['Content-Security-Policy'] = "frame-src 'self' https://www.youtube.com https://youtube.com; img-src 'self' data: https:; script-src 'self' 'unsafe-inline';"
         return response
     except Exception:
         # 失敗時でもテンプレートは表示
         cache_buster = _get_asset_version()
         response = render_template('index.html', contents={}, cache_buster=cache_buster)
-        response.headers['Content-Security-Policy'] = "frame-src 'self' https://www.youtube.com https://youtube.com; img-src 'self' data: https:; script-src 'self' 'unsafe-inline';"
         return response
 
 @app.route('/__version')
