@@ -4,11 +4,22 @@ import os
 import traceback
 from datetime import datetime, timedelta
 from utils.db import get_db_connection
+from services.stripe_payment_service import stripe_payment_service
 
 stripe_bp = Blueprint('stripe', __name__)
 
 @stripe_bp.route('/webhook', methods=['POST'])
 def stripe_webhook():
+    # 委譲（正規URL: /api/v1/stripe/webhook）
+    try:
+        payload = request.get_data()
+        signature = request.headers.get('Stripe-Signature', '')
+        if not signature:
+            return jsonify({'success': False, 'error': 'Stripe-Signatureヘッダーが見つかりません'}), 400
+        result = stripe_payment_service.process_webhook(payload, signature)
+        return (jsonify(result), 200) if result.get('success') else (jsonify(result), 400)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
     print(f"[Stripe Webhook] リクエスト受信: {request.method}")
     payload = request.data
     sig_header = request.headers.get('Stripe-Signature')
