@@ -1960,7 +1960,8 @@ def handle_subscription_cancel_company(reply_token, company_id, stripe_subscript
         
         subscription_status, monthly_base_price = monthly_subscription
         
-        if subscription_status != 'active':
+        # active または trialing の場合のみ解約進行（それ以外は非アクティブ扱い）
+        if subscription_status not in ('active', 'trialing'):
             send_line_message(reply_token, [{"type": "text", "text": "❌ 月額基本サブスクリプションが既に非アクティブです。"}])
             conn.close()
             return
@@ -1968,12 +1969,17 @@ def handle_subscription_cancel_company(reply_token, company_id, stripe_subscript
         # Stripeサブスクリプションの解約処理
         try:
             if stripe_subscription_id:
-                # Stripeサブスクリプションを期間終了時に解約
-                stripe.Subscription.modify(
-                    stripe_subscription_id,
-                    cancel_at_period_end=True
-                )
-                print(f'[DEBUG] Stripeサブスクリプション解約設定完了: {stripe_subscription_id}')
+                if subscription_status == 'trialing':
+                    # トライアル中は即時解約
+                    stripe.Subscription.delete(stripe_subscription_id)
+                    print(f'[DEBUG] Stripeサブスクリプション即時解約完了(Trial): {stripe_subscription_id}')
+                else:
+                    # 通常は期間終了時に解約
+                    stripe.Subscription.modify(
+                        stripe_subscription_id,
+                        cancel_at_period_end=True
+                    )
+                    print(f'[DEBUG] Stripeサブスクリプション解約設定完了(PeriodEnd): {stripe_subscription_id}')
             else:
                 print(f'[DEBUG] StripeサブスクリプションIDが存在しません')
         except Exception as e:
@@ -2022,7 +2028,9 @@ def handle_subscription_cancel_company(reply_token, company_id, stripe_subscript
             "template": {
                 "type": "buttons",
                 "title": "月額基本サブスクリプション解約完了",
-                "text": f"月額基本サブスクリプション（{monthly_base_price:,}円/月）を解約しました。\n\n📋 解約内容:\n• 月額基本料金の解約\n• 全コンテンツの利用停止\n\nご利用ありがとうございました。",
+                "text": (f"月額基本サブスクリプション（{monthly_base_price:,}円/月）を解約しました。\n\n"
+                         + ("トライアル中のため即時解約となりました。\n\n" if subscription_status == 'trialing' else "期間終了時に解約されます。\n\n")
+                         + "📋 解約内容:\n• 月額基本料金の解約\n• 全コンテンツの利用停止\n\nご利用ありがとうございました。"),
                 "actions": [
                     {
                         "type": "message",
