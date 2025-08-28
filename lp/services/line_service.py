@@ -2028,9 +2028,7 @@ def handle_subscription_cancel_company(reply_token, company_id, stripe_subscript
             "template": {
                 "type": "buttons",
                 "title": "月額基本サブスクリプション解約完了",
-                "text": (f"月額基本サブスクリプション（{monthly_base_price:,}円/月）を解約しました。\n\n"
-                         + ("トライアル中のため即時解約となりました。\n\n" if subscription_status == 'trialing' else "期間終了時に解約されます。\n\n")
-                         + "📋 解約内容:\n• 月額基本料金の解約\n• 全コンテンツの利用停止\n\nご利用ありがとうございました。"),
+                "text": ("即時解約が完了しました。" if subscription_status == 'trialing' else "期間終了時に解約されます。"),
                 "actions": [
                     {
                         "type": "message",
@@ -2042,8 +2040,15 @@ def handle_subscription_cancel_company(reply_token, company_id, stripe_subscript
         }
         
         from utils.message_templates import get_menu_navigation_hint
+        details_text = (
+            f"月額基本サブスクリプション（{monthly_base_price:,}円/月）を解約しました。\n"
+            + ("トライアル中のため即時解約となりました。\n" if subscription_status == 'trialing' else "期間終了時に解約されます。\n")
+            + "\n📋 解約内容:\n• 月額基本料金の解約\n• 全コンテンツの利用停止"
+        )
+
         send_line_message(reply_token, [
             cancel_message,
+            {"type": "text", "text": details_text},
             get_menu_navigation_hint()
         ])
         print(f'[DEBUG] 月額基本サブスクリプション解約処理完了')
