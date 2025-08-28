@@ -2329,8 +2329,8 @@ def handle_content_confirmation_company(company_id, content_type):
                 
                 contents = c.fetchall()
                 print(f'[DEBUG] 統一処理: アクティブコンテンツ一覧:')
-                for i, content in enumerate(contents, 1):
-                    print(f'  {i}. {content[1]} ({content[0]}) - {content[2]}')
+                for i, row in enumerate(contents, 1):
+                    print(f'  {i}. {row[1]} ({row[0]}) - {row[2]}')
                 
                 # Stripeサブスクリプションを取得
                 subscription = stripe.Subscription.retrieve(stripe_subscription_id)
