@@ -2040,9 +2040,14 @@ def handle_subscription_cancel_company(reply_token, company_id, stripe_subscript
         }
         
         from utils.message_templates import get_menu_navigation_hint
+        # トライアル中の場合は即時解約メッセージを追加、それ以外は通常の解約メッセージ
+        trial_message = "トライアル中のため即時解約となりました。\n" if subscription_status == 'trialing' else ""
+        cancellation_timing_message = "期間終了時に解約されます。\n" if subscription_status != 'trialing' else ""
+        
         details_text = (
             f"月額基本サブスクリプション（{monthly_base_price:,}円/月）を解約しました。\n"
-            + ("トライアル中のため即時解約となりました。\n" if subscription_status == 'trialing' else "期間終了時に解約されます。\n")
+            + trial_message
+            + cancellation_timing_message
             + "\n📋 解約内容:\n• 月額基本料金の解約\n• 全コンテンツの利用停止"
         )
 
