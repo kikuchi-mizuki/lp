@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start -p ${PORT:-3001}",
     "lint": "next lint",
-    "setup-sheet": "npx tsx scripts/setup-spreadsheet.ts"
+    "setup-sheet": "npx tsx scripts/setup-spreadsheet.ts",
+    "encode-key": "node scripts/encode-private-key.js",
+    "check-env": "node scripts/check-env.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.3",

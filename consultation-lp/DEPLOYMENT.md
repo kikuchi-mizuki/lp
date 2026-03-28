@@ -15,12 +15,26 @@
    - Settings → Root Directory → `consultation-lp` と入力
 
 2. **環境変数** を設定:
+
+   **必須の環境変数:**
    ```
    GOOGLE_SPREADSHEET_ID=15yjq73FUIiNKtZGmNQgOorTthaEpd0-NYZ-XChJ0r5M
    GOOGLE_SHEET_NAME=相談LP事例
    GOOGLE_SERVICE_ACCOUNT_EMAIL=(サービスアカウントのメールアドレス)
-   GOOGLE_PRIVATE_KEY=(プライベートキー - 改行は\nで表記)
    NEXT_PUBLIC_SITE_URL=(デプロイ後のURL - 例: https://your-app.up.railway.app)
+   ```
+
+   **秘密鍵の設定（以下のいずれか1つを選択）:**
+
+   **推奨: Base64エンコード方式**
+   ```
+   GOOGLE_PRIVATE_KEY_BASE64=(Base64エンコードした秘密鍵)
+   ```
+   ※ `node scripts/encode-private-key.js` で生成できます
+
+   **または: 従来の方式**
+   ```
+   GOOGLE_PRIVATE_KEY=(プライベートキー - 改行は\nで表記)
    ```
 
    **Supabase設定（オプション - 将来的に使用する場合）:**
@@ -40,7 +54,24 @@
 
 ## 環境変数の注意点
 
-### GOOGLE_PRIVATE_KEY の設定方法
+### GOOGLE_PRIVATE_KEY の設定方法（推奨: Base64エンコード）
+
+**⭐️ 推奨方法: Base64エンコードを使用（改行の問題を回避）**
+
+1. ローカルで秘密鍵をBase64エンコード:
+   ```bash
+   cd consultation-lp
+   node scripts/encode-private-key.js
+   ```
+
+2. 出力されたBase64文字列をコピー
+
+3. Railwayで以下の環境変数を設定:
+   ```
+   GOOGLE_PRIVATE_KEY_BASE64=(Base64文字列)
+   ```
+
+**従来の方法: 改行を手動で変換**
 
 プライベートキーは改行を `\n` で表記する必要があります：
 
@@ -49,6 +80,8 @@
 ```
 
 または、Railwayのダッシュボードで直接ペーストする場合は、そのままコピー&ペーストでOKです。
+
+⚠️ 注意: 改行の処理に問題がある場合は、Base64エンコード方式（上記の推奨方法）を使用してください。
 
 ## トラブルシューティング
 
