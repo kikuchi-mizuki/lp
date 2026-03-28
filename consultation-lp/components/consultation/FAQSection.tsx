@@ -100,12 +100,9 @@ export default function FAQSection() {
       </div>
 
       <div className="mt-12 text-center">
-        <p className="text-gray-600 mb-4">
-          その他のご質問がある方は、お気軽にお問い合わせください
+        <p className="text-gray-600 text-sm md:text-base">
+          その他のご質問も、無料相談に込めてお送りいただけます（下のセクションからお進みください）
         </p>
-        <a href="#contact" className="btn-primary">
-          無料相談する
-        </a>
       </div>
     </section>
   )

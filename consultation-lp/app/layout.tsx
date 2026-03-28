@@ -7,11 +7,11 @@ const notoSansJP = Noto_Sans_JP({ subsets: ['latin'], variable: '--font-noto-san
 
 export const metadata: Metadata = {
   title: '業務改善無料相談 | AIコレクションズ',
-  description: 'AIや自動化で業務を改善したいけど、何から始めればいいかわからない方へ。あなたの業務に合った改善方法を無料で整理します。',
+  description: 'AIで変えたいのに、正しい順番が見えず止まっている方へ。業務に合った改善の順番を無料で整理します。',
   keywords: ['業務改善', 'AI導入', '自動化', '無料相談', 'DX', '効率化'],
   openGraph: {
     title: '業務改善無料相談 | AIコレクションズ',
-    description: 'AIや自動化で業務を改善したいけど、何から始めればいいかわからない方へ。',
+    description: 'AIで変えたいのに、正しい順番が見えず止まっている方へ。無料で改善の順番を整理します。',
     type: 'website',
     locale: 'ja_JP',
   },

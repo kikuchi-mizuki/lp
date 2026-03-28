@@ -46,13 +46,13 @@ export default function HeroSection() {
             filter: 'drop-shadow(0 2px 10px rgba(2, 6, 23, 0.06))',
           }}
         >
-          AIや自動化で
+          AIで変えたいのに、
           <br />
-          業務を改善したいけど、
+          正しい順番が
           <br />
-          何から始めればいいか
+          見えないまま
           <br />
-          <span className="gradient-text">わからない方へ</span>
+          <span className="gradient-text">止まっている方へ</span>
         </h1>
 
         {/* タイトル下の装飾ライン */}
@@ -117,53 +117,11 @@ export default function HeroSection() {
           style={{
             fontSize: '0.875rem',
             color: 'var(--text-light)',
-            marginBottom: '2rem',
+            marginBottom: '0',
           }}
         >
           無理な営業は一切ありません。お気軽にご相談ください。
         </p>
-
-        {/* トラストマーク */}
-        <div
-          className="mt-12 pt-8"
-          style={{
-            borderTop: '1px solid var(--border-light)',
-          }}
-        >
-          <p style={{ fontSize: '0.875rem', color: 'var(--text-light)', marginBottom: '1rem' }}>
-            信頼の実績
-          </p>
-          <div
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              justifyContent: 'center',
-              alignItems: 'center',
-              gap: '2rem',
-              fontSize: '0.875rem',
-              color: 'var(--text-gray)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-              <span style={{ fontSize: '2rem', fontWeight: 'bold', marginRight: '0.5rem' }} className="gradient-text">
-                50+
-              </span>
-              <span>企業の導入実績</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-              <span style={{ fontSize: '2rem', fontWeight: 'bold', marginRight: '0.5rem' }} className="gradient-text">
-                90%
-              </span>
-              <span>業務時間削減</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-              <span style={{ fontSize: '2rem', fontWeight: 'bold', marginRight: '0.5rem' }} className="gradient-text">
-                0円
-              </span>
-              <span>相談料</span>
-            </div>
-          </div>
-        </div>
       </div>
     </section>
   )

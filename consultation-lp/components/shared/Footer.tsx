@@ -23,7 +23,7 @@ export default function Footer() {
             <h3 className="text-white font-semibold mb-4">サービス</h3>
             <ul className="space-y-2 text-sm">
               <li>
-                <Link href="/consultation" className="hover:text-primary-400 transition-colors">
+                <Link href="/" className="hover:text-primary-400 transition-colors">
                   業務改善無料相談
                 </Link>
               </li>

@@ -1,6 +1,8 @@
-import { redirect } from 'next/navigation'
+import ConsultationLanding from '@/components/consultation/ConsultationLanding'
+import { consultationMetadata } from '@/lib/consultationMetadata'
 
-// ルートパスは /consultation にリダイレクト
+export const metadata = consultationMetadata
+
 export default function Home() {
-  redirect('/consultation')
+  return <ConsultationLanding />
 }

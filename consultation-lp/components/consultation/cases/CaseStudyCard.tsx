@@ -1,0 +1,101 @@
+'use client'
+
+import Image from 'next/image'
+import { Sparkles, ExternalLink } from 'lucide-react'
+import type { CaseData } from '@/lib/googleSheets'
+import { getCaseMetricHighlight } from '@/lib/caseStudyUtils'
+
+type Props = {
+  caseItem: CaseData
+  onOpen: (c: CaseData) => void
+  index: number
+}
+
+function Thumbnail({ src, alt }: { src: string; alt: string }) {
+  const isLocal = src.startsWith('/')
+  if (isLocal) {
+    return (
+      <Image src={src} alt={alt} fill className="object-cover" sizes="(max-width:768px) 100vw, 400px" />
+    )
+  }
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={src} alt={alt} className="absolute inset-0 h-full w-full object-cover" loading="lazy" />
+}
+
+export default function CaseStudyCard({ caseItem, onOpen, index }: Props) {
+  const { headline, sub } = getCaseMetricHighlight(caseItem)
+  const industryLabel = (caseItem.industry || '').trim() || caseItem.target.split(/[・｜|]/)[0]?.trim() || '事例'
+
+  return (
+    <article
+      className="card-hover animate-fade-in flex h-full cursor-pointer flex-col overflow-hidden rounded-[var(--radius-medium)] border border-[var(--border-light)] bg-[var(--background-white)] shadow-[var(--shadow-card)] transition-shadow hover:shadow-[var(--shadow-medium)]"
+      style={{ animationDelay: `${index * 70}ms` }}
+      onClick={() => onOpen(caseItem)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onOpen(caseItem)
+        }
+      }}
+      role="button"
+      tabIndex={0}
+    >
+      <div className="relative aspect-[16/10] w-full bg-gradient-to-br from-slate-100 to-blue-50">
+        {caseItem.thumbnailUrl ? (
+          <Thumbnail src={caseItem.thumbnailUrl} alt={caseItem.title} />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-sm font-medium text-slate-400">
+            導入事例
+          </div>
+        )}
+        {caseItem.isFeatured && (
+          <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-xs font-bold text-[var(--primary-color)] shadow-sm backdrop-blur-sm">
+            <Sparkles className="h-3.5 w-3.5" aria-hidden />
+            おすすめ
+          </span>
+        )}
+        <span className="absolute bottom-3 left-3 rounded-full bg-[var(--primary-color)] px-3 py-1 text-xs font-bold text-white shadow-md">
+          {industryLabel}
+        </span>
+      </div>
+
+      <div className="flex flex-1 flex-col p-5">
+        <div className="mb-3 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 ring-1 ring-blue-100/80">
+          <p className="text-center text-lg font-extrabold tracking-tight text-[var(--primary-dark)] md:text-xl">
+            {headline}
+          </p>
+          {sub && sub !== headline && (
+            <p className="mt-1 line-clamp-2 text-center text-xs font-medium text-[var(--text-gray)]">{sub}</p>
+          )}
+        </div>
+
+        <h3 className="mb-2 line-clamp-2 text-lg font-bold leading-snug text-[var(--text-dark)]">
+          {caseItem.title}
+        </h3>
+
+        {caseItem.catchCopy && (
+          <p className="mb-4 line-clamp-2 text-sm leading-relaxed text-[var(--text-gray)]">
+            {caseItem.catchCopy}
+          </p>
+        )}
+
+        {caseItem.tags && caseItem.tags.length > 0 && (
+          <div className="mb-4 flex flex-wrap gap-1.5">
+            {caseItem.tags.slice(0, 4).map((tag) => (
+              <span key={tag} className="badge-primary text-xs font-medium">
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
+
+        <div className="mt-auto flex items-center justify-between border-t border-[var(--border-light)] pt-4 text-sm font-bold text-[var(--primary-color)]">
+          <span className="inline-flex items-center gap-1">
+            詳しく見る
+            <ExternalLink className="h-4 w-4 opacity-80" aria-hidden />
+          </span>
+        </div>
+      </div>
+    </article>
+  )
+}

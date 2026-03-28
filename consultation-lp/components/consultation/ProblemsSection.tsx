@@ -81,8 +81,19 @@ export default function ProblemsSection() {
         })}
       </div>
 
-      <div className="mt-16 text-center">
-        <div className="inline-block bg-gradient-to-r from-primary-50 to-accent-50 rounded-2xl p-8 max-w-3xl">
+      <div className="mt-16 max-w-3xl mx-auto text-center px-2">
+        <p className="text-base md:text-lg text-gray-700 leading-relaxed mb-6">
+          課題のリストアップまではできても、
+          <span className="font-semibold text-gray-900">「どれを先に潰すと効くか」</span>
+          が見えないまま、検討だけが長引く——というパターンはとても多いです。
+        </p>
+        <p className="text-sm md:text-base text-gray-600 leading-relaxed mb-10">
+          ツール選定の前に、業務の流れと優先順位を一緒に整理する。それがこの無料相談の役割です。
+        </p>
+      </div>
+
+      <div className="mt-4 text-center">
+        <div className="inline-block bg-gradient-to-r from-primary-50 to-accent-50 rounded-2xl p-8 max-w-3xl shadow-[var(--shadow-soft)]">
           <p className="text-lg md:text-xl font-semibold text-gray-900 mb-4">
             これらの悩みは、AIや自動化で解決できます
           </p>

@@ -18,7 +18,7 @@ export default function Header() {
       <div className="mx-auto px-4 sm:px-6 lg:px-8" style={{ maxWidth: '1080px' }}>
         <div className="flex items-center justify-between h-16 md:h-20">
           {/* Logo */}
-          <Link href="/consultation" className="flex items-center">
+          <Link href="/" className="flex items-center">
             <Image
               src="/images/logo.png"
               alt="AI Collections"
