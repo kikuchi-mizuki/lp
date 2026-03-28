@@ -22,6 +22,53 @@ function Thumbnail({ src, alt }: { src: string; alt: string }) {
   return <img src={src} alt={alt} className="absolute inset-0 h-full w-full object-cover" loading="lazy" />
 }
 
+function VideoPreview({ videoUrl }: { videoUrl: string }) {
+  // MP4などの動画ファイルの場合
+  if (videoUrl.match(/\.(mp4|webm|ogg)$/i)) {
+    return (
+      <video
+        className="absolute inset-0 h-full w-full object-cover"
+        muted
+        loop
+        playsInline
+        preload="metadata"
+        poster=""
+      >
+        <source src={videoUrl} type={`video/${videoUrl.split('.').pop()}`} />
+      </video>
+    )
+  }
+
+  // YouTube動画の場合はサムネイルを表示
+  if (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')) {
+    let videoId = ''
+    if (videoUrl.includes('youtube.com/watch?v=')) {
+      videoId = videoUrl.split('v=')[1]?.split('&')[0] || ''
+    } else if (videoUrl.includes('youtu.be/')) {
+      videoId = videoUrl.split('youtu.be/')[1]?.split('?')[0] || ''
+    }
+
+    if (videoId) {
+      // eslint-disable-next-line @next/next/no-img-element
+      return (
+        <img
+          src={`https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`}
+          alt="Video thumbnail"
+          className="absolute inset-0 h-full w-full object-cover"
+          loading="lazy"
+        />
+      )
+    }
+  }
+
+  // その他の場合はプレースホルダー
+  return (
+    <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-800 to-blue-900 text-white">
+      <Play className="h-16 w-16 opacity-50" />
+    </div>
+  )
+}
+
 export default function CaseStudyCard({ caseItem, onOpen, index }: Props) {
   const { headline, sub } = getCaseMetricHighlight(caseItem)
   const industryLabel = (caseItem.industry || '').trim() || caseItem.target.split(/[・｜|]/)[0]?.trim() || '事例'
@@ -41,7 +88,9 @@ export default function CaseStudyCard({ caseItem, onOpen, index }: Props) {
       tabIndex={0}
     >
       <div className="relative aspect-[16/10] w-full bg-gradient-to-br from-slate-100 to-blue-50">
-        {caseItem.thumbnailUrl ? (
+        {caseItem.videoUrl ? (
+          <VideoPreview videoUrl={caseItem.videoUrl} />
+        ) : caseItem.thumbnailUrl ? (
           <Thumbnail src={caseItem.thumbnailUrl} alt={caseItem.title} />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-sm font-medium text-slate-400">
