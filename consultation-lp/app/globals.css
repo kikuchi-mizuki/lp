@@ -1,0 +1,239 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* AIコレクションズの既存カラー変数 */
+    --primary-color: #1E40AF;
+    --primary-light: #DBEAFE;
+    --primary-dark: #1E3A8A;
+    --secondary-color: #64748B;
+    --secondary-light: #F1F5F9;
+    --accent-color: #3B82F6;
+    --accent-light: #EFF6FF;
+    --text-dark: #0F172A;
+    --text-gray: #475569;
+    --text-light: #94A3B8;
+    --background-white: #FFFFFF;
+    --background-light: #F8FAFC;
+    --border-light: #E2E8F0;
+    --shadow-soft: 0 4px 25px rgba(30, 64, 175, 0.08);
+    --shadow-medium: 0 8px 35px rgba(30, 64, 175, 0.12);
+    --shadow-card: 0 2px 15px rgba(0, 0, 0, 0.08);
+    --radius-small: 12px;
+    --radius-medium: 16px;
+    --radius-large: 24px;
+    --font-family: 'Noto Sans JP', sans-serif;
+    --ring-color: rgba(30, 64, 175, 0.35);
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    font-family: var(--font-family);
+    background:
+      radial-gradient(1200px 600px at -10% -20%, rgba(14,165,233,0.08), transparent 60%),
+      radial-gradient(1000px 500px at 110% -10%, rgba(37,99,235,0.06), transparent 55%),
+      linear-gradient(180deg, #FFFFFF 0%, var(--background-light) 100%);
+    color: var(--text-dark);
+    line-height: 1.8;
+    font-weight: 400;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-bold;
+  }
+}
+
+@layer components {
+  /* Gradient Text - AIコレクションズスタイル */
+  .gradient-text {
+    background-image: linear-gradient(90deg, var(--primary-color), var(--accent-color));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* Primary Button - AIコレクションズスタイル */
+  .btn-primary {
+    @apply inline-flex items-center justify-center px-8 py-4 text-base font-semibold text-white transition-all duration-300;
+    border-radius: var(--radius-large);
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-color) 100%);
+    box-shadow: var(--shadow-card);
+  }
+
+  .btn-primary:hover {
+    box-shadow: var(--shadow-medium);
+    transform: translateY(-2px);
+  }
+
+  .btn-primary-large {
+    @apply px-12 py-5 text-lg font-bold;
+    border-radius: var(--radius-large);
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-color) 100%);
+    box-shadow: var(--shadow-card);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    transition: all 0.3s;
+  }
+
+  .btn-primary-large:hover {
+    box-shadow: var(--shadow-medium);
+    transform: translateY(-2px);
+  }
+
+  /* Secondary Button */
+  .btn-secondary {
+    @apply inline-flex items-center justify-center px-6 py-3 text-base font-semibold bg-white border-2 transition-all duration-300;
+    border-radius: var(--radius-large);
+    color: var(--primary-color);
+    border-color: var(--primary-color);
+    box-shadow: var(--shadow-soft);
+  }
+
+  .btn-secondary:hover {
+    background: var(--primary-light);
+    box-shadow: var(--shadow-card);
+  }
+
+  /* Section Container - AIコレクションズ max-width */
+  .section-container {
+    max-width: 1080px;
+    @apply mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24;
+  }
+
+  /* Card - AIコレクションズスタイル */
+  .card {
+    @apply bg-white p-6 transition-all duration-300;
+    border-radius: var(--radius-medium);
+    box-shadow: var(--shadow-card);
+  }
+
+  .card-hover {
+    @apply card cursor-pointer;
+  }
+
+  .card-hover:hover {
+    box-shadow: var(--shadow-medium);
+    transform: translateY(-4px);
+  }
+
+  /* Input - AIコレクションズスタイル */
+  .input {
+    @apply w-full px-4 py-3 border transition-all duration-200;
+    border-color: var(--border-light);
+    border-radius: var(--radius-small);
+    font-family: var(--font-family);
+  }
+
+  .input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px var(--ring-color);
+  }
+
+  .input-error {
+    @apply input;
+    border-color: #EF4444;
+  }
+
+  .input-error:focus {
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+  }
+
+  /* Textarea */
+  .textarea {
+    @apply input resize-none;
+  }
+
+  /* Label */
+  .label {
+    @apply block text-sm font-semibold mb-2;
+    color: var(--text-dark);
+  }
+
+  /* Error Message */
+  .error-message {
+    @apply text-sm mt-1;
+    color: #EF4444;
+  }
+
+  /* Badge */
+  .badge {
+    @apply inline-flex items-center px-3 py-1 text-xs font-medium;
+    border-radius: 999px;
+  }
+
+  .badge-primary {
+    @apply badge;
+    background: var(--primary-light);
+    color: var(--primary-color);
+  }
+
+  .badge-success {
+    @apply badge bg-green-100 text-green-800;
+  }
+
+  /* Section Heading - AIコレクションズスタイル */
+  .section-heading {
+    @apply text-3xl md:text-4xl lg:text-5xl font-bold text-center mb-4;
+    color: var(--text-dark);
+    line-height: 1.2;
+    letter-spacing: 0.01em;
+  }
+
+  .section-subheading {
+    @apply text-lg md:text-xl text-center max-w-3xl mx-auto mb-12;
+    color: var(--text-gray);
+    font-weight: 400;
+    line-height: 1.7;
+  }
+}
+
+@layer utilities {
+  .animation-delay-200 {
+    animation-delay: 200ms;
+  }
+
+  .animation-delay-400 {
+    animation-delay: 400ms;
+  }
+
+  .animation-delay-600 {
+    animation-delay: 600ms;
+  }
+}
+
+/* カスタムスクロールバー */
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #0284c7;
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #0369a1;
+}
