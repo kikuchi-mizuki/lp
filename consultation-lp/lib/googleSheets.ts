@@ -20,8 +20,15 @@ export interface CaseData {
  * Google Sheets APIクライアントを初期化
  */
 function getGoogleSheetsClient() {
-  const privateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n')
+  // 環境変数から取得し、様々な改行形式に対応
+  let privateKey = process.env.GOOGLE_PRIVATE_KEY || ''
   const clientEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL
+
+  // \\n (ダブルバックスラッシュ) を実際の改行に変換
+  privateKey = privateKey.replace(/\\\\n/g, '\n')
+  // \n (シングルバックスラッシュ) を実際の改行に変換
+  privateKey = privateKey.replace(/\\n/g, '\n')
+
 
   if (!privateKey || !clientEmail ||
       privateKey.includes('your_private_key_here') ||
