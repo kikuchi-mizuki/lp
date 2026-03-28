@@ -88,10 +88,10 @@ export default function CaseStudyCard({ caseItem, onOpen, index }: Props) {
       tabIndex={0}
     >
       <div className="relative aspect-[16/10] w-full bg-gradient-to-br from-slate-100 to-blue-50">
-        {caseItem.videoUrl ? (
-          <VideoPreview videoUrl={caseItem.videoUrl} />
-        ) : caseItem.thumbnailUrl ? (
+        {caseItem.thumbnailUrl ? (
           <Thumbnail src={caseItem.thumbnailUrl} alt={caseItem.title} />
+        ) : caseItem.videoUrl ? (
+          <VideoPreview videoUrl={caseItem.videoUrl} />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-sm font-medium text-slate-400">
             導入事例
