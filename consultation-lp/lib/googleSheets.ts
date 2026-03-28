@@ -29,6 +29,8 @@ function getGoogleSheetsClient() {
   if (privateKeyBase64) {
     try {
       privateKey = Buffer.from(privateKeyBase64, 'base64').toString('utf-8')
+      // デコード後も改行文字列が残っている場合は変換
+      privateKey = privateKey.replace(/\\\\n/g, '\n').replace(/\\n/g, '\n')
     } catch (error) {
       console.error('Failed to decode base64 private key:', error)
       return null
