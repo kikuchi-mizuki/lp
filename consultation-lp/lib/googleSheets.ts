@@ -20,15 +20,23 @@ export interface CaseData {
  * Google Sheets APIクライアントを初期化
  */
 function getGoogleSheetsClient() {
-  // 環境変数から取得し、様々な改行形式に対応
+  // 環境変数から取得
   let privateKey = process.env.GOOGLE_PRIVATE_KEY || ''
+  const privateKeyBase64 = process.env.GOOGLE_PRIVATE_KEY_BASE64
   const clientEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL
 
-  // \\n (ダブルバックスラッシュ) を実際の改行に変換
-  privateKey = privateKey.replace(/\\\\n/g, '\n')
-  // \n (シングルバックスラッシュ) を実際の改行に変換
-  privateKey = privateKey.replace(/\\n/g, '\n')
-
+  // Base64エンコードされている場合はデコード (Railwayでの推奨方法)
+  if (privateKeyBase64) {
+    try {
+      privateKey = Buffer.from(privateKeyBase64, 'base64').toString('utf-8')
+    } catch (error) {
+      console.error('Failed to decode base64 private key:', error)
+      return null
+    }
+  } else {
+    // 通常の環境変数の場合、改行を変換
+    privateKey = privateKey.replace(/\\\\n/g, '\n').replace(/\\n/g, '\n')
+  }
 
   if (!privateKey || !clientEmail ||
       privateKey.includes('your_private_key_here') ||
