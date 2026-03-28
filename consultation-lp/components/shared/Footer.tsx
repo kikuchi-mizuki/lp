@@ -37,6 +37,16 @@ export default function Footer() {
                   よくある質問
                 </a>
               </li>
+              <li>
+                <a
+                  href="https://lp-production-9e2c.up.railway.app/main"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-primary-400 transition-colors"
+                >
+                  AI秘書サービス
+                </a>
+              </li>
             </ul>
           </div>
 

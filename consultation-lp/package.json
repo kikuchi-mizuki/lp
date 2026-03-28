@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev -p 3001",
     "build": "next build",
-    "start": "next start -p 3001",
+    "start": "next start -p ${PORT:-3001}",
     "lint": "next lint",
     "setup-sheet": "npx tsx scripts/setup-spreadsheet.ts"
   },
@@ -13,6 +13,7 @@
     "@hookform/resolvers": "^3.3.3",
     "@supabase/auth-helpers-nextjs": "^0.8.7",
     "@supabase/supabase-js": "^2.39.0",
+    "dotenv": "^17.3.1",
     "framer-motion": "^10.16.16",
     "googleapis": "^171.4.0",
     "lucide-react": "^0.298.0",

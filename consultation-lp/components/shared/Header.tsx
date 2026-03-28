@@ -71,6 +71,21 @@ export default function Header() {
               よくある質問
             </a>
             <a
+              href="https://lp-production-9e2c.up.railway.app/main"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium transition-colors"
+              style={{
+                color: 'var(--text-gray)',
+                fontSize: '0.95rem',
+                padding: '0.5rem 0',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.color = 'var(--primary-color)'}
+              onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-gray)'}
+            >
+              AI秘書サービス
+            </a>
+            <a
               href="#contact"
               className="btn-primary"
             >
@@ -113,6 +128,15 @@ export default function Header() {
               onClick={() => setIsMenuOpen(false)}
             >
               よくある質問
+            </a>
+            <a
+              href="https://lp-production-9e2c.up.railway.app/main"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block py-2 text-gray-700 hover:text-primary-600 transition-colors font-medium"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              AI秘書サービス
             </a>
             <a
               href="#contact"
