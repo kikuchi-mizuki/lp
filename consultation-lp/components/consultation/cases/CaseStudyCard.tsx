@@ -1,7 +1,7 @@
 'use client'
 
 import Image from 'next/image'
-import { Sparkles, ExternalLink } from 'lucide-react'
+import { Sparkles, ExternalLink, Play } from 'lucide-react'
 import type { CaseData } from '@/lib/googleSheets'
 import { getCaseMetricHighlight } from '@/lib/caseStudyUtils'
 
@@ -53,6 +53,13 @@ export default function CaseStudyCard({ caseItem, onOpen, index }: Props) {
             <Sparkles className="h-3.5 w-3.5" aria-hidden />
             おすすめ
           </span>
+        )}
+        {caseItem.videoUrl && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 transition-opacity hover:opacity-100">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white/95 shadow-lg backdrop-blur-sm">
+              <Play className="h-8 w-8 fill-[var(--primary-color)] text-[var(--primary-color)]" aria-hidden />
+            </div>
+          </div>
         )}
         <span className="absolute bottom-3 left-3 rounded-full bg-[var(--primary-color)] px-3 py-1 text-xs font-bold text-white shadow-md">
           {industryLabel}
