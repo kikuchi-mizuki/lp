@@ -11,7 +11,7 @@ export default function HeroSection() {
         <h1 className="hero-title">
           AIがあなたの
           <br />
-          右腕になる時代
+          <span className="gradient-text">右腕になる時代</span>
         </h1>
 
         <div
