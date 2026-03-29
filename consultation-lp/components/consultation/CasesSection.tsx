@@ -176,10 +176,6 @@ export default function CasesSection() {
             ))}
           </div>
         )}
-
-        <p className="mx-auto mt-12 max-w-2xl text-center text-sm leading-relaxed text-[var(--text-gray)]">
-          事例はスプレッドシート連携で随時追加できます。公開件数が増えるほど、業種・タグの組み合わせで「自分ごと化」しやすくなります。
-        </p>
       </section>
 
       {selectedCase && (

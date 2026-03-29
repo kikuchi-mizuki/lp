@@ -9,7 +9,9 @@ export default function HeroSection() {
 
       <div className="hero-section-inner">
         <h1 className="hero-title">
-          <span className="gradient-text">AIがあなたの右腕になる時代</span>
+          AIがあなたの
+          <br />
+          右腕になる時代
         </h1>
 
         <div
@@ -26,7 +28,7 @@ export default function HeroSection() {
         <p className="hero-lead">
           3時間かかっていた業務が15分に。
           <br />
-          実際に成果を出した企業の事例をご紹介します。
+          活用事例を参考にしてみてください。
         </p>
 
         <div className="hero-cta-row">
