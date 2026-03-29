@@ -134,8 +134,7 @@ export default function CasesSection() {
         <h2 className="section-heading">
           <span className="gradient-text">導入事例</span>
         </h2>
-        <p className="section-subheading">同じ課題を持つ企業の改善ストーリーをご紹介します</p>
-        <div className="text-center">
+        <div className="text-center mt-8">
           <p style={{ color: 'var(--text-gray)' }}>{error || '現在表示できる導入事例がありません'}</p>
         </div>
       </section>
@@ -148,9 +147,6 @@ export default function CasesSection() {
         <h2 className="section-heading">
           <span className="gradient-text">導入事例</span>
         </h2>
-        <p className="section-subheading max-w-2xl mx-auto">
-          数字の変化と、導入前の悩みまで見えるので「うちも近いかも」とイメージしやすくなっています。気になる事例から詳細を開いてください。
-        </p>
 
         {(industries.length > 0 || allTags.length > 0) && (
           <CaseStudyFilters

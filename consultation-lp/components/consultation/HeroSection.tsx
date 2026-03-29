@@ -10,10 +10,9 @@ export default function HeroSection() {
       <div className="hero-section-inner">
         <h1 className="hero-title">
           AIで変えたいのに、
-          <br />
-          正しい順番が
-          <br />
-          見えないまま
+          <br className="hidden sm:block" />
+          <span className="sm:hidden"> </span>
+          正しい順番が見えないまま
           <br />
           <span className="gradient-text">止まっている方へ</span>
         </h1>
@@ -25,27 +24,30 @@ export default function HeroSection() {
             margin: '14px auto 0',
             borderRadius: '999px',
             background: 'linear-gradient(90deg, var(--primary-color), var(--accent-color))',
-            marginBottom: '2rem',
+            marginBottom: '1.5rem',
           }}
         />
 
         <p className="hero-lead">
           あなたの業務に合った改善方法を、無料で整理します。
-          <br />
-          まずは現状を整理するところから始めましょう。
         </p>
 
         <div className="hero-cta-row">
-          <a href="#contact" className="btn-primary-large group inline-flex items-center">
-            無料で相談してみる
+          <a
+            href="https://lin.ee/YOUR_LINE_ID"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-primary-large group inline-flex items-center"
+          >
+            LINEで無料相談
             <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
           </a>
-          <a href="#cases" className="btn-secondary px-8 py-4">
+          <a href="#cases" className="btn-secondary px-6 py-3 sm:px-8 sm:py-4">
             導入事例を見る
           </a>
         </div>
 
-        <p className="hero-note">無理な営業は一切ありません。お気軽にご相談ください。</p>
+        <p className="hero-note">無理な営業は一切ありません</p>
       </div>
     </section>
   )
