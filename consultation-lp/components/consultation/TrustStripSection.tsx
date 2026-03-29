@@ -14,11 +14,11 @@ export default function TrustStripSection() {
       className="border-y border-[var(--border-light)] bg-white/80 py-8 backdrop-blur-sm"
       aria-label="信頼のポイント"
     >
-      <div className="mx-auto flex max-w-5xl flex-col items-stretch justify-center gap-6 px-4 sm:flex-row sm:gap-10 md:gap-16">
+      <div className="mx-auto flex max-w-5xl flex-col items-start justify-center gap-6 px-4 sm:flex-row sm:items-stretch sm:gap-10 md:gap-16">
         {items.map(({ icon: Icon, label, sub }) => (
           <div
             key={label}
-            className="flex flex-1 items-center gap-4 md:gap-5"
+            className="flex flex-1 items-center gap-4 md:gap-5 w-full sm:w-auto"
           >
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-100 text-[var(--primary-color)] shadow-sm">
               <Icon className="h-6 w-6" aria-hidden />
