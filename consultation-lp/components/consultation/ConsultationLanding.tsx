@@ -14,7 +14,6 @@ export default function ConsultationLanding() {
         <HeroSection />
         <TrustStripSection />
         <CasesSection />
-        <ConsultationCTASection variant="after-cases" />
         <FAQSection />
         <ConsultationCTASection variant="final" />
       </main>
