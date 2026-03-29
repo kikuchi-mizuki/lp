@@ -1,9 +1,9 @@
 'use client'
 
-import Image from 'next/image'
+import { useRef, useState } from 'react'
 import { Sparkles, ExternalLink, Play } from 'lucide-react'
 import type { CaseData } from '@/lib/googleSheets'
-import { getCaseMetricHighlight } from '@/lib/caseStudyUtils'
+import { getCaseMetricHighlight, normalizeMediaUrl } from '@/lib/caseStudyUtils'
 
 type Props = {
   caseItem: CaseData
@@ -11,19 +11,56 @@ type Props = {
   index: number
 }
 
-function Thumbnail({ src, alt }: { src: string; alt: string }) {
-  const isLocal = src.startsWith('/')
-  if (isLocal) {
+function Thumbnail({ src }: { src: string }) {
+  const normalized = normalizeMediaUrl(src)
+  const [failed, setFailed] = useState(false)
+
+  if (!normalized || failed) {
     return (
-      <Image src={src} alt={alt} fill className="object-cover" sizes="(max-width:768px) 100vw, 400px" />
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-gradient-to-br from-slate-100 to-blue-50 px-4 text-center">
+        <span className="text-xs font-medium text-slate-400">画像を表示できません</span>
+        <span className="line-clamp-2 text-[10px] leading-tight text-slate-300">URL・パスをご確認ください</span>
+      </div>
     )
   }
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img src={src} alt={alt} className="absolute inset-0 h-full w-full object-cover" loading="lazy" />
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={normalized}
+      alt=""
+      className="absolute inset-0 h-full w-full object-cover"
+      loading="lazy"
+      decoding="async"
+      referrerPolicy="no-referrer"
+      onError={() => setFailed(true)}
+    />
+  )
+}
+
+function YoutubeThumb({ videoId }: { videoId: string }) {
+  const triedFallback = useRef(false)
+  const [src, setSrc] = useState(`https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`)
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt=""
+      className="absolute inset-0 h-full w-full object-cover"
+      loading="lazy"
+      decoding="async"
+      onError={() => {
+        if (!triedFallback.current) {
+          triedFallback.current = true
+          setSrc(`https://img.youtube.com/vi/${videoId}/hqdefault.jpg`)
+        }
+      }}
+    />
+  )
 }
 
 function VideoPreview({ videoUrl }: { videoUrl: string }) {
-  // MP4などの動画ファイルの場合
   if (videoUrl.match(/\.(mp4|webm|ogg)$/i)) {
     return (
       <video
@@ -32,14 +69,12 @@ function VideoPreview({ videoUrl }: { videoUrl: string }) {
         loop
         playsInline
         preload="metadata"
-        poster=""
       >
-        <source src={videoUrl} type={`video/${videoUrl.split('.').pop()}`} />
+        <source src={normalizeMediaUrl(videoUrl)} type={`video/${videoUrl.split('.').pop()}`} />
       </video>
     )
   }
 
-  // YouTube動画の場合はサムネイルを表示
   if (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')) {
     let videoId = ''
     if (videoUrl.includes('youtube.com/watch?v=')) {
@@ -49,19 +84,10 @@ function VideoPreview({ videoUrl }: { videoUrl: string }) {
     }
 
     if (videoId) {
-      // eslint-disable-next-line @next/next/no-img-element
-      return (
-        <img
-          src={`https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`}
-          alt="Video thumbnail"
-          className="absolute inset-0 h-full w-full object-cover"
-          loading="lazy"
-        />
-      )
+      return <YoutubeThumb videoId={videoId} />
     }
   }
 
-  // その他の場合はプレースホルダー
   return (
     <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-800 to-blue-900 text-white">
       <Play className="h-16 w-16 opacity-50" />
@@ -87,9 +113,9 @@ export default function CaseStudyCard({ caseItem, onOpen, index }: Props) {
       role="button"
       tabIndex={0}
     >
-      <div className="relative aspect-[16/10] w-full bg-gradient-to-br from-slate-100 to-blue-50">
+      <div className="relative aspect-[16/10] w-full overflow-hidden bg-gradient-to-br from-slate-100 to-blue-50">
         {caseItem.thumbnailUrl ? (
-          <Thumbnail src={caseItem.thumbnailUrl} alt={caseItem.title} />
+          <Thumbnail src={caseItem.thumbnailUrl} />
         ) : caseItem.videoUrl ? (
           <VideoPreview videoUrl={caseItem.videoUrl} />
         ) : (
@@ -105,12 +131,10 @@ export default function CaseStudyCard({ caseItem, onOpen, index }: Props) {
         )}
         {caseItem.videoUrl && (
           <>
-            {/* 常に表示される動画バッジ */}
             <div className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-red-600 px-2.5 py-1 text-xs font-bold text-white shadow-md">
               <Play className="h-3 w-3 fill-white" aria-hidden />
               動画
             </div>
-            {/* ホバー時の再生ボタン */}
             <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 transition-opacity hover:opacity-100">
               <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white/95 shadow-xl backdrop-blur-sm">
                 <Play className="h-8 w-8 fill-[var(--primary-color)] text-[var(--primary-color)]" aria-hidden />

@@ -20,25 +20,93 @@ export default function CasesSection() {
   const [tag, setTag] = useState<string | null>(null)
 
   useEffect(() => {
+    let cancelled = false
+    const controller = new AbortController()
+
+    const fetchDeadlineMs = 16_000
+    const abortTimer = window.setTimeout(() => controller.abort(), fetchDeadlineMs)
+
+    /** fetch 完了後も response.json() が止まることがあるため別タイムアウト */
+    const jsonTimeoutMs = 10_000
+    async function readJsonBody(response: Response): Promise<unknown> {
+      return Promise.race([
+        response.json(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('response.json timeout')), jsonTimeoutMs)
+        ),
+      ])
+    }
+
+    /** いずれの経路でも最終的にスピナーを止める */
+    const watchdogMs = 22_000
+    const watchdog = window.setTimeout(() => {
+      if (cancelled) return
+      setLoading(false)
+      setError(
+        '読み込みが完了しませんでした。通信環境を確認し、ページを再読み込みするか、しばらくしてからお試しください。'
+      )
+    }, watchdogMs)
+
     async function fetchCases() {
       try {
-        const response = await fetch('/api/cases')
-        const data = await response.json()
+        const base = typeof window !== 'undefined' ? window.location.origin : ''
+        const response = await fetch(`${base}/api/cases`, {
+          signal: controller.signal,
+          cache: 'no-store',
+          headers: { Accept: 'application/json' },
+        })
+        window.clearTimeout(abortTimer)
 
-        if (data.success) {
+        if (cancelled) return
+
+        if (!response.ok) {
+          setError('導入事例の取得に失敗しました（サーバーエラー）')
+          return
+        }
+
+        const data = (await readJsonBody(response)) as {
+          success?: boolean
+          cases?: CaseData[]
+          degraded?: boolean
+        }
+
+        if (cancelled) return
+
+        if (data.success && Array.isArray(data.cases)) {
           setCases(data.cases)
+          setError(null)
         } else {
           setError('導入事例の取得に失敗しました')
         }
       } catch (err) {
+        window.clearTimeout(abortTimer)
+        if (cancelled) return
         console.error('Error fetching cases:', err)
-        setError('導入事例の取得に失敗しました')
+        if (err instanceof Error && err.name === 'AbortError') {
+          setError(
+            '接続がタイムアウトしました。開発サーバーが起動しているか、ネットワークをご確認ください。'
+          )
+        } else if (err instanceof Error && err.message === 'response.json timeout') {
+          setError('サーバーからの応答の解析に失敗しました。再読み込みしてください。')
+        } else {
+          setError('導入事例の取得に失敗しました')
+        }
       } finally {
-        setLoading(false)
+        window.clearTimeout(watchdog)
+        if (!cancelled) {
+          setLoading(false)
+        }
       }
     }
 
     fetchCases()
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(abortTimer)
+      window.clearTimeout(watchdog)
+      controller.abort()
+    }
   }, [])
 
   const industries = useMemo(() => collectIndustries(cases), [cases])

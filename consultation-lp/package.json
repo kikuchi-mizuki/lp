@@ -4,6 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3001",
+    "dev:poll": "NEXT_WEBPACK_USE_POLL=1 next dev -p 3001",
+    "dev:fresh": "rm -rf .next && next dev -p 3001",
+    "dev:fresh:poll": "rm -rf .next && NEXT_WEBPACK_USE_POLL=1 next dev -p 3001",
     "build": "next build",
     "start": "next start -p ${PORT:-3001}",
     "lint": "next lint",

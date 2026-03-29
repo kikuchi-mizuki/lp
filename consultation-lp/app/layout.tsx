@@ -1,13 +1,13 @@
 import type { Metadata } from 'next'
-import { Inter, Noto_Sans_JP } from 'next/font/google'
 import './globals.css'
-
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
-const notoSansJP = Noto_Sans_JP({ subsets: ['latin'], variable: '--font-noto-sans-jp' })
 
 export const metadata: Metadata = {
   title: '業務改善無料相談 | AIコレクションズ',
   description: 'AIで変えたいのに、正しい順番が見えず止まっている方へ。業務に合った改善の順番を無料で整理します。',
+  icons: {
+    icon: [{ url: '/images/logo.png', type: 'image/png' }],
+    apple: '/images/logo.png',
+  },
   keywords: ['業務改善', 'AI導入', '自動化', '無料相談', 'DX', '効率化'],
   openGraph: {
     title: '業務改善無料相談 | AIコレクションズ',
@@ -28,8 +28,8 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="ja" className={`${inter.variable} ${notoSansJP.variable}`}>
-      <body className="font-sans antialiased bg-gray-50 text-gray-900">
+    <html lang="ja">
+      <body className="antialiased min-h-screen">
         {children}
       </body>
     </html>

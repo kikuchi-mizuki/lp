@@ -12,7 +12,7 @@ export default function ConsultationLanding() {
   return (
     <>
       <Header />
-      <main>
+      <main className="main-below-fixed-header">
         <HeroSection />
         <TrustStripSection />
         <ProblemsSection />

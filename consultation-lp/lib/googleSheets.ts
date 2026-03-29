@@ -72,6 +72,11 @@ function getGoogleSheetsClient() {
   }
 }
 
+/** API がタイムアウトしたときなど、LP を空にしないための静的サンプル */
+export function getConsultationCasesFallback(): CaseData[] {
+  return getSampleCases()
+}
+
 function getSampleCases(): CaseData[] {
   return prepareCasesForDisplay([
     {
