@@ -34,7 +34,7 @@ export default function HeroSection() {
 
         <div className="hero-cta-row">
           <a
-            href="https://lin.ee/YOUR_LINE_ID"
+            href="https://line.me/ti/p/EZPuFuksS3"
             target="_blank"
             rel="noopener noreferrer"
             className="btn-primary-large group inline-flex items-center"
