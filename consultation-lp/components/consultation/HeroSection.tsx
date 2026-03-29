@@ -9,12 +9,7 @@ export default function HeroSection() {
 
       <div className="hero-section-inner">
         <h1 className="hero-title">
-          AIで変えたいのに、
-          <br className="hidden sm:block" />
-          <span className="sm:hidden"> </span>
-          正しい順番が見えないまま
-          <br />
-          <span className="gradient-text">止まっている方へ</span>
+          <span className="gradient-text">AIがあなたの右腕になる時代</span>
         </h1>
 
         <div
@@ -29,7 +24,9 @@ export default function HeroSection() {
         />
 
         <p className="hero-lead">
-          あなたの業務に合った改善方法を、無料で整理します。
+          3時間かかっていた業務が15分に。
+          <br />
+          実際に成果を出した企業の事例をご紹介します。
         </p>
 
         <div className="hero-cta-row">
@@ -39,15 +36,12 @@ export default function HeroSection() {
             rel="noopener noreferrer"
             className="btn-primary-large group inline-flex items-center"
           >
-            LINEで無料相談
+            LINEで相談してみる
             <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
-          </a>
-          <a href="#cases" className="btn-secondary px-6 py-3 sm:px-8 sm:py-4">
-            導入事例を見る
           </a>
         </div>
 
-        <p className="hero-note">無理な営業は一切ありません</p>
+        <p className="hero-note">まずは事例を見て、あなたに合うか確かめてください</p>
       </div>
     </section>
   )

@@ -3,36 +3,36 @@
 import type { ReactNode } from 'react'
 import { ArrowRight, MessageCircleHeart } from 'lucide-react'
 
-type Variant = 'after-cases' | 'after-faq'
+type Variant = 'after-cases' | 'final'
 
 const copy: Record<
   Variant,
   { eyebrow: string; title: ReactNode; body: string; button: string }
 > = {
   'after-cases': {
-    eyebrow: '次の一歩',
+    eyebrow: '',
     title: (
       <>
-        事例のあとに残るのは、
-        <br className="sm:hidden" />
-        <span className="gradient-text">「自社ならどうする？」</span>です
+        <span className="gradient-text">あなたの業務でも実現できるか</span>
+        <br />
+        まずは相談してみませんか
       </>
     ),
     body:
-      '同じ業種でなくても大丈夫です。課題の型は似ています。無料相談で、優先して直す順番だけ一緒に決めましょう。',
-    button: '無料で相談してみる',
+      '同じ業種でなくても、課題の型は似ています。LINEで気軽にご相談ください。',
+    button: 'LINEで相談する',
   },
-  'after-faq': {
-    eyebrow: '最後のひと押し',
+  final: {
+    eyebrow: '',
     title: (
       <>
-        不安がひとつでも残っているなら、
+        気になったら、
         <br className="sm:hidden" />
-        <span className="gradient-text">その場で解消</span>できます
+        <span className="gradient-text">まずLINEから</span>
       </>
     ),
-    body: 'メールだけでも構いません。まずは現状を書き出すところから。相談したからといって必ず契約になるわけではありません。',
-    button: '無料相談に進む',
+    body: 'ご質問だけでも大丈夫です。',
+    button: 'LINEで相談する',
   },
 }
 
@@ -43,20 +43,31 @@ export default function ConsultationCTASection({ variant }: { variant: Variant }
     <section
       className="section-container"
       style={{
-        background:
-          'linear-gradient(180deg, var(--background-white) 0%, var(--primary-light) 35%, var(--accent-light) 100%)',
+        background: variant === 'after-cases'
+          ? 'linear-gradient(180deg, var(--background-light) 0%, var(--background-white) 100%)'
+          : 'var(--background-white)',
       }}
     >
-      <div className="mx-auto max-w-3xl rounded-[var(--radius-large)] border border-white/80 bg-white/90 p-8 text-center shadow-[var(--shadow-medium)] backdrop-blur-sm md:p-12">
-        <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[var(--primary-color)]">{c.eyebrow}</p>
-        <h2 className="section-heading mb-4 text-2xl md:text-3xl">{c.title}</h2>
-        <p className="mx-auto mb-8 max-w-xl text-[var(--text-gray)] leading-relaxed">{c.body}</p>
-        <a href="#contact" className="btn-primary-large group inline-flex items-center gap-2">
+      <div className={`mx-auto max-w-2xl text-center ${variant === 'after-cases' ? 'rounded-[var(--radius-large)] border border-[var(--border-light)] bg-white p-8 md:p-10 shadow-[var(--shadow-soft)]' : 'py-8'}`}>
+        {c.eyebrow && (
+          <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[var(--primary-color)]">{c.eyebrow}</p>
+        )}
+        <h2 className={`mb-4 font-bold leading-tight ${variant === 'after-cases' ? 'text-xl md:text-2xl' : 'text-lg md:text-xl'}`}>
+          {c.title}
+        </h2>
+        <p className={`mx-auto max-w-xl text-[var(--text-gray)] leading-relaxed ${variant === 'after-cases' ? 'mb-6' : 'mb-4 text-sm'}`}>
+          {c.body}
+        </p>
+        <a
+          href="https://line.me/ti/p/EZPuFuksS3"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`group inline-flex items-center gap-2 ${variant === 'after-cases' ? 'btn-primary-large' : 'btn-secondary px-6 py-3'}`}
+        >
           <MessageCircleHeart className="h-5 w-5" aria-hidden />
           {c.button}
           <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" aria-hidden />
         </a>
-        <p className="mt-6 text-sm text-[var(--text-light)]">無理な営業は一切ありません</p>
       </div>
     </section>
   )
