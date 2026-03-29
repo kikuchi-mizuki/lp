@@ -224,6 +224,13 @@ function parseExtendedRow(row: string[], index: number): CaseData | null {
   const target = row[2] || ''
   if (!title) return null
 
+  if (index === 0) {
+    console.log('DEBUG first row columns:')
+    console.log(`  row[13] (isFeatured): "${row[13]}"`)
+    console.log(`  row[14] (isPublished): "${row[14]}"`)
+    console.log(`  row[15] (sortOrder): "${row[15]}"`)
+  }
+
   const tags = parseTagsCell(row[12])
   const isPublished = parseBoolCell(row[14], true)
   const isFeatured = parseBoolCell(row[13], false)
@@ -256,6 +263,10 @@ export async function getCasesFromSheet(): Promise<CaseData[]> {
     const spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID
     const sheetName = process.env.GOOGLE_SHEET_NAME || 'Sheet1'
 
+    console.log('=== Google Sheets API Call Start ===')
+    console.log('Spreadsheet ID:', spreadsheetId ? `${spreadsheetId.substring(0, 10)}...` : 'NOT SET')
+    console.log('Sheet Name:', sheetName)
+
     if (!spreadsheetId || spreadsheetId.includes('your_spreadsheet_id')) {
       console.warn('GOOGLE_SPREADSHEET_ID not configured, returning sample data')
       return getSampleCases()
@@ -271,16 +282,27 @@ export async function getCasesFromSheet(): Promise<CaseData[]> {
     const range = `${sheetName}!A2:P100`
     console.log(`Fetching data from range: ${range}`)
 
-    const response = await sheets.spreadsheets.values.get({
+    const timeout = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Request timeout after 10s')), 10000)
+    })
+
+    const fetchData = sheets.spreadsheets.values.get({
       spreadsheetId,
       range,
     })
 
+    const response = await Promise.race([fetchData, timeout])
+
+    console.log('✅ Data fetched successfully')
+
     const rows = response.data.values
 
     if (!rows || rows.length === 0) {
+      console.log('No rows found in spreadsheet')
       return []
     }
+
+    console.log(`Found ${rows.length} rows`)
 
     const cases: CaseData[] = []
 
@@ -290,9 +312,20 @@ export async function getCasesFromSheet(): Promise<CaseData[]> {
       if (parsed) cases.push(parsed)
     })
 
-    return prepareCasesForDisplay(cases)
+    console.log(`Parsed ${cases.length} cases`)
+    console.log('Sample case data:', cases.slice(0, 2).map(c => ({
+      id: c.id,
+      title: c.title.substring(0, 30),
+      isPublished: c.isPublished,
+      isFeatured: c.isFeatured
+    })))
+
+    const displayCases = prepareCasesForDisplay(cases)
+    console.log(`After prepareCasesForDisplay: ${displayCases.length} cases`)
+
+    return displayCases
   } catch (error) {
-    console.error('Error fetching cases from Google Sheets:', error)
+    console.error('❌ Error fetching cases from Google Sheets:', error)
     console.warn('Returning sample data due to error')
     return getSampleCases()
   }
