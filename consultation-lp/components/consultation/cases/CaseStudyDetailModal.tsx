@@ -199,26 +199,6 @@ export default function CaseStudyDetailModal({ selectedCase, onClose }: Props) {
               </p>
             </section>
           )}
-
-          <div
-            className="rounded-[var(--radius-medium)] p-8 text-center text-white"
-            style={{
-              background: 'linear-gradient(135deg, var(--primary-color) 0%, var(--accent-color) 100%)',
-            }}
-          >
-            <p className="mb-2 text-xl font-bold">同じように、自社の優先順位を整理できます</p>
-            <p className="mb-6 text-sm opacity-95">
-              事例と近い課題かどうかは問いません。無料相談で現状を一緒に整理しましょう。
-            </p>
-            <a
-              href="#contact"
-              onClick={onClose}
-              className="inline-block rounded-[var(--radius-small)] bg-white px-10 py-4 text-base font-bold text-[var(--primary-color)] shadow-lg transition-transform hover:scale-[1.02]"
-            >
-              無料で相談する
-            </a>
-            <p className="mt-4 text-xs opacity-90">無理な営業は一切ありません</p>
-          </div>
         </div>
       </div>
     </div>
